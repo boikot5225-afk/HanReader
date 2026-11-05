@@ -1,0 +1,18 @@
+/.gradle/
+/.idea/
+/build/
+/app/build/
+local.properties
+*.iml
+*.apk
+*.aab
+
+# Signing keys are private
+*.jks
+*.keystore
+*.p12
+keystore.properties
+signing-secrets.txt
+
+# Shared debug key: test builds from any machine install over each other. Not a release key.
+!app/debug.keystore

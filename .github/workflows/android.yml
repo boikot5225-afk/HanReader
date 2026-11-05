@@ -1,0 +1,68 @@
+name: HanReader Android CI
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      # The hosted Ubuntu runner already includes Android command-line tools.
+      # setup-android@v3 tries to install obsolete SDK package "tools" and fails.
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -V | tail -n 1)"
+          fi
+          test -n "$SDKMANAGER" && test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Tests and debug APK
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hanreader-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      # A stable release is only built after GitHub Actions secrets are configured.
+      - name: Load private release key
+        shell: bash
+        env:
+          SIGNING_KEY_BASE64: ${{ secrets.HANREADER_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.HANREADER_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.HANREADER_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.HANREADER_KEY_PASSWORD }}
+        run: |
+          if [[ -n "$SIGNING_KEY_BASE64" && -n "$SIGNING_STORE_PASSWORD" && -n "$SIGNING_KEY_ALIAS" && -n "$SIGNING_KEY_PASSWORD" ]]; then
+            printf '%s' "$SIGNING_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/hanreader-release.p12"
+            chmod 600 "$RUNNER_TEMP/hanreader-release.p12"
+            echo "HANREADER_KEYSTORE_FILE=$RUNNER_TEMP/hanreader-release.p12" >> "$GITHUB_ENV"
+            echo "HANREADER_KEYSTORE_PASSWORD=$SIGNING_STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "HANREADER_KEY_ALIAS=$SIGNING_KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "HANREADER_KEY_PASSWORD=$SIGNING_KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "HANREADER_HAS_RELEASE_KEY=true" >> "$GITHUB_ENV"
+          else
+            echo "No release secrets: only the debug APK will be produced."
+          fi
+      - name: Build signed release APK
+        if: env.HANREADER_HAS_RELEASE_KEY == 'true'
+        run: gradle :app:assembleRelease --stacktrace
+      - name: Upload signed release APK
+        if: env.HANREADER_HAS_RELEASE_KEY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hanreader-signed-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
