@@ -20,6 +20,20 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+    // zh/lexicon.dat is gzip data: store it as is. (A ".gz" asset would be silently unpacked by the build.)
+    androidResources { noCompress += "dat" }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all { test ->
+            // Optional mirror for Robolectric's Android jars (set in ~/.gradle/gradle.properties).
+            providers.gradleProperty("robolectricRepoUrl").orNull?.let {
+                test.systemProperty("robolectric.dependency.repo.url", it)
+            }
+            providers.environmentVariable("HANREADER_TEST_EPUB").orNull?.let {
+                test.environment("HANREADER_TEST_EPUB", it)
+            }
+        }
+    }
     signingConfigs {
         // Shared, committed debug key so every test APK installs over the previous one.
         getByName("debug") {
@@ -61,7 +75,13 @@ dependencies {
     implementation("androidx.room:room-runtime:2.8.5")
     implementation("androidx.room:room-ktx:2.8.5")
     ksp("androidx.room:room-compiler:2.8.5")
+    implementation("org.jsoup:jsoup:1.18.1")
     testImplementation("junit:junit:4.13.2")
+    // Robolectric: run screens and the database on the JVM, without a device.
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core:1.6.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     // Real org.json for JVM unit tests (android.jar only has stubs).
     testImplementation("org.json:json:20240303")
 }

@@ -54,15 +54,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.hanreader.app.reader.LibraryScreen
+import com.hanreader.app.reader.ReaderScreen
+import com.hanreader.app.reader.ReaderViewModel
 import kotlinx.coroutines.delay
 
 private enum class Tab(val title: String) {
-    TODAY("Сегодня"),
-    WORDS("Словарь"),
+    READ("Читать"),
+    TODAY("Учить"),
+    WORDS("Слова"),
     IMPORT("Импорт")
 }
 
 private fun Tab.icon(): ImageVector = when (this) {
+    Tab.READ -> LexiconIcons.Library
     Tab.TODAY -> LexiconIcons.Sun
     Tab.WORDS -> LexiconIcons.Book
     Tab.IMPORT -> LexiconIcons.Download
@@ -76,8 +81,11 @@ private fun languageBadge(tag: String): String = when {
 }
 
 @Composable
-fun LexiconScreen(vm: LexiconViewModel = viewModel()) {
-    var tab by rememberSaveable { mutableStateOf(Tab.TODAY) }
+fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = viewModel()) {
+    var tab by rememberSaveable { mutableStateOf(Tab.READ) }
+    // An open book takes the whole screen, like a review session.
+    var reading by rememberSaveable { mutableStateOf<Long?>(null) }
+    LaunchedEffect(reading) { reading?.let { if (reader.open.value?.entity?.id != it) reader.openBook(it) } }
     // A running review session hides the navigation and takes the whole screen.
     var session by rememberSaveable { mutableStateOf<ReviewMode?>(null) }
     var wordFilter by rememberSaveable { mutableStateOf(WordFilter.ALL) }
@@ -113,7 +121,13 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel()) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
             val active = session
-            if (active != null) {
+            val book = reading
+            if (book != null) {
+                ReaderScreen(reader, onClose = {
+                    reading = null
+                    reader.closeBook()
+                })
+            } else if (active != null) {
                 BackHandler { session = null }
                 ReviewSession(
                     mode = active,
@@ -144,6 +158,7 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel()) {
                     bottomBar = { BottomNav(tab) { tab = it } }
                 ) { padding ->
                     when (tab) {
+                        Tab.READ -> LibraryScreen(reader, padding, onOpen = { reading = it })
                         Tab.TODAY -> TodayScreen(
                             cards = visibleCards,
                             settings = settings,

@@ -9,6 +9,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Load the Chinese dictionary in the background right away, so it is ready by the first tap.
+        com.hanreader.app.reader.ZhEngine.warmUp(this)
         setContent { LexiconTheme { LexiconScreen() } }
     }
 }

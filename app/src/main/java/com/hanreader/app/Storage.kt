@@ -71,6 +71,78 @@ data class CardExample(
     val exampleTranslation: String
 )
 
+/** An imported EPUB. The file lives in the app's private storage under books/[fileName]. */
+@Entity(tableName = "books")
+data class BookEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    val author: String,
+    val fileName: String,
+    val chapterCount: Int,
+    val addedAt: Long = System.currentTimeMillis(),
+    val lastOpenedAt: Long = 0,
+    /** Reading position: spine item and first visible block. */
+    val chapterIndex: Int = 0,
+    val blockIndex: Int = 0
+)
+
+/**
+ * Where a word was met: the sentence, the book and the chapter. One row per save from the reader.
+ * The book reference is plain data (no foreign key), so sources survive deleting the book.
+ */
+@Entity(
+    tableName = "word_sources",
+    foreignKeys = [
+        ForeignKey(
+            entity = WordCard::class,
+            parentColumns = ["id"],
+            childColumns = ["cardId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["cardId"]), Index(value = ["bookId"])]
+)
+data class WordSource(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val cardId: Long,
+    val bookId: Long,
+    val bookTitle: String,
+    val chapterIndex: Int,
+    val chapterTitle: String,
+    val sentence: String,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+/** A word saved from the reader, with its context. */
+data class ReaderSave(
+    val word: String,
+    val reading: String,
+    val translation: String,
+    val sentence: String,
+    val bookId: Long,
+    val bookTitle: String,
+    val chapterIndex: Int,
+    val chapterTitle: String
+)
+
+@Dao
+interface BookDao {
+    @Query("SELECT * FROM books ORDER BY CASE WHEN lastOpenedAt > 0 THEN lastOpenedAt ELSE addedAt END DESC")
+    fun observeAll(): Flow<List<BookEntity>>
+
+    @Query("SELECT * FROM books WHERE id = :id")
+    suspend fun get(id: Long): BookEntity?
+
+    @Insert
+    suspend fun insert(book: BookEntity): Long
+
+    @Query("UPDATE books SET chapterIndex = :chapter, blockIndex = :block, lastOpenedAt = :at WHERE id = :id")
+    suspend fun savePosition(id: Long, chapter: Int, block: Int, at: Long = System.currentTimeMillis())
+
+    @Query("DELETE FROM books WHERE id = :id")
+    suspend fun delete(id: Long)
+}
+
 data class ImportStats(
     val added: Int,
     val examplesAdded: Int,
@@ -202,6 +274,45 @@ interface CardDao {
         return true
     }
 
+    @Insert
+    suspend fun insertSource(row: WordSource): Long
+
+    @Query("SELECT COUNT(*) FROM word_sources WHERE bookId = :bookId")
+    fun observeSavedFromBook(bookId: Long): Flow<Int>
+
+    /**
+     * Save a word met while reading. An existing card (same word and translation) keeps its
+     * progress and gains the sentence as one more example; the source row records book and chapter.
+     * Returns true when a new card was created.
+     */
+    @Transaction
+    suspend fun saveFromReader(language: String, save: ReaderSave): Boolean {
+        val created = insertOne(
+            WordCard(
+                language = language,
+                word = save.word,
+                reading = save.reading,
+                translation = save.translation,
+                example = save.sentence,
+                exampleTranslation = ""
+            )
+        )
+        val cardId = if (created > 0) created else
+            findCardId(language, save.word, save.translation) ?: error("Не удалось найти уже существующее слово")
+        insertExample(CardExample(cardId = cardId, example = save.sentence, exampleTranslation = ""))
+        insertSource(
+            WordSource(
+                cardId = cardId,
+                bookId = save.bookId,
+                bookTitle = save.bookTitle,
+                chapterIndex = save.chapterIndex,
+                chapterTitle = save.chapterTitle,
+                sentence = save.sentence
+            )
+        )
+        return created > 0
+    }
+
     @Query("SELECT * FROM cards ORDER BY id")
     suspend fun allCards(): List<WordCard>
 
@@ -232,9 +343,16 @@ interface CardDao {
     suspend fun delete(id: Long)
 }
 
-@Database(entities = [WordCard::class, CardExample::class], version = 3, exportSchema = false)
+// Version 4 (HanReader): books and word_sources. HanReader uses its own database file,
+// so no database of version 3 exists under this name; Lexicon data arrives through backups.
+@Database(
+    entities = [WordCard::class, CardExample::class, BookEntity::class, WordSource::class],
+    version = 4,
+    exportSchema = false
+)
 abstract class LexiconDatabase : RoomDatabase() {
     abstract fun cardDao(): CardDao
+    abstract fun bookDao(): BookDao
 
     companion object {
         @Volatile private var instance: LexiconDatabase? = null
