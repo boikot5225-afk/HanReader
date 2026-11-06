@@ -113,6 +113,58 @@ data class WordSource(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+/**
+ * A word the reader treats as known: no pinyin in "unknown only" mode, not counted as new.
+ * [source] is "manual" (tapped «Знаю») or "hsk3:N" / "hsk2:N" (bulk-marked by level).
+ */
+@Entity(tableName = "known_words")
+data class KnownWord(
+    @PrimaryKey val word: String,
+    val source: String,
+    val addedAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface KnownWordDao {
+    @Query("SELECT word FROM known_words")
+    fun observeWords(): Flow<List<String>>
+
+    @Query("SELECT * FROM known_words ORDER BY word")
+    suspend fun all(): List<KnownWord>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun put(word: KnownWord)
+
+    /** Bulk marking never overrides a word the user marked by hand. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun putAllIfAbsent(words: List<KnownWord>): List<Long>
+
+    @Query("DELETE FROM known_words WHERE word = :word")
+    suspend fun remove(word: String)
+
+    @Query("DELETE FROM known_words WHERE source LIKE 'hsk%'")
+    suspend fun removeLevelMarks()
+
+    @Query("DELETE FROM known_words")
+    suspend fun removeAll()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putAll(words: List<KnownWord>)
+
+    /** Replace the HSK marks with words up to the chosen level; manual marks stay. */
+    @Transaction
+    suspend fun setLevelMarks(words: List<KnownWord>): Int {
+        removeLevelMarks()
+        return putAllIfAbsent(words).count { it > 0 }
+    }
+
+    @Transaction
+    suspend fun replaceAll(words: List<KnownWord>) {
+        removeAll()
+        putAll(words)
+    }
+}
+
 /** A word saved from the reader, with its context. */
 data class ReaderSave(
     val word: String,
@@ -343,16 +395,18 @@ interface CardDao {
     suspend fun delete(id: Long)
 }
 
-// Version 4 (HanReader): books and word_sources. HanReader uses its own database file,
+// Version 4 (HanReader 0.1.0): books and word_sources. HanReader uses its own database file,
 // so no database of version 3 exists under this name; Lexicon data arrives through backups.
+// Version 5 (0.2.0): known_words. Schemas are exported to app/schemas for migration checks.
 @Database(
-    entities = [WordCard::class, CardExample::class, BookEntity::class, WordSource::class],
-    version = 4,
-    exportSchema = false
+    entities = [WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class],
+    version = 5,
+    exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
     abstract fun cardDao(): CardDao
     abstract fun bookDao(): BookDao
+    abstract fun knownWordDao(): KnownWordDao
 
     companion object {
         @Volatile private var instance: LexiconDatabase? = null
@@ -396,11 +450,22 @@ abstract class LexiconDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `known_words` (`word` TEXT NOT NULL, `source` TEXT NOT NULL, " +
+                        "`addedAt` INTEGER NOT NULL, PRIMARY KEY(`word`))"
+                )
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5)
+
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext, LexiconDatabase::class.java, "hanreader.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                ).addMigrations(*MIGRATIONS).build().also { instance = it }
             }
     }
 }

@@ -14,8 +14,41 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
+enum class HskSystem(val title: String, val levels: List<Int>) {
+    HSK3("HSK 3.0", listOf(1, 2, 3, 4, 5, 6, 7)),
+    HSK2("HSK 2.0", listOf(1, 2, 3, 4, 5, 6));
+
+    fun levelTitle(level: Int): String = if (this == HSK3 && level == 7) "7–9" else level.toString()
+}
+
+/** HSK levels per word: new HSK 3.0 (1..6, 7 = 7–9) and old HSK 2.0 (1..6); 0 = not listed. */
+class HskLevels(private val levels: Map<String, Int>) {
+    fun hsk3(word: String): Int = (levels[word] ?: 0) shr 4
+    fun hsk2(word: String): Int = (levels[word] ?: 0) and 0xF
+
+    fun wordsUpTo(system: HskSystem, level: Int): List<String> = levels.keys.filter {
+        val l = if (system == HskSystem.HSK3) hsk3(it) else hsk2(it)
+        l in 1..level
+    }
+
+    companion object {
+        /** assets/zh/hsk.tsv: word \t hsk3Level \t hsk2Level. */
+        fun parse(lines: Sequence<String>): HskLevels {
+            val map = HashMap<String, Int>(16_000)
+            for (line in lines) {
+                val p = line.split('\t')
+                if (p.size < 3) continue
+                val n = p[1].toIntOrNull() ?: 0
+                val o = p[2].toIntOrNull() ?: 0
+                map[p[0]] = (n shl 4) or o
+            }
+            return HskLevels(map)
+        }
+    }
+}
+
 /** Dictionary + segmenter, loaded once per process in the background. */
-class ZhEngine(val dictionary: ZhDictionary, val loadMs: Long) {
+class ZhEngine(val dictionary: ZhDictionary, val loadMs: Long, val hsk: HskLevels = HskLevels(emptyMap())) {
     val segmenter = ZhSegmenter(dictionary)
 
     /** Word pinyin without spaces ("Zhōngguó"); for words without a CEDICT entry, built from characters. */
@@ -53,7 +86,8 @@ class ZhEngine(val dictionary: ZhDictionary, val loadMs: Long) {
                     runCatching {
                         val t = System.nanoTime()
                         val dict = app.assets.open("zh/lexicon.dat").use { ZhDictionary.load(it) }
-                        ZhEngine(dict, (System.nanoTime() - t) / 1_000_000)
+                        val hsk = app.assets.open("zh/hsk.tsv").bufferedReader().useLines { HskLevels.parse(it) }
+                        ZhEngine(dict, (System.nanoTime() - t) / 1_000_000, hsk)
                     }.onSuccess { d.complete(it) }.onFailure { d.completeExceptionally(it) }
                 }
                 return d
@@ -129,5 +163,27 @@ object ChapterBuilder {
             out = out.substring(from, (from + MAX_SENTENCE).coerceAtMost(out.length)).trim() + "…"
         }
         return out.trimStart('”', '’', '」', '』')
+    }
+}
+
+/** How much of a chapter the reader already knows, counted over word occurrences. */
+data class KnownCoverage(val total: Int, val known: Int, val unknownDistinct: Int) {
+    val percent: Int get() = if (total == 0) 0 else (known * 100 / total)
+
+    companion object {
+        fun of(chapter: ChapterContent, known: Set<String>): KnownCoverage {
+            var total = 0
+            var k = 0
+            val unknown = HashSet<String>()
+            for (b in chapter.blocks) {
+                if (b !is ReaderBlock.Text) continue
+                for (t in b.tokens) {
+                    if (t.kind != TokenKind.HAN) continue
+                    total++
+                    if (t.text in known) k++ else unknown += t.text
+                }
+            }
+            return KnownCoverage(total, k, unknown.size)
+        }
     }
 }

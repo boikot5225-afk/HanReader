@@ -1,0 +1,3 @@
+Default character readings and phrase readings: pypinyin 0.53.0 (pinyin_dict.json, phrases_dict.json)
+https://github.com/mozillazg/python-pinyin
+License: MIT, Copyright (c) 2016 mozillazg, 闲耘

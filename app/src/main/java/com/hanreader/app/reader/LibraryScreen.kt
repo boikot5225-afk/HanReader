@@ -15,7 +15,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +48,9 @@ import com.hanreader.app.WordFont
 @Composable
 fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) -> Unit) {
     val books by vm.library.collectAsState()
+    val known by vm.knownWords.collectAsState()
+    val levelMark by vm.levelMark.collectAsState()
+    var showLevel by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf<BookEntity?>(null) }
@@ -70,6 +76,9 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
     ) {
         item {
             Overline("Моя библиотека")
+        }
+        item {
+            KnownWordsPanel(known.size, levelMark, onChoose = { showLevel = true })
         }
         if (books.isEmpty()) {
             item {
@@ -105,6 +114,8 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
             }
         }
     }
+
+    if (showLevel) LevelDialog(vm, levelMark, onClose = { showLevel = false })
 
     confirmDelete?.let { book ->
         AlertDialog(
@@ -149,4 +160,69 @@ private fun BookRow(book: BookEntity, onOpen: () -> Unit, onDelete: () -> Unit) 
             }
         }
     }
+}
+
+@Composable
+private fun KnownWordsPanel(count: Int, mark: LevelMark, onChoose: () -> Unit) {
+    Panel(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(start = 20.dp, end = 12.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Знакомые слова: $count", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    if (mark.level == 0) "Отметь свой уровень — пиньинь останется только над новыми словами"
+                    else "Отмечено до ${mark.system.title} ${mark.system.levelTitle(mark.level)} и слова «Знаю»",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            TextButton(onClick = onChoose) { Text(if (mark.level == 0) "Уровень" else "Изменить") }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LevelDialog(vm: ReaderViewModel, current: LevelMark, onClose: () -> Unit) {
+    var system by remember { mutableStateOf(current.system) }
+    var level by remember { mutableStateOf(current.level) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = { if (!busy) onClose() },
+        title = { Text("Какие слова ты уже знаешь?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Все слова до выбранного уровня станут знакомыми. Слова, отмеченные вручную, не изменятся.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HskSystem.entries.forEach { s ->
+                        FilterChip(selected = system == s, onClick = {
+                            system = s
+                            if (level !in s.levels) level = s.levels.last()
+                        }, label = { Text(s.title) })
+                    }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = level == 0, onClick = { level = 0 }, label = { Text("Начинаю") })
+                    system.levels.forEach { l ->
+                        FilterChip(selected = level == l, onClick = { level = l }, label = { Text(system.levelTitle(l)) })
+                    }
+                }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !busy, onClick = {
+                busy = true
+                vm.setLevel(system, level) { r ->
+                    busy = false
+                    r.onSuccess { onClose() }.onFailure { error = it.message ?: "Не получилось" }
+                }
+            }) { Text(if (busy) "Сохраняю…" else "Готово") }
+        },
+        dismissButton = { TextButton(enabled = !busy, onClick = onClose) { Text("Отмена") } }
+    )
 }

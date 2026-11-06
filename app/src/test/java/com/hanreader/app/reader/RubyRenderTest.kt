@@ -35,6 +35,7 @@ class RubyRenderTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     private val engine = ZhEngine(ZhSegmenterTest.dict, 0)
+    private val knownSample = setOf("今天", "天气", "很", "好", "他", "去", "看书", "家", "不", "远", "走路", "只要", "十分钟")
 
     private fun block(text: String, heading: Boolean = false) = ReaderBlock.Text(
         text, heading,
@@ -70,7 +71,10 @@ class RubyRenderTest {
                 ) {
                     blocks.forEachIndexed { i, b ->
                         RubyParagraph(
-                            b, metrics, showPinyin = i != 3, saved = setOf("图书馆"),
+                            // Paragraph 2: "unknown only" mode; paragraph 3: pinyin off.
+                            b, metrics, showPinyin = i != 3,
+                            hidePinyinFor = if (i == 2) knownSample else null,
+                            saved = setOf("图书馆"),
                             selection = if (i == 2) sel..sel else null, colors = colors, onTap = {}
                         )
                     }

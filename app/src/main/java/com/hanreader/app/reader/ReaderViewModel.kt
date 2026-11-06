@@ -9,6 +9,8 @@ import android.util.LruCache
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hanreader.app.BookEntity
+import com.hanreader.app.KnownWord
+import com.hanreader.app.isLearned
 import com.hanreader.app.LexiconDatabase
 import com.hanreader.app.ReaderSave
 import com.hanreader.app.epub.EpubBook
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -26,6 +29,16 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 const val STUDY_LANGUAGE = "zh-CN"
+
+/** Which words get pinyin: all, only words not yet known, or none. */
+enum class PinyinMode(val title: String) {
+    ALL("Над всеми словами"),
+    UNKNOWN("Только над незнакомыми"),
+    OFF("Выключен")
+}
+
+/** The level the user marked as known in one tap; level 0 = none. */
+data class LevelMark(val system: HskSystem, val level: Int)
 
 /** An open book: the EPUB file, its row in the database and the chapter on screen. */
 data class OpenBook(
@@ -40,6 +53,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val db = LexiconDatabase.get(app)
     private val books = db.bookDao()
     private val cards = db.cardDao()
+    private val knownDao = db.knownWordDao()
+    private val prefs = app.getSharedPreferences("reader_settings", android.content.Context.MODE_PRIVATE)
     private val engineDeferred = ZhEngine.warmUp(app)
     private val booksDir = File(app.filesDir, "books").apply { mkdirs() }
     private val openMutex = Mutex()
@@ -50,10 +65,66 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     val library: StateFlow<List<BookEntity>> =
         books.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val studyCards = cards.observeByLanguage(STUDY_LANGUAGE)
+
     /** Words already in the user's cards, highlighted in the text. */
-    val savedWords: StateFlow<Set<String>> = cards.observeByLanguage(STUDY_LANGUAGE)
+    val savedWords: StateFlow<Set<String>> = studyCards
         .map { list -> list.mapTo(HashSet()) { it.word } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    /** Words marked «Знаю» by hand or by HSK level. */
+    val markedKnown: StateFlow<Set<String>> = knownDao.observeWords()
+        .map { it.toHashSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    /** Everything the reader treats as known: marked words plus cards learned in reviews (30+ days). */
+    val knownWords: StateFlow<Set<String>> = combine(knownDao.observeWords(), studyCards) { marked, list ->
+        HashSet<String>(marked.size + list.size).apply {
+            addAll(marked)
+            list.filter { it.isLearned() }.forEach { add(it.word) }
+        } as Set<String>
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    private val _pinyinMode = MutableStateFlow(
+        PinyinMode.entries.firstOrNull { it.name == prefs.getString("pinyin", null) } ?: PinyinMode.ALL
+    )
+    val pinyinMode: StateFlow<PinyinMode> = _pinyinMode.asStateFlow()
+
+    fun setPinyinMode(mode: PinyinMode) {
+        _pinyinMode.value = mode
+        prefs.edit().putString("pinyin", mode.name).apply()
+    }
+
+    private val _levelMark = MutableStateFlow(
+        LevelMark(
+            HskSystem.entries.firstOrNull { it.name == prefs.getString("hskSystem", null) } ?: HskSystem.HSK3,
+            prefs.getInt("hskLevel", 0)
+        )
+    )
+    val levelMark: StateFlow<LevelMark> = _levelMark.asStateFlow()
+
+    fun setKnown(word: String, known: Boolean) {
+        viewModelScope.launch {
+            if (known) knownDao.put(KnownWord(word, "manual")) else knownDao.remove(word)
+        }
+    }
+
+    /** Marks every word up to [level] of [system] as known (0 removes the level marks). Manual marks stay. */
+    fun setLevel(system: HskSystem, level: Int, onDone: (Result<Int>) -> Unit) {
+        viewModelScope.launch {
+            onDone(runCatching {
+                val engine = engineDeferred.await()
+                val words = withContext(Dispatchers.Default) {
+                    if (level == 0) emptyList() else engine.hsk.wordsUpTo(system, level)
+                }
+                val tag = (if (system == HskSystem.HSK3) "hsk3:" else "hsk2:") + level
+                val added = knownDao.setLevelMarks(words.map { KnownWord(it, tag) })
+                _levelMark.value = LevelMark(system, level)
+                prefs.edit().putString("hskSystem", system.name).putInt("hskLevel", level).apply()
+                added
+            })
+        }
+    }
 
     private val _open = MutableStateFlow<OpenBook?>(null)
     val open: StateFlow<OpenBook?> = _open.asStateFlow()

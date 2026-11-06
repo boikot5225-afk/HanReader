@@ -3,6 +3,7 @@ package com.hanreader.app
 import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
+import androidx.room.withTransaction
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -24,6 +25,7 @@ val languages = listOf(
 @OptIn(ExperimentalCoroutinesApi::class)
 class LexiconViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = LexiconDatabase.get(app).cardDao()
+    private val knownDao = LexiconDatabase.get(app).knownWordDao()
     private val selection = MutableStateFlow("zh-CN")
     private val settingsStore = LearningSettingsStore(app)
     private val preferences = MutableStateFlow(settingsStore.load("zh-CN"))
@@ -125,7 +127,8 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                     exportedAt = System.currentTimeMillis(),
                     cards = cards,
                     examples = dao.allExamples(),
-                    settings = languages.map { settingsStore.load(it.tag) }
+                    settings = languages.map { settingsStore.load(it.tag) },
+                    knownWords = knownDao.all()
                 )
                 val text = BackupFormat.encode(backup)
                 withContext(Dispatchers.IO) {
@@ -157,7 +160,11 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
     fun restoreBackup(backup: Backup, onDone: (Result<Unit>) -> Unit) {
         viewModelScope.launch {
             onDone(runCatching {
-                dao.replaceAll(backup.cards, backup.examples)
+                // One transaction: a failure leaves cards and known words exactly as before.
+                LexiconDatabase.get(getApplication()).withTransaction {
+                    dao.replaceAll(backup.cards, backup.examples)
+                    backup.knownWords?.let { knownDao.replaceAll(it) }
+                }
                 backup.settings
                     .filter { s -> languages.any { it.tag == s.language } }
                     .forEach { settingsStore.save(it) }

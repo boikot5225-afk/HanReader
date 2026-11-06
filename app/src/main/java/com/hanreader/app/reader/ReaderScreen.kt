@@ -25,6 +25,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -81,6 +83,9 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val open by vm.open.collectAsState()
     val saved by vm.savedWords.collectAsState()
     val engine by vm.engine.collectAsState()
+    val known by vm.knownWords.collectAsState()
+    val marked by vm.markedKnown.collectAsState()
+    val pinyinMode by vm.pinyinMode.collectAsState()
     val book = open ?: run {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
@@ -89,7 +94,6 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val speaker = remember(context) { Speaker(context) }
     DisposableEffect(speaker) { onDispose { speaker.close() } }
 
-    var showPinyin by rememberSaveable { mutableStateOf(true) }
     var fontStep by rememberSaveable { mutableStateOf(2) }
     var showToc by remember { mutableStateOf(false) }
     var selection by remember { mutableStateOf<Selection?>(null) }
@@ -133,10 +137,10 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         ReaderTopBar(
             title = chapter?.title ?: book.entity.title,
             subtitle = book.entity.title,
-            showPinyin = showPinyin,
+            pinyinMode = pinyinMode,
             onBack = onClose,
             onToc = { showToc = true },
-            onPinyin = { showPinyin = !showPinyin },
+            onPinyin = vm::setPinyinMode,
             onSmaller = { if (fontStep > 0) fontStep-- },
             onBigger = { if (fontStep < FONT_SIZES.lastIndex) fontStep++ }
         )
@@ -167,7 +171,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                             is ReaderBlock.Text -> RubyParagraph(
                                 block = block,
                                 metrics = metrics,
-                                showPinyin = showPinyin,
+                                showPinyin = pinyinMode != PinyinMode.OFF,
+                                hidePinyinFor = if (pinyinMode == PinyinMode.UNKNOWN) known else null,
                                 saved = saved,
                                 selection = selection?.takeIf { it.block == i }?.let { it.first..it.last },
                                 colors = colors,
@@ -179,6 +184,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                     item(key = "footer:${chapter.index}") {
                         ChapterFooter(
                             chapter = chapter,
+                            known = known,
                             count = book.epub.chapters.size,
                             engineMs = engine?.loadMs,
                             onPrev = { vm.goToChapter(chapter.index - 1) },
@@ -207,7 +213,10 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             block = block,
             engine = eng,
             saved = saved,
+            known = known,
+            marked = marked,
             speaker = speaker,
+            onKnown = vm::setKnown,
             onChange = { selection = it },
             onDismiss = { selection = null },
             onSave = { word, reading, translation, sentence, done ->
@@ -233,10 +242,10 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
 private fun ReaderTopBar(
     title: String,
     subtitle: String,
-    showPinyin: Boolean,
+    pinyinMode: PinyinMode,
     onBack: () -> Unit,
     onToc: () -> Unit,
-    onPinyin: () -> Unit,
+    onPinyin: (PinyinMode) -> Unit,
     onSmaller: () -> Unit,
     onBigger: () -> Unit
 ) {
@@ -256,26 +265,70 @@ private fun ReaderTopBar(
             )
         }
         IconButton(onClick = onToc) { Icon(LexiconIcons.ListBullets, contentDescription = "Оглавление") }
-        TextButton(onClick = onPinyin) {
-            Text(
-                "pīn",
-                color = if (showPinyin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = if (showPinyin) FontWeight.Bold else FontWeight.Normal
-            )
-        }
+        PinyinMenu(pinyinMode, onPinyin)
         TextButton(onClick = onSmaller) { Text("A−") }
         TextButton(onClick = onBigger) { Text("A+") }
     }
 }
 
 @Composable
-private fun ChapterFooter(chapter: ChapterContent, count: Int, engineMs: Long?, onPrev: () -> Unit, onNext: () -> Unit) {
+private fun PinyinMenu(mode: PinyinMode, onPick: (PinyinMode) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { open = true }) {
+            Text(
+                when (mode) {
+                    PinyinMode.ALL -> "pīn"
+                    PinyinMode.UNKNOWN -> "pīn·?"
+                    PinyinMode.OFF -> "pīn"
+                },
+                color = if (mode == PinyinMode.OFF) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
+                fontWeight = if (mode == PinyinMode.OFF) FontWeight.Normal else FontWeight.Bold
+            )
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            Text(
+                "Пиньинь",
+                Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            PinyinMode.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.title) },
+                    onClick = { open = false; onPick(option) },
+                    trailingIcon = {
+                        if (option == mode) Icon(LexiconIcons.Check, null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChapterFooter(
+    chapter: ChapterContent,
+    known: Set<String>,
+    count: Int,
+    engineMs: Long?,
+    onPrev: () -> Unit,
+    onNext: () -> Unit
+) {
+    val coverage = remember(chapter, known) { KnownCoverage.of(chapter, known) }
     Column(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = onPrev, enabled = chapter.index > 0) { Text("← Назад") }
             OutlinedButton(onClick = onNext, enabled = chapter.index < count - 1) { Text("Дальше →") }
         }
         Spacer(Modifier.height(12.dp))
+        if (coverage.total > 0) {
+            Text(
+                "Знакомо ${coverage.percent}% слов раздела · незнакомых разных слов: ${coverage.unknownDistinct}",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.height(4.dp))
+        }
         Text(
             "Раздел ${chapter.index + 1} из $count · ${chapter.chars} знаков · разбор ${chapter.parseMs} мс" +
                 (engineMs?.let { " · словарь $it мс" } ?: ""),
@@ -345,7 +398,10 @@ private fun WordSheet(
     block: ReaderBlock.Text,
     engine: ZhEngine,
     saved: Set<String>,
+    known: Set<String>,
+    marked: Set<String>,
     speaker: Speaker,
+    onKnown: (String, Boolean) -> Unit,
     onChange: (Selection) -> Unit,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String, (Result<Boolean>) -> Unit) -> Unit
@@ -434,6 +490,26 @@ private fun WordSheet(
                 Box(contentAlignment = Alignment.Center) {
                     Text(if (isSaved) "Добавить пример к карточке" else "Сохранить в карточки", style = MaterialTheme.typography.titleMedium)
                 }
+            }
+            val isMarked = word in marked
+            val learnedInCards = word in known && !isMarked
+            OutlinedButton(
+                onClick = { onKnown(word, !isMarked) },
+                enabled = !learnedInCards,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                if (isMarked) {
+                    Icon(LexiconIcons.Check, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+                }
+                Text(
+                    when {
+                        learnedInCards -> "Выучено в карточках"
+                        isMarked -> "Знаю · нажми, чтобы снять"
+                        else -> "Знаю это слово"
+                    },
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
             status?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             speaker.message.takeIf { it.isNotEmpty() }?.let { Text(it, color = MaterialTheme.colorScheme.error) }

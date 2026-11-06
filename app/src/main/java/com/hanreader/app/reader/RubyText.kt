@@ -67,9 +67,11 @@ private fun layout(
     metrics: RubyMetrics,
     heading: Boolean,
     showPinyin: Boolean,
+    hidePinyinFor: Set<String>?,
     gapPx: Float,
     lineGapPx: Float
 ): RubyLayout {
+    // The pinyin row is kept even above known words, so lines keep one rhythm.
     val pinH = if (showPinyin) metrics.pinyinHeight.toFloat() else 0f
     val hanH = metrics.han("汉", heading).size.height.toFloat()
     val lineH = pinH + hanH + lineGapPx
@@ -87,7 +89,8 @@ private fun layout(
             continue
         }
         val hanLayout = metrics.han(t.text, heading)
-        val pinLayout = if (showPinyin && t.pinyin.isNotEmpty()) metrics.pinyin(t.pinyin) else null
+        val wantPinyin = showPinyin && t.pinyin.isNotEmpty() && (hidePinyinFor == null || t.text !in hidePinyinFor)
+        val pinLayout = if (wantPinyin) metrics.pinyin(t.pinyin) else null
         val gap = if (showPinyin && t.kind == TokenKind.HAN) gapPx else 0f
         val w = maxOf(hanLayout.size.width.toFloat(), pinLayout?.size?.width?.toFloat() ?: 0f) + gap
         // Closing punctuation never starts a line: let it hang past the margin.
@@ -111,6 +114,8 @@ fun RubyParagraph(
     block: ReaderBlock.Text,
     metrics: RubyMetrics,
     showPinyin: Boolean,
+    /** Words that get no pinyin ("unknown only" mode); null shows pinyin over every word. */
+    hidePinyinFor: Set<String>?,
     saved: Set<String>,
     selection: IntRange?,
     colors: RubyColors,
@@ -122,8 +127,8 @@ fun RubyParagraph(
         val widthPx = constraints.maxWidth.toFloat()
         val gapPx = with(density) { colors.wordGap.toPx() }
         val lineGapPx = with(density) { colors.lineGap.toPx() }
-        val laid = remember(block, widthPx, metrics, showPinyin) {
-            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, gapPx, lineGapPx)
+        val laid = remember(block, widthPx, metrics, showPinyin, hidePinyinFor) {
+            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx)
         }
         val heightDp = with(density) { laid.height.toDp() }
         Canvas(
@@ -151,7 +156,7 @@ fun RubyParagraph(
                     )
                 }
                 val hanW = p.hanLayout.size.width
-                val inner = p.width - (if (p.pinyinLayout != null && t.kind == TokenKind.HAN) gapPx else 0f)
+                val inner = p.width - (if (showPinyin && t.kind == TokenKind.HAN) gapPx else 0f)
                 p.pinyinLayout?.let { pl ->
                     drawText(
                         pl,

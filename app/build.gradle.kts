@@ -11,8 +11,8 @@ android {
         applicationId = "com.hanreader.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -85,3 +85,6 @@ dependencies {
     // Real org.json for JVM unit tests (android.jar only has stubs).
     testImplementation("org.json:json:20240303")
 }
+
+// Room writes each database version's schema here; keep them committed to check migrations.
+ksp { arg("room.schemaLocation", "$projectDir/schemas") }

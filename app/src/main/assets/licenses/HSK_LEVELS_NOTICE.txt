@@ -1,0 +1,3 @@
+HSK levels (zh/hsk.tsv): Complete HSK Vocabulary, commit 7ac65bf1a6387d35f1ade478906172a19311c7f9
+https://github.com/drkameleon/complete-hsk-vocabulary
+License: MIT, Copyright (c) 2026 Yanis Zafirópulos

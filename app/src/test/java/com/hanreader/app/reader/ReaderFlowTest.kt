@@ -112,4 +112,28 @@ class ReaderFlowTest {
         assertEquals(false, saved!!.getOrThrow())
         assertEquals(1, runBlocking { dao.allCards() }.count { it.word == "终于" })
     }
+
+    @Test
+    fun levelMarksAndManualMarks() {
+        val vm = ReaderViewModel(app)
+        val dao = LexiconDatabase.get(app).knownWordDao()
+        var r: Result<Int>? = null
+        vm.setLevel(HskSystem.HSK3, 1) { r = it }
+        waitFor(60_000) { r != null }
+        assertEquals(506, r!!.getOrThrow())
+        assertTrue(runBlocking { dao.all() }.any { it.word == "我" && it.source == "hsk3:1" })
+
+        vm.setKnown("终于", true)
+        waitFor { runBlocking { dao.all() }.any { it.word == "终于" } }
+
+        // Clearing the level removes only the level marks.
+        r = null
+        vm.setLevel(HskSystem.HSK3, 0) { r = it }
+        waitFor { r != null }
+        assertEquals(listOf("终于"), runBlocking { dao.all() }.map { it.word })
+        assertEquals(LevelMark(HskSystem.HSK3, 0), vm.levelMark.value)
+
+        vm.setKnown("终于", false)
+        waitFor { runBlocking { dao.all() }.isEmpty() }
+    }
 }

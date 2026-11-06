@@ -13,7 +13,8 @@ Android-приложение для чтения китайских книг и 
 | EPUB | `epub/EpubBook.kt`: container.xml → OPF → spine, оглавление из EPUB3 nav или NCX, глава → абзацы / заголовки / картинки (Jsoup) |
 | Словарь | `assets/zh/lexicon.dat`: 121 тыс. статей CC-CEDICT + 69 тыс. слов Jieba для сегментации, загружается в фоне при запуске |
 | Сегментация | `zh/ZhSegmenter.kt`: модель Jieba без HMM — граф слов словаря + динамическое программирование по частотам |
-| Пиньинь | из CC-CEDICT для слова целиком, иначе по иероглифам |
+| Пиньинь | основное чтение слова или иероглифа из pypinyin, иначе из CC-CEDICT; три режима: над всеми, только над незнакомыми, выключен |
+| Знакомые слова | таблица `known_words`: «Знаю» в карточке слова и отметка всех слов до уровня HSK 3.0 / 2.0; выученные карточки (30+ дней) тоже считаются знакомыми; в конце раздела — доля знакомых слов |
 | Отображение | `reader/RubyText.kt`: абзац рисуется на Canvas, пиньинь над словами, касание определяется по координатам; `LazyColumn` собирает только видимые абзацы |
 | Слово → карточка | `CardDao.saveFromReader`: новая карточка или новый пример к существующей, источник (книга, глава, предложение) в таблице `word_sources` |
 
@@ -24,7 +25,7 @@ Android-приложение для чтения китайских книг и 
 
 - Перевод слов английский (CC-CEDICT). Русский перевод — следующий шаг (ИИ или русский словарь).
 - Оформление издателя (шрифты, таблицы, CSS) упрощается; режим страниц не сделан — только прокрутка.
-- Слова отмечаются только как «сохранённые»; отметки «знаю» пока нет.
+- Чтение многозначного иероглифа, стоящего отдельно, не зависит от контекста (地 всегда dì).
 - Сегментация: 14 из 17 регрессионных случаев Reader AI (`app/src/test/resources/zh_lexical_regressions.json`).
   Неверные границы можно поправить вручную в карточке слова (кнопки «← +», «−», «+ →»).
 
@@ -41,10 +42,16 @@ JDK 17, Gradle 8.13+, Android SDK 36.
 Отладочные APK подписаны общим ключом `app/debug.keystore`, поэтому ставятся поверх друг друга.
 Релизная подпись — см. [SIGNING.md](SIGNING.md).
 
-Словарь пересобирается так: `python3 tools/build_zh_dict.py zh_dict_core.json zh_vocab_frequency.txt.gz jieba/dict.txt app/src/main/assets/zh/lexicon.dat`.
+Данные пересобираются так:
+`python3 tools/build_zh_dict.py zh_dict_core.json zh_vocab_frequency.txt.gz jieba/dict.txt pypinyin/ app/src/main/assets/zh/lexicon.dat`
+и `python3 tools/build_hsk.py complete.min.json app/src/main/assets/zh/hsk.tsv`.
+
+Схемы базы каждой версии лежат в `app/schemas`; `MigrationTest` поднимает базу 0.1.0 и проверяет переход на текущую версию.
 
 ## Лицензии данных
 
 - CC-CEDICT — CC BY-SA 4.0 (MDBG), `assets/licenses/CC-CEDICT_NOTICE.txt`
 - Частотный список HSK — MIT, `assets/licenses/HSK_FREQUENCY_NOTICE.txt`
 - Словарь Jieba 0.42.1 — MIT
+- Чтения pypinyin 0.53.0 — MIT
+- Уровни HSK (Complete HSK Vocabulary) — MIT

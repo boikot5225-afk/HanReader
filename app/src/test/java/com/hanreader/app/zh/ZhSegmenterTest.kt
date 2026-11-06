@@ -41,6 +41,16 @@ class ZhSegmenterTest {
         assertEquals(listOf("他", "终于", "回来", "了"), words("他终于回来了"))
     }
 
+    /** Polyphonic characters use their common reading, phrases their contextual one. */
+    @Test
+    fun commonReadings() {
+        val expected = mapOf(
+            "离" to "lí", "还" to "hái", "都" to "dōu", "只" to "zhǐ", "要" to "yào",
+            "银行" to "yín háng", "长大" to "zhǎng dà", "觉得" to "jué de", "便宜" to "pián yi", "中国" to "Zhōng guó"
+        )
+        expected.forEach { (word, reading) -> assertEquals(word, reading, dict.lookup(word)!!.pinyin) }
+    }
+
     /** Regression cases carried over from Reader AI (data/zh_lexical_regressions.json). */
     @Test
     fun readerAiRegressions() {
