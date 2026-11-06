@@ -93,4 +93,13 @@ class KnownWordsTest {
         assertEquals("наконец; в конце концов", engine.cardTranslation("终于"))
         assertEquals(null, engine.russianSource("图书馆"))
     }
+
+    @Test
+    fun equivalentLevelsBySize() {
+        assertEquals(2, HskLevels.equivalent(HskSystem.HSK2, 4))
+        assertEquals(1, HskLevels.equivalent(HskSystem.HSK2, 1))
+        assertEquals(4, HskLevels.equivalent(HskSystem.HSK3, 2))
+        assertEquals(1, hsk.hsk3("事"))
+        assertTrue("事" in hsk.wordsUpTo(HskSystem.HSK3, HskLevels.equivalent(HskSystem.HSK2, 4)))
+    }
 }

@@ -177,7 +177,9 @@ fun RubyParagraph(
     highlight: IntRange? = null,
     /** Words to underline in red (not known yet) and in blue (recommended); null: no marks. */
     unknownMarks: Set<String>? = null,
-    recommendedMarks: Set<String>? = null
+    recommendedMarks: Set<String>? = null,
+    /** Token indices never marked (characters of a name). */
+    noMarks: Set<Int> = emptySet()
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val density = LocalDensity.current
@@ -250,6 +252,7 @@ fun RubyParagraph(
                 val lineColor = when {
                     t.kind != TokenKind.HAN -> null
                     isSaved -> colors.saved
+                    p.token in noMarks -> null
                     recommendedMarks != null && t.text in recommendedMarks -> colors.recommendedLine
                     unknownMarks != null && t.text in unknownMarks -> colors.unknownLine
                     else -> null

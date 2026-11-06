@@ -33,6 +33,16 @@ class HskLevels(private val levels: Map<String, Int>) {
     }
 
     companion object {
+        /**
+         * The level of the other HSK system with about the same vocabulary size.
+         * HSK 2.0 levels hold 150/300/600/1,200/2,500/5,000 words in total; HSK 3.0 levels
+         * 506/1,256/2,209/3,181/4,240/5,363/~11,000.
+         */
+        fun equivalent(from: HskSystem, level: Int): Int = when (from) {
+            HskSystem.HSK2 -> intArrayOf(0, 1, 1, 1, 2, 3, 5)[level.coerceIn(0, 6)]
+            HskSystem.HSK3 -> intArrayOf(0, 2, 4, 4, 5, 5, 6, 6)[level.coerceIn(0, 7)]
+        }
+
         /** assets/zh/hsk.tsv: word \t hsk3Level \t hsk2Level. */
         fun parse(lines: Sequence<String>): HskLevels {
             val map = HashMap<String, Int>(16_000)

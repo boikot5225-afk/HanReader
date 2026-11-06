@@ -121,6 +121,16 @@ class ReaderFlowTest {
         vm.setLevel(HskSystem.HSK3, 1) { r = it }
         waitFor(60_000) { r != null }
         assertTrue(r!!.getOrThrow() > 500)
+
+        // HSK 2.0 level 4 also counts HSK 3.0 levels 1-2: 事 is not in the old lists but obviously known.
+        r = null
+        vm.setLevel(HskSystem.HSK2, 4) { r = it }
+        waitFor(60_000) { r != null }
+        val words = runBlocking { dao.all() }.map { it.word }.toSet()
+        assertTrue("事" in words && "说" in words && "他们" in words)
+        r = null
+        vm.setLevel(HskSystem.HSK3, 1) { r = it }
+        waitFor(60_000) { r != null }
         assertTrue(runBlocking { dao.all() }.any { it.word == "我" && it.source == "hsk3:1" })
 
         vm.setKnown("终于", true)

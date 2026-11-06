@@ -120,7 +120,11 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 val engine = engineDeferred.await()
                 val words = withContext(Dispatchers.Default) {
                     if (level == 0) emptyList() else {
+                        // Both lists: HSK 2.0 leaves out words HSK 3.0 has at low levels (事, 那些) and the
+                        // other way round, so the same vocabulary size of the other system counts too.
                         val listed = engine.hsk.wordsUpTo(system, level).toHashSet()
+                        val other = if (system == HskSystem.HSK2) HskSystem.HSK3 else HskSystem.HSK2
+                        listed += engine.hsk.wordsUpTo(other, HskLevels.equivalent(system, level))
                         listed + KnownExpansion.expand(listed, engine.dictionary)
                     }
                 }
@@ -151,8 +155,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     companion object {
-        /** 2: official HSK 2.0 lists, erhua forms, derived words (他们, 那些, 没有). */
-        const val HSK_DATA_VERSION = 2
+        /** 2: official HSK 2.0 lists, erhua forms, derived words; 3: the other system's words of the same size. */
+        const val HSK_DATA_VERSION = 3
 
         /** Saved block index meaning "the end of the chapter". */
         const val END_OF_CHAPTER = Int.MAX_VALUE / 2

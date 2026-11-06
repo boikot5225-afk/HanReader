@@ -203,6 +203,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onTap = { t -> selection = Selection(i, t, t); chrome = false; highlight = null },
             lines = lines,
             unknownMarks = if (appearance.markUnknown) unknownSet else null,
+            noMarks = remember(block, names, engine) { engine?.let { VocabularyStats.nameTokens(block, names, it) } ?: emptySet() },
             recommendedMarks = if (appearance.markRecommended) recommendedSet else null,
             highlight = highlight?.takeIf { it.chapter == chapter?.index && it.block == i }?.let { h ->
                 val first = block.tokens.indexOfFirst { it.end > h.start }

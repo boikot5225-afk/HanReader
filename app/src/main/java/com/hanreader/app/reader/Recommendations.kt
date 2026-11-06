@@ -19,7 +19,7 @@ object Recommendations {
      */
     fun level(mark: LevelMark, known: KnownMatcher, hsk: HskLevels): ReaderLevel {
         if (mark.level > 0) {
-            val l = if (mark.system == HskSystem.HSK3) mark.level else HSK2_TO_3[mark.level.coerceIn(1, 6)]
+            val l = if (mark.system == HskSystem.HSK3) mark.level else HskLevels.equivalent(HskSystem.HSK2, mark.level)
             return ReaderLevel(l, auto = false)
         }
         var level = 1
@@ -99,7 +99,4 @@ object Recommendations {
     }
 
     private const val AUTO_SHARE = 0.8
-
-    /** HSK 2.0 level → HSK 3.0 level of about the same vocabulary size (300/600/1,200/2,500/5,000 words). */
-    private val HSK2_TO_3 = intArrayOf(0, 1, 1, 1, 2, 3, 5)
 }
