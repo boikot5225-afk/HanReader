@@ -172,7 +172,9 @@ fun RubyParagraph(
     onTap: (Int) -> Unit,
     modifier: Modifier = Modifier,
     /** Only these lines (page mode: a paragraph split across pages); null draws the whole paragraph. */
-    lines: IntRange? = null
+    lines: IntRange? = null,
+    /** Tokens to mark as a search match. */
+    highlight: IntRange? = null
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val density = LocalDensity.current
@@ -211,6 +213,14 @@ fun RubyParagraph(
                 if (lines != null && laid.lineOf(p) !in shown) continue
                 val t = block.tokens[p.token]
                 val selected = selection != null && p.token in selection
+                if (highlight != null && p.token in highlight && !selected) {
+                    drawRoundRect(
+                        colors.saved.copy(alpha = 0.28f),
+                        topLeft = Offset(p.x - pad, p.lineTop),
+                        size = Size(p.width + pad, laid.hanTop + laid.hanHeight),
+                        cornerRadius = CornerRadius(6f, 6f)
+                    )
+                }
                 val isSaved = t.kind == TokenKind.HAN && t.text in saved
                 if (selected) {
                     drawRoundRect(

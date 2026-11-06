@@ -42,6 +42,8 @@ object LexiconIcons {
 
     val Close by lazy { line("close", "M18 6L6 18M6 6L18 18") }
     val Back by lazy { line("back", "M15 5L8 12L15 19") }
+    val BookmarkLine by lazy { line("bookmark", "M6.5 4H17.5V20L12 16L6.5 20Z") }
+    val BookmarkFilled by lazy { solid("bookmark_filled", "M6 3.5H18V21L12 16.6L6 21Z") }
     val ListBullets by lazy { line("list", "M9 6H20M9 12H20M9 18H20M4.5 6H5M4.5 12H5M4.5 18H5") }
     val Library by lazy { line("library", "M5 4V20M10 4V20M14.5 5L19 19.5M3 20H21") }
     val ChevronDown by lazy { line("chevron_down", "M6 9L12 15L18 9") }

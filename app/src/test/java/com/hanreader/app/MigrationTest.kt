@@ -4,6 +4,7 @@ import android.app.Application
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -85,10 +86,14 @@ class MigrationTest {
             db.bookDao().setIgnored(7, "终于", true)
             db.bookDao().saveAnalysis(7, listOf(BookWord(7, "终于", 4, 5)), 11)
             assertEquals(listOf("终于"), db.bookDao().ignoredWords(7)) // ignore marks survive re-analysis
+            // v7: bookmarks, removed with their book
+            db.bookmarkDao().insert(Bookmark(bookId = 7, chapterIndex = 5, blockIndex = 12, chapterTitle = "第五章", snippet = "他终于回来了"))
+            assertEquals(1, db.bookmarkDao().observe(7).first().size)
             db.bookDao().delete(7)
+            assertEquals(0, db.bookmarkDao().observe(7).first().size)
             assertEquals(emptyList<String>(), db.bookDao().ignoredWords(7)) // cascade
         }
-        assertEquals(6, db.openHelper.readableDatabase.version)
+        assertEquals(7, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

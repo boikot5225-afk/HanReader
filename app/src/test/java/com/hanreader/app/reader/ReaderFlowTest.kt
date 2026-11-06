@@ -163,4 +163,39 @@ class ReaderFlowTest {
         val card = runBlocking { cardDao.allCards() }.single { it.word == "打电话" }
         assertEquals("晚上他给妈妈打电话。", card.example)
     }
+
+    @Test
+    fun bookmarksAndSearchInTheBook() {
+        val vm = ReaderViewModel(app)
+        var imported: Result<Long>? = null
+        vm.importBook(Uri.fromFile(sampleBook())) { imported = it }
+        waitFor { imported != null }
+        val bookId = imported!!.getOrThrow()
+        vm.openBook(bookId)
+        waitFor(60_000) { vm.open.value?.chapter != null }
+        val chapter = vm.open.value!!.chapter!!
+
+        vm.addBookmark(chapter, 2)
+        val dao = LexiconDatabase.get(app).bookmarkDao()
+        waitFor { runBlocking { dao.observe(bookId).first() }.isNotEmpty() }
+        val b = runBlocking { dao.observe(bookId).first() }.single()
+        assertEquals(0, b.chapterIndex)
+        assertEquals(2, b.blockIndex)
+        assertTrue(b.snippet.startsWith("今天天气很好"))
+
+        vm.search("图书馆")
+        waitFor(60_000) { vm.search.value.query == "图书馆" && !vm.search.value.running }
+        assertEquals(3, vm.search.value.hits.size)
+        assertTrue(vm.search.value.hits.all { it.chapter == 0 })
+        vm.search("dianhua")
+        waitFor(60_000) { vm.search.value.query == "dianhua" && !vm.search.value.running }
+        assertTrue(vm.search.value.hits.any { it.chapter == 1 })
+
+        // Jump to a paragraph of another chapter: the position is saved there.
+        vm.goToChapter(1, block = 1)
+        waitFor(60_000) { vm.open.value?.chapter?.index == 1 && vm.open.value?.entity?.blockIndex == 1 }
+
+        vm.removeBookmark(b.id)
+        waitFor { runBlocking { dao.observe(bookId).first() }.isEmpty() }
+    }
 }

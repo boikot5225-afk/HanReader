@@ -89,6 +89,36 @@ data class BookEntity(
     val analyzedTokens: Int = 0
 )
 
+/** A bookmark: a paragraph of a chapter, with the start of its text to recognise it. */
+@Entity(
+    tableName = "bookmarks",
+    foreignKeys = [
+        ForeignKey(entity = BookEntity::class, parentColumns = ["id"], childColumns = ["bookId"], onDelete = ForeignKey.CASCADE)
+    ],
+    indices = [Index(value = ["bookId"])]
+)
+data class Bookmark(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val bookId: Long,
+    val chapterIndex: Int,
+    val blockIndex: Int,
+    val chapterTitle: String,
+    val snippet: String,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface BookmarkDao {
+    @Query("SELECT * FROM bookmarks WHERE bookId = :bookId ORDER BY chapterIndex, blockIndex")
+    fun observe(bookId: Long): Flow<List<Bookmark>>
+
+    @Insert
+    suspend fun insert(b: Bookmark): Long
+
+    @Query("DELETE FROM bookmarks WHERE id = :id")
+    suspend fun delete(id: Long)
+}
+
 /** How often a word occurs in a book, from the one-time book analysis. */
 @Entity(
     tableName = "book_words",
@@ -455,17 +485,20 @@ interface CardDao {
 // so no database of version 3 exists under this name; Lexicon data arrives through backups.
 // Version 5 (0.2.0): known_words. Schemas are exported to app/schemas for migration checks.
 // Version 6 (0.3.0): book_words and books.analyzedTokens (book vocabulary analysis).
+// Version 7 (0.7.0): bookmarks.
 @Database(
     entities = [
-        WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class
+        WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
+        Bookmark::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
     abstract fun cardDao(): CardDao
     abstract fun bookDao(): BookDao
     abstract fun knownWordDao(): KnownWordDao
+    abstract fun bookmarkDao(): BookmarkDao
 
     companion object {
         @Volatile private var instance: LexiconDatabase? = null
@@ -531,7 +564,20 @@ abstract class LexiconDatabase : RoomDatabase() {
             "`ignored` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`bookId`, `word`), " +
             "FOREIGN KEY(`bookId`) REFERENCES `books`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6)
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(BOOKMARKS_SQL)
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bookmarks_bookId` ON `bookmarks` (`bookId`)")
+            }
+        }
+
+        // Copied from app/schemas/.../7.json; MigrationTest checks it against the entity.
+        private const val BOOKMARKS_SQL = "CREATE TABLE IF NOT EXISTS `bookmarks` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+            "`bookId` INTEGER NOT NULL, `chapterIndex` INTEGER NOT NULL, `blockIndex` INTEGER NOT NULL, " +
+            "`chapterTitle` TEXT NOT NULL, `snippet` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, " +
+            "FOREIGN KEY(`bookId`) REFERENCES `books`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {

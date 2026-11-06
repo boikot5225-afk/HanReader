@@ -220,12 +220,12 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** [atEnd]: open on the last page (turning back from the next chapter). */
-    fun goToChapter(index: Int, atEnd: Boolean = false) {
-        viewModelScope.launch { openMutex.withLock { loadChapterLocked(index, atEnd) } }
+    /** [atEnd]: open on the last page (turning back from the next chapter); [block]: open at that paragraph. */
+    fun goToChapter(index: Int, atEnd: Boolean = false, block: Int? = null) {
+        viewModelScope.launch { openMutex.withLock { loadChapterLocked(index, atEnd, block) } }
     }
 
-    private suspend fun loadChapterLocked(index: Int, atEnd: Boolean = false) {
+    private suspend fun loadChapterLocked(index: Int, atEnd: Boolean = false, block: Int? = null) {
         val current = _open.value ?: return
         if (index !in current.epub.chapters.indices) return
         _open.value = current.copy(loading = true, error = null)
@@ -238,8 +238,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             onSuccess = { now.copy(chapter = it, loading = false) },
             onFailure = { now.copy(loading = false, error = "Глава не открылась: ${it.message}") }
         )
-        if (result.isSuccess && (index != now.entity.chapterIndex || atEnd)) {
-            savePosition(index, if (atEnd) END_OF_CHAPTER else 0)
+        if (result.isSuccess && (index != now.entity.chapterIndex || atEnd || block != null)) {
+            savePosition(index, block ?: if (atEnd) END_OF_CHAPTER else 0)
         }
     }
 
@@ -272,6 +272,61 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, o)
             if (o.outWidth > 0) o.outHeight.toFloat() / o.outWidth else null
         }?.also { aspects[path] = it }
+    }
+
+    // ---- Bookmarks ----
+
+    private val bookmarkDao = db.bookmarkDao()
+
+    fun bookmarks(bookId: Long) = bookmarkDao.observe(bookId)
+
+    fun addBookmark(chapter: ChapterContent, block: Int) {
+        val o = _open.value ?: return
+        val text = (chapter.blocks.getOrNull(block) as? ReaderBlock.Text)?.text
+            ?: chapter.blocks.drop(block).filterIsInstance<ReaderBlock.Text>().firstOrNull()?.text.orEmpty()
+        viewModelScope.launch {
+            bookmarkDao.insert(
+                com.hanreader.app.Bookmark(
+                    bookId = o.entity.id, chapterIndex = chapter.index, blockIndex = block,
+                    chapterTitle = chapter.title, snippet = text.replace('\n', ' ').take(60)
+                )
+            )
+        }
+    }
+
+    fun removeBookmark(id: Long) {
+        viewModelScope.launch { bookmarkDao.delete(id) }
+    }
+
+    // ---- Search in the book ----
+
+    data class SearchState(
+        val query: String = "",
+        val hits: List<SearchHit> = emptyList(),
+        val running: Boolean = false,
+        val progress: Float = 0f
+    )
+
+    private val _search = MutableStateFlow(SearchState())
+    val search: StateFlow<SearchState> = _search.asStateFlow()
+    private var searchJob: kotlinx.coroutines.Job? = null
+
+    fun search(query: String) {
+        searchJob?.cancel()
+        val q = query.trim()
+        if (q.isEmpty()) { _search.value = SearchState(); return }
+        val epub = _open.value?.epub ?: return
+        _search.value = SearchState(q, emptyList(), running = true)
+        searchJob = viewModelScope.launch {
+            val engine = engineDeferred.await()
+            val found = ArrayList<SearchHit>()
+            withContext(Dispatchers.Default) {
+                BookSearch.search(epub, q, engine, onProgress = { done, total ->
+                    _search.value = SearchState(q, found.toList(), running = true, progress = done.toFloat() / total)
+                }) { hit -> found += hit }
+            }
+            _search.value = SearchState(q, found.toList(), running = false, progress = 1f)
+        }
     }
 
     // ---- Reading speed (Han characters per minute), for "≈ N min left" ----
