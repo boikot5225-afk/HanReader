@@ -1088,7 +1088,9 @@ private fun WordSheet(
     // A combination the dictionary lacks: its dictionary words (革命 + 党), else its characters.
     val composed = remember(word) { if (entry == null) engine.compose(word) else null }
     val chars = remember(word) { if (entry == null) composed ?: engine.characters(word) else emptyList() }
-    val reading = entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
+    // One token: its reading in context (慢慢地 de, not the dictionary's dì).
+    val reading = if (selection.first == selection.last && first.pinyin.isNotEmpty() && first.text.length == 1) first.pinyin
+        else entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
     val russian = remember(word) { engine.russianSenses(word) }
     val translation = engine.cardTranslation(word)
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }

@@ -333,16 +333,19 @@ object ChapterBuilder {
                         ScriptMode.SIMPLIFIED -> simple
                         ScriptMode.TRADITIONAL -> if (traditional) b.text else engine.script.toTraditional(simple)
                     }.takeIf { it.length == simple.length } ?: simple
-                    val tokens = engine.segmenter.segment(simple, extra).map { tok ->
+                    val segmented = engine.segmenter.segment(simple, extra)
+                    val tokens = segmented.mapIndexed { k, tok ->
+                        // A standalone polyphone reads as its neighbours say (慢慢地 de, 很长 cháng).
+                        val contextual = com.hanreader.app.zh.Polyphones.reading(segmented, k)
                         RToken(
                             text = tok.text,
-                            pinyin = engine.pinyinOf(tok),
+                            pinyin = contextual ?: engine.pinyinOf(tok),
                             kind = tok.kind,
                             start = tok.start,
                             end = tok.end,
                             defined = tok.entry?.hasDefinition == true,
                             display = if (shown === simple) tok.text else shown.substring(tok.start, tok.end),
-                            syllables = engine.syllablesOf(tok)
+                            syllables = contextual?.let { listOf(it) } ?: engine.syllablesOf(tok)
                         )
                     }
                     ReaderBlock.Text(simple, b.heading, tokens, shown)
