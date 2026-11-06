@@ -533,7 +533,7 @@ private fun RunningFooter(left: String, right: String) {
 
 /** Page mode: the chapter split into screens, turned by swipe, side taps or the volume keys. */
 @Composable
-private fun PagedChapter(
+internal fun PagedChapter(
     vm: ReaderViewModel,
     book: OpenBook,
     chapter: ChapterContent,
@@ -576,10 +576,13 @@ private fun PagedChapter(
             indent = colors.indent,
             glossFor = glossFor
         )
-        val pages by produceState<List<Page>?>(null, chapter, pageSpec, metrics) {
-            value = Paginator.paginate(chapter, metrics, pageSpec) { vm.imageAspect(it) }
+        // The pages remember which chapter they were made for: produceState keeps its last value
+        // while the next one is computed, and pages of another chapter must never be drawn with
+        // this chapter's paragraphs (that crashed: a page item pointing at an image found text).
+        val pages by produceState<Pair<ChapterContent, List<Page>>?>(null, chapter, pageSpec, metrics) {
+            value = chapter to Paginator.paginate(chapter, metrics, pageSpec) { vm.imageAspect(it) }
         }
-        val list = pages
+        val list = pages?.takeIf { it.first === chapter }?.second
         if (list == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             return@BoxWithConstraints
@@ -662,13 +665,18 @@ private fun PagedChapter(
                                 when (item) {
                                     PageItem.Banner -> Box(Modifier.fillMaxWidth().height(BANNER_H)) { banner() }
                                     is PageItem.Lines -> {
-                                        if (item.spacingBefore) Spacer(Modifier.height(appearance.paragraphSpacing.dp))
-                                        (chapter.blocks[item.block] as? ReaderBlock.Text)?.let { paragraph(it, item.block, item.lines) }
+                                        val b = chapter.blocks.getOrNull(item.block) as? ReaderBlock.Text
+                                        if (b != null) {
+                                            if (item.spacingBefore) Spacer(Modifier.height(appearance.paragraphSpacing.dp))
+                                            paragraph(b, item.block, item.lines)
+                                        }
                                     }
                                     is PageItem.Image -> {
-                                        if (item.spacingBefore) Spacer(Modifier.height(appearance.paragraphSpacing.dp))
-                                        val path = (chapter.blocks[item.block] as ReaderBlock.Image).path
-                                        Box(Modifier.fillMaxWidth().height(with(density) { item.heightPx.toDp() })) { BookImage(vm, path) }
+                                        val img = chapter.blocks.getOrNull(item.block) as? ReaderBlock.Image
+                                        if (img != null) {
+                                            if (item.spacingBefore) Spacer(Modifier.height(appearance.paragraphSpacing.dp))
+                                            Box(Modifier.fillMaxWidth().height(with(density) { item.heightPx.toDp() })) { BookImage(vm, img.path) }
+                                        }
                                     }
                                 }
                             }
