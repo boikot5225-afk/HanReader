@@ -1005,7 +1005,9 @@ private fun WordSheet(
     val last = tokens[selection.last]
     val word = block.text.substring(first.start, last.end)
     val entry = remember(word) { engine.lookup(word)?.takeIf { it.hasDefinition } }
-    val chars = remember(word) { if (entry == null) engine.characters(word) else emptyList() }
+    // A combination the dictionary lacks: its dictionary words (革命 + 党), else its characters.
+    val composed = remember(word) { if (entry == null) engine.compose(word) else null }
+    val chars = remember(word) { if (entry == null) composed ?: engine.characters(word) else emptyList() }
     val reading = entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
     val russian = remember(word) { engine.russianSenses(word) }
     val translation = engine.cardTranslation(word)
@@ -1068,7 +1070,10 @@ private fun WordSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
-                Text("Слова нет в словаре. По иероглифам:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (composed != null) "Сочетание слов:" else "Слова нет в словаре. По иероглифам:",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 chars.forEach { c ->
                     Text("${c.word}  ${c.pinyin} — ${engine.cardTranslation(c.word) ?: c.shortGloss(2)}", style = MaterialTheme.typography.bodyLarge)
                 }

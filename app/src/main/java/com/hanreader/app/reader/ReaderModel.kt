@@ -101,10 +101,34 @@ class ZhEngine(
     }
 
     /**
-     * A few words to write above an unknown word: the first Russian sense (first part, without
-     * remarks in brackets or subject labels), else the first English sense; null if none.
+     * A word the dictionary does not define (a Jieba combination like 革命党 or 一件), split into
+     * the fewest defined dictionary words, longest first: 革命 + 党. Null if the word has a meaning
+     * of its own, is a single character, or cannot be covered by defined words.
      */
-    fun glossShort(word: String): String? {
+    fun compose(word: String): List<ZhEntry>? {
+        if (word.length < 2 || dictionary.lookup(word)?.hasDefinition == true) return null
+        val n = word.length
+        val best = IntArray(n + 1) { Int.MAX_VALUE }
+        val back = IntArray(n + 1)
+        best[0] = 0
+        for (i in 0 until n) {
+            if (best[i] == Int.MAX_VALUE) continue
+            for (len in minOf(n - i, dictionary.maxWordLength) downTo 1) {
+                if (len == n) continue
+                val part = word.substring(i, i + len)
+                if (dictionary.lookup(part)?.hasDefinition != true) continue
+                if (best[i] + 1 < best[i + len]) { best[i + len] = best[i] + 1; back[i + len] = len }
+            }
+        }
+        if (best[n] == Int.MAX_VALUE) return null
+        val parts = ArrayList<ZhEntry>()
+        var k = n
+        while (k > 0) { val len = back[k]; parts += dictionary.lookup(word.substring(k - len, k))!!; k -= len }
+        return parts.reversed()
+    }
+
+    /** The first short sense of a defined word, Russian if possible. */
+    private fun firstSense(word: String): String? {
         fun clean(x: String) = x.replace(Regex("\\([^)]*\\)|\\[[^]]*]|（[^）]*）"), " ")
             .replace(Regex("^(перен|разг|книжн|лит|мед|юр|хим|физ|бот|зоол|воен|ист|диал|офиц|вежл|груб|арх|устар|сокр)\\.\\s*"), "")
             .split(',', ';', '；', '，').map { it.trim() }.firstOrNull { it.isNotEmpty() }
@@ -115,6 +139,16 @@ class ZhEngine(
         }
     }
 
+    /** "революция + партия" for a word made of dictionary words; null if it cannot be composed. */
+    fun composedGloss(word: String): String? =
+        compose(word)?.map { firstSense(it.word) ?: return null }?.joinToString(" + ")
+
+    /**
+     * A few words to write above an unknown word: the first Russian sense (first part, without
+     * remarks in brackets or subject labels), else the first English sense; null if none.
+     */
+    fun glossShort(word: String): String? = firstSense(word) ?: composedGloss(word)
+
     /**
      * The meaning stored on a flash card: Russian when available (first two senses), otherwise
      * the short English CC-CEDICT gloss, otherwise null.
@@ -122,7 +156,7 @@ class ZhEngine(
     fun cardTranslation(word: String): String? {
         val ru = russianSenses(word)
         if (ru.isNotEmpty()) return ru.take(2).joinToString("; ")
-        return dictionary.lookup(word)?.takeIf { it.hasDefinition }?.shortGloss()
+        return dictionary.lookup(word)?.takeIf { it.hasDefinition }?.shortGloss() ?: composedGloss(word)
     }
 
 

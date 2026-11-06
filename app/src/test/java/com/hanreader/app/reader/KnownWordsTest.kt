@@ -102,4 +102,22 @@ class KnownWordsTest {
         assertEquals(1, hsk.hsk3("事"))
         assertTrue("事" in hsk.wordsUpTo(HskSystem.HSK3, HskLevels.equivalent(HskSystem.HSK2, 4)))
     }
+
+    @Test
+    fun combinationsWithoutAMeaningAreComposed() {
+        val ru = File("src/main/assets/zh/ru.tsv").bufferedReader().useLines { ZhEngine.parseRussian(it) }
+        val ruAi = File("src/main/assets/zh/ru_ai.tsv").bufferedReader().useLines { ZhEngine.parseRussian(it) }
+        val engine = ZhEngine(ZhSegmenterTest.dict, 0, hsk, ru, ruAi)
+        for (w in listOf("革命党", "一件", "城里")) {
+            assertTrue("$w should have no meaning of its own", ZhSegmenterTest.dict.lookup(w)?.hasDefinition != true)
+            val parts = engine.compose(w)!!.map { it.word }
+            assertEquals(w, parts.joinToString(""))
+            assertTrue(parts.size >= 2)
+            assertTrue(engine.glossShort(w)!!.contains(" + "))
+            assertTrue(engine.cardTranslation(w)!!.contains(" + "))
+        }
+        assertEquals(listOf("革命", "党"), engine.compose("革命党")!!.map { it.word })
+        assertNull(engine.compose("图书馆")) // has its own meaning
+        assertNull(engine.compose("我")) // one character
+    }
 }
