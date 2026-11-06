@@ -77,7 +77,10 @@ class ThemeRenderTest {
                                 Modifier.width(400.dp).background(spec.background).padding(horizontal = a.margin.dp, vertical = 20.dp),
                                 verticalArrangement = Arrangement.spacedBy(a.paragraphSpacing.dp)
                             ) {
-                                Text(theme.title, color = spec.muted, fontFamily = spec.display, fontSize = 13.sp)
+                                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                    Text(theme.title, Modifier.weight(1f), color = spec.muted, fontFamily = spec.display, fontSize = 13.sp)
+                                    KnownIndicator(percent = 66, unknown = 199, recommended = 12) {}
+                                }
                                 Text("雨夜", color = spec.text, fontFamily = han, fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
                                 paragraphs.forEachIndexed { i, b ->
                                     val sel = if (i == 1) b.tokens.indexOfFirst { it.text == "顺着" } else -1

@@ -77,6 +77,11 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         .map { list -> list.mapTo(HashSet()) { it.word } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
+    /** Words still being learned: in the cards and not learned yet (interval under 30 days). Underlined in the text. */
+    val studyingWords: StateFlow<Set<String>> = studyCards
+        .map { list -> list.filter { !it.isLearned() }.mapTo(HashSet()) { it.word } as Set<String> }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
     /** Words marked «Знаю» by hand or by HSK level. */
     val markedKnown: StateFlow<Set<String>> = knownDao.observeWords()
         .map { it.toHashSet() }

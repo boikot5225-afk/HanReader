@@ -45,6 +45,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.hanreader.app.BookEntity
 import com.hanreader.app.LexiconIcons
 import com.hanreader.app.Overline
@@ -351,5 +356,41 @@ fun BookVocabularyAction(book: BookEntity, progress: Float?, onClick: () -> Unit
                 else -> "Словарь книги"
             }
         )
+    }
+}
+
+/**
+ * A small indicator in the page header: a ring with the share of known words of the chapter and,
+ * if any, a blue mark with the number of recommended words. A tap opens «Подготовиться к разделу».
+ */
+@Composable
+fun KnownIndicator(percent: Int, unknown: Int, recommended: Int, onClick: () -> Unit) {
+    val spec = com.hanreader.app.LocalThemeSpec.current
+    val label = "Знакомо $percent% слов раздела, незнакомых $unknown" +
+        (if (recommended > 0) ", рекомендуемых $recommended" else "") + ". Подготовиться к разделу"
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(22.dp),
+        color = androidx.compose.ui.graphics.Color.Transparent,
+        modifier = Modifier.height(44.dp).semantics(mergeDescendants = true) { contentDescription = label }
+    ) {
+        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            androidx.compose.foundation.Canvas(Modifier.size(20.dp)) {
+                val stroke = 3.dp.toPx()
+                val inset = stroke / 2
+                val arcSize = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke)
+                val topLeft = androidx.compose.ui.geometry.Offset(inset, inset)
+                drawArc(spec.border, 0f, 360f, false, topLeft, arcSize, style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
+                drawArc(
+                    spec.text, -90f, 360f * percent.coerceIn(0, 100) / 100f, false, topLeft, arcSize,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                )
+            }
+            Text("$percent%", color = spec.muted, fontFamily = spec.display, fontSize = 12.sp)
+            if (recommended > 0) {
+                Box(Modifier.size(8.dp).background(spec.recommendedLine, CircleShape))
+                Text("$recommended", color = spec.recommendedLine, fontFamily = spec.display, fontSize = 12.sp)
+            }
+        }
     }
 }

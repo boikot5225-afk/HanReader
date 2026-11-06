@@ -115,6 +115,8 @@ private data class Selection(val block: Int, val first: Int, val last: Int)
 fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val open by vm.open.collectAsState()
     val saved by vm.savedWords.collectAsState()
+    // Underlined as "in study": once learned (30+ days) a word reads like any known word.
+    val studying by vm.studyingWords.collectAsState()
     val engine by vm.engine.collectAsState()
     val known by vm.knownWords.collectAsState()
     val marked by vm.markedKnown.collectAsState()
@@ -201,7 +203,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             metrics = metrics,
             showPinyin = showPinyin,
             hidePinyinFor = hidePinyinFor,
-            saved = saved,
+            saved = studying,
             selection = selection?.takeIf { it.block == i }?.let { it.first..it.last },
             colors = colors,
             onTap = { t -> selection = Selection(i, t, t); chrome = false; highlight = null },
@@ -248,8 +250,12 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 appearance = appearance,
                 showPinyin = showPinyin,
                 hidePinyinFor = hidePinyinFor,
-                showBanner = engine != null && coverage != null && coverage.unknownDistinct > 0,
-                banner = { coverage?.let { c -> ChapterPrepareBanner(c.unknownDistinct, c.percent, if (appearance.markRecommended) recommended.size else 0) { showPrepare = true } } },
+                showBanner = false,
+                banner = {
+                    if (engine != null && coverage != null && coverage.total > 0) {
+                        KnownIndicator(coverage.percent, coverage.unknownDistinct, if (appearance.markRecommended) recommended.size else 0) { showPrepare = true }
+                    }
+                },
                 paragraph = paragraph,
                 bars = bars,
                 speed = speed,
@@ -270,8 +276,10 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 bars = bars,
                 speed = speed,
                 banner = {
-                    if (engine != null && coverage != null && coverage.total > 0 && coverage.unknownDistinct > 0) {
-                        ChapterPrepareBanner(coverage.unknownDistinct, coverage.percent, if (appearance.markRecommended) recommended.size else 0) { showPrepare = true }
+                    if (engine != null && coverage != null && coverage.total > 0) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            KnownIndicator(coverage.percent, coverage.unknownDistinct, if (appearance.markRecommended) recommended.size else 0) { showPrepare = true }
+                        }
                     }
                 },
                 footer = {
@@ -473,16 +481,17 @@ private fun ImmersiveEffects(hideBars: Boolean, keepOn: Boolean, brightness: Flo
     }
 }
 
-private val HEADER_H = 30.dp
+private val HEADER_H = 44.dp
 private val FOOTER_H = 30.dp
 private val BANNER_H = 64.dp
 
 @Composable
-private fun RunningHeader(text: String, bookmarked: Boolean = false) {
+private fun RunningHeader(text: String, bookmarked: Boolean = false, indicator: @Composable () -> Unit = {}) {
     val spec = LocalThemeSpec.current
     Row(Modifier.fillMaxWidth().height(HEADER_H), verticalAlignment = Alignment.CenterVertically) {
         Text(text, Modifier.weight(1f), color = spec.muted, fontFamily = spec.display, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (bookmarked) Icon(LexiconIcons.BookmarkFilled, contentDescription = "Закладка", tint = spec.accent, modifier = Modifier.size(18.dp))
+        indicator()
     }
 }
 
@@ -622,7 +631,7 @@ private fun PagedChapter(
                 ) {
                     val pageIndex = index - lead
                     val onPage = list.getOrNull(pageIndex)?.items?.map { it.block }?.toSet().orEmpty()
-                    RunningHeader(chapter.title, bookmarked = onPage.any { it in bookmarkedBlocks })
+                    RunningHeader(chapter.title, bookmarked = onPage.any { it in bookmarkedBlocks }, indicator = banner)
                     Column(Modifier.weight(1f).fillMaxWidth()) {
                         if (pageIndex < 0 || pageIndex >= list.size) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
