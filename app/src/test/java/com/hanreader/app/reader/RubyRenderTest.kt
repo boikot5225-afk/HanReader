@@ -92,4 +92,40 @@ class RubyRenderTest {
         check(heading.pinyin == heading.pinyin.lowercase()) { "composed pinyin must be lower-case: ${heading.pinyin}" }
         check(blocks.all { b -> b.tokens.none { it.kind == TokenKind.HAN && it.pinyin.isEmpty() } })
     }
+
+    /** Tone colours on pinyin and characters, traditional script, a highlight with a note: build/screens/tones.png. */
+    @Test
+    fun rendersTonesTraditionalAndHighlights() {
+        val script = File("src/main/assets/zh/script.tsv").inputStream().use { com.hanreader.app.zh.ZhScript.parse(it) }
+        val eng = ZhEngine(ZhSegmenterTest.dict, 0, script = script)
+        val book = com.hanreader.app.epub.TxtBook("今天天气很好，他终于决定去图书馆看书。她的头发很长，妈妈说她像画里的人。".toByteArray(), "x")
+        val simple = ChapterBuilder.build(book, 0, eng).blocks.first() as ReaderBlock.Text
+        val trad = ChapterBuilder.build(book, 0, eng, script = com.hanreader.app.ScriptMode.TRADITIONAL).blocks.first() as ReaderBlock.Text
+        val h = com.hanreader.app.Highlight(1, 1, 0, 0, 19, simple.text.length, 0, "заметка", "", "")
+        val (marked, noted) = Highlights.tokens(trad, listOf(h))
+        compose.setContent {
+            LexiconTheme {
+                val scheme = MaterialTheme.colorScheme
+                val measurer = rememberTextMeasurer(cacheSize = 0)
+                val base = TextStyle(fontSize = 22.sp, fontFamily = WordFont, color = scheme.onBackground)
+                fun metrics(t: com.hanreader.app.ToneColors) = RubyMetrics(
+                    measurer, base,
+                    base.copy(fontSize = 11.sp, fontFamily = null, color = scheme.onSurfaceVariant),
+                    base.copy(fontSize = 27.sp, fontWeight = FontWeight.SemiBold),
+                    tones = t
+                )
+                val colors = RubyColors(scheme.onBackground, scheme.onSurfaceVariant, scheme.primary, scheme.secondaryContainer, 3.dp, 8.dp)
+                Column(Modifier.width(411.dp).background(scheme.background).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    RubyParagraph(simple, metrics(com.hanreader.app.ToneColors.PINYIN), true, null, emptySet(), null, colors, {})
+                    RubyParagraph(simple, metrics(com.hanreader.app.ToneColors.HAN), true, null, emptySet(), null, colors, {})
+                    RubyParagraph(trad, metrics(com.hanreader.app.ToneColors.OFF), true, null, emptySet(), null, colors, {}, marked = marked, noted = noted)
+                }
+            }
+        }
+        compose.waitForIdle()
+        val root = compose.activity.window.decorView
+        val image = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+        root.draw(android.graphics.Canvas(image))
+        File(File("build/screens").apply { mkdirs() }, "tones.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
 }

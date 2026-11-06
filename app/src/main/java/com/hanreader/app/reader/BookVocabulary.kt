@@ -99,6 +99,7 @@ object BookAnalyzer {
         epub: BookSource,
         segmenter: ZhSegmenter,
         dict: ZhDictionary,
+        script: com.hanreader.app.zh.ZhScript = com.hanreader.app.zh.ZhScript.NONE,
         onProgress: (Int, Int) -> Unit = { _, _ -> }
     ): BookAnalysis {
         val counts = HashMap<String, IntArray>(32_000) // [count, firstChapter]
@@ -107,9 +108,9 @@ object BookAnalyzer {
         var tokens = 0
         val total = epub.chapters.size
         for (c in epub.chapters) {
-            for (b in epub.blocks(c.index)) {
-                if (b !is EpubBlock.Text) continue
-                val seg = segmenter.segment(b.text)
+            val texts = script.forDictionary(epub.blocks(c.index).mapNotNull { (it as? EpubBlock.Text)?.text })
+            for (text in texts) {
+                val seg = segmenter.segment(text)
                 for (t in seg) {
                     if (t.kind != TokenKind.HAN) continue
                     tokens++

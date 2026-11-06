@@ -18,7 +18,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import com.hanreader.app.ToneColors
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -45,7 +50,10 @@ class RubyMetrics(
     val pinyinStyle: TextStyle,
     val headingStyle: TextStyle,
     /** The small translation above the pinyin. */
-    val glossStyle: TextStyle = pinyinStyle
+    val glossStyle: TextStyle = pinyinStyle,
+    val tones: ToneColors = ToneColors.OFF,
+    /** Colours of tones 1-4 and the neutral tone. */
+    val tonePalette: List<Color> = Tones.LIGHT
 ) {
     private val gloss = HashMap<String, TextLayoutResult>()
 
@@ -72,6 +80,36 @@ class RubyMetrics(
 
     fun pinyin(text: String): TextLayoutResult =
         pinyin.getOrPut(text) { measurer.measure(text, pinyinStyle, softWrap = false, maxLines = 1) }
+
+    private val tonedHan = HashMap<String, TextLayoutResult>()
+    private val tonedPinyin = HashMap<String, TextLayoutResult>()
+
+    /** The characters of a token as drawn: in the chosen script, coloured by tone if asked. */
+    fun hanOf(t: RToken, isHeading: Boolean): TextLayoutResult {
+        if (!tones.han || t.syllables.size != t.display.length) return han(t.display, isHeading)
+        val key = (if (isHeading) "h|" else "b|") + t.display + "|" + t.pinyin
+        return tonedHan.getOrPut(key) {
+            val text = buildAnnotatedString {
+                t.display.forEachIndexed { k, c -> withStyle(SpanStyle(color = tonePalette[Tones.of(t.syllables[k]) - 1])) { append(c) } }
+            }
+            measurer.measure(text, if (isHeading) headingStyle else hanStyle, softWrap = false, maxLines = 1)
+        }
+    }
+
+    /** The reading of a token, each syllable in its tone's colour if asked. */
+    fun pinyinOf(t: RToken): TextLayoutResult {
+        if (!tones.pinyin || t.syllables.isEmpty() || t.syllables.sumOf { it.length } != t.pinyin.length) return pinyin(t.pinyin)
+        return tonedPinyin.getOrPut(t.pinyin + "|" + t.syllables.joinToString(" ")) {
+            val text = buildAnnotatedString {
+                for (syl in t.syllables) withStyle(SpanStyle(color = tonePalette[Tones.of(syl) - 1])) { append(syl) }
+            }
+            measurer.measure(text, pinyinStyle, softWrap = false, maxLines = 1)
+        }
+    }
+
+    /** True if the token's layouts carry their own colours (drawn without a colour override). */
+    fun tonedHan(t: RToken) = tones.han && t.syllables.size == t.display.length && t.syllables.isNotEmpty()
+    fun tonedPinyin(t: RToken) = tones.pinyin && t.syllables.isNotEmpty() && t.syllables.sumOf { it.length } == t.pinyin.length
 
     val emWidth: Int by lazy { han("汉", false).size.width }
     val pinyinHeight: Int by lazy { pinyin("hàn").size.height }
@@ -160,9 +198,9 @@ internal fun layout(
             }
             continue
         }
-        val hanLayout = metrics.han(t.text, heading)
+        val hanLayout = metrics.hanOf(t, heading)
         val wantPinyin = showPinyin && t.pinyin.isNotEmpty() && (hidePinyinFor == null || t.text !in hidePinyinFor)
-        val pinLayout = if (wantPinyin) metrics.pinyin(t.pinyin) else null
+        val pinLayout = if (wantPinyin) metrics.pinyinOf(t) else null
         val gap = if (showPinyin && t.kind == TokenKind.HAN) gapPx else 0f
         val w = maxOf(hanLayout.size.width.toFloat(), pinLayout?.size?.width?.toFloat() ?: 0f) + gap
         // Closing punctuation never starts a line: let it hang past the margin.
@@ -239,7 +277,11 @@ fun RubyParagraph(
     /** Token indices never marked (characters of a name). */
     noMarks: Set<Int> = emptySet(),
     /** Short translations above the pinyin (word -> text); null: no translation row. */
-    glossFor: Map<String, String>? = null
+    glossFor: Map<String, String>? = null,
+    /** The reader's highlights: token index -> colour. */
+    marked: Map<Int, Color> = emptyMap(),
+    /** Tokens that end a highlight with a note (a small dot is drawn after them). */
+    noted: Set<Int> = emptySet()
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val density = LocalDensity.current
@@ -290,6 +332,13 @@ fun RubyParagraph(
                         cornerRadius = CornerRadius(6f, 6f)
                     )
                 }
+                marked[p.token]?.let { c ->
+                    if (!selected) drawRect(
+                        c.copy(alpha = 0.32f),
+                        topLeft = Offset(p.x, p.lineTop + laid.hanTop - 2f),
+                        size = Size(p.width, laid.hanHeight + 4f)
+                    )
+                }
                 val isSaved = t.kind == TokenKind.HAN && t.text in saved
                 if (selected) {
                     drawRoundRect(
@@ -304,15 +353,19 @@ fun RubyParagraph(
                 p.pinyinLayout?.let { pl ->
                     drawText(
                         pl,
-                        color = if (isSaved) colors.saved else colors.pinyin,
+                        color = if (metrics.tonedPinyin(t)) Color.Unspecified else if (isSaved) colors.saved else colors.pinyin,
                         topLeft = Offset(p.x + (inner - pl.size.width) / 2f, p.lineTop + laid.pinTop)
                     )
                 }
                 drawText(
                     p.hanLayout,
-                    color = colors.text,
+                    color = if (metrics.tonedHan(t)) Color.Unspecified else colors.text,
                     topLeft = Offset(p.x + (inner - hanW) / 2f, p.lineTop + laid.hanTop)
                 )
+                if (p.token in noted) {
+                    val c = marked[p.token] ?: colors.saved
+                    drawCircle(c, radius = 5f, center = Offset(p.x + p.width - 1f, p.lineTop + laid.hanTop + 3f))
+                }
                 val lineColor = when {
                     t.kind != TokenKind.HAN -> null
                     isSaved -> colors.saved
@@ -353,7 +406,7 @@ data class RubyColors(
 /** Text styles of the reader from the appearance settings and the theme. */
 @Composable
 fun rememberRubyMetrics(measurer: TextMeasurer, a: Appearance, spec: ThemeSpec, han: FontFamily): RubyMetrics =
-    remember(measurer, a.fontSize, a.pinyinScale, spec, han) {
+    remember(measurer, a.fontSize, a.pinyinScale, spec, han, a.tones) {
         val size = a.fontSize.sp
         val base = TextStyle(fontSize = size, fontFamily = han, color = spec.text)
         RubyMetrics(
@@ -367,7 +420,9 @@ fun rememberRubyMetrics(measurer: TextMeasurer, a: Appearance, spec: ThemeSpec, 
                 color = spec.pinyin
             ),
             headingStyle = base.copy(fontSize = size * 1.25f, fontWeight = FontWeight.SemiBold),
-            glossStyle = TextStyle(fontSize = size * 0.42f, fontFamily = spec.body, color = spec.muted)
+            glossStyle = TextStyle(fontSize = size * 0.42f, fontFamily = spec.body, color = spec.muted),
+            tones = a.tones,
+            tonePalette = if (spec.dark) Tones.DARK else Tones.LIGHT
         )
     }
 
@@ -384,3 +439,20 @@ fun rubyColors(a: Appearance, spec: ThemeSpec) = RubyColors(
     recommendedLine = spec.recommendedLine,
     gloss = spec.muted
 )
+
+/** Tone of a pinyin syllable from its mark (ā á ǎ à); 5 = neutral. */
+object Tones {
+    private const val MARKS = "āēīōūǖĀĒĪŌŪǕáéíóúǘÁÉÍÓÚǗǎěǐǒǔǚǍĚǏǑǓǙàèìòùǜÀÈÌÒÙǛ"
+
+    fun of(syllable: String): Int {
+        for (c in syllable) {
+            val i = MARKS.indexOf(c)
+            if (i >= 0) return i / 12 + 1
+            if (c in '1'..'5') return c - '0'
+        }
+        return 5
+    }
+
+    val LIGHT = listOf(Color(0xFFD32F2F), Color(0xFF2E7D32), Color(0xFF1565C0), Color(0xFF7B1FA2), Color(0xFF8A8A8A))
+    val DARK = listOf(Color(0xFFFF6B6B), Color(0xFF66D17A), Color(0xFF64B0FF), Color(0xFFCB8BFF), Color(0xFF9A9A9A))
+}

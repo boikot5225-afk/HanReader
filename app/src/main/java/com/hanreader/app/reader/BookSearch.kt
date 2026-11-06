@@ -49,14 +49,16 @@ object BookSearch {
         val q = query.trim()
         if (q.isEmpty()) return
         val pinyin = isPinyinQuery(q)
-        val key = if (pinyin) toneless(q) else q
+        val key = if (pinyin) toneless(q) else engine.script.toSimplified(q)
         if (key.isEmpty()) return
         var hits = 0
         for (c in epub.chapters) {
             for ((bi, b) in epub.blocks(c.index).withIndex()) {
                 coroutineContext.ensureActive()
                 if (b !is EpubBlock.Text) continue
-                val ranges = if (pinyin) pinyinMatches(b.text, key, engine) else textMatches(b.text, key)
+                // Matched in simplified form: a traditional book is found with simplified input and back.
+                val simple = engine.script.toSimplified(b.text)
+                val ranges = if (pinyin) pinyinMatches(simple, key, engine) else textMatches(simple, key)
                 for (r in ranges) {
                     onHit(hit(c.index, c.title, bi, b.text, r.first, r.last + 1))
                     if (++hits >= MAX_HITS) return

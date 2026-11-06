@@ -6,6 +6,8 @@ import com.hanreader.app.epub.EpubBlock
 import com.hanreader.app.epub.BookSource
 import com.hanreader.app.zh.TokenKind
 import com.hanreader.app.zh.ZhDictionary
+import com.hanreader.app.zh.ZhScript
+import com.hanreader.app.ScriptMode
 import com.hanreader.app.zh.ZhEntry
 import com.hanreader.app.zh.ZhSegmenter
 import com.hanreader.app.zh.ZhToken
@@ -70,7 +72,9 @@ class ZhEngine(
     /** Machine translation of CC-CEDICT meanings into Russian, senses joined by "; ". */
     private val russianAi: Map<String, String> = emptyMap(),
     /** Proper names (assets/zh/names.tsv): p = person, l = place, o = organisation. */
-    private val names: Map<String, Char> = emptyMap()
+    private val names: Map<String, Char> = emptyMap(),
+    /** Simplified <-> traditional tables. */
+    val script: ZhScript = ZhScript.NONE
 ) {
     enum class NameKind(val title: String) { PERSON("человек"), PLACE("место"), ORGANISATION("организация") }
 
@@ -174,6 +178,15 @@ class ZhEngine(
         }.joinToString("")
     }
 
+    /** One reading per character of a Han token (for tone colours); empty if they do not line up. */
+    fun syllablesOf(token: ZhToken): List<String> {
+        if (token.kind != TokenKind.HAN) return emptyList()
+        val p = token.entry?.pinyin.orEmpty()
+        val parts = if (p.isNotEmpty()) p.split(' ').filter { it.isNotEmpty() }
+        else token.text.map { dictionary.lookup(it.toString())?.pinyin?.substringBefore(' ').orEmpty().lowercase() }
+        return if (parts.size == token.text.length && parts.none { it.isEmpty() }) parts else emptyList()
+    }
+
     /** Dictionary entry for a word; for an unknown combination, null. */
     fun lookup(word: String): ZhEntry? = dictionary.lookup(word)
 
@@ -226,12 +239,13 @@ class ZhEngine(
                         val t = System.nanoTime()
                         val dict = ZhDictionary.map(lexiconFile(app))
                         val ms = (System.nanoTime() - t) / 1_000_000
-                        c.complete(ZhEngine(dict, ms))
+                        val script = runCatching { app.assets.open("zh/script.tsv").use { ZhScript.parse(it) } }.getOrDefault(ZhScript.NONE)
+                        c.complete(ZhEngine(dict, ms, script = script))
                         val hsk = app.assets.open("zh/hsk.tsv").bufferedReader().useLines { HskLevels.parse(it) }
                         val ru = app.assets.open("zh/ru.tsv").bufferedReader().useLines { parseRussian(it) }
                         val ruAi = app.assets.open("zh/ru_ai.tsv").bufferedReader().useLines { parseRussian(it) }
                         val names = app.assets.open("zh/names.tsv").bufferedReader().useLines { parseNames(it) }
-                        f.complete(ZhEngine(dict, ms, hsk, ru, ruAi, names))
+                        f.complete(ZhEngine(dict, ms, hsk, ru, ruAi, names, script))
                     } catch (e: Throwable) {
                         c.completeExceptionally(e)
                         f.completeExceptionally(e)
@@ -258,6 +272,12 @@ class ZhEngine(
     }
 }
 
+/**
+ * Words the reader knows, plus the ones marked «Не знаю» ([unknown]): those stay unknown even
+ * when the level, learned cards or known parts would count them.
+ */
+class KnownWords(private val words: Set<String>, val unknown: Set<String>) : Set<String> by words
+
 /** A token ready to draw: text, pinyin and whether it can be tapped (Han word). */
 data class RToken(
     val text: String,
@@ -265,11 +285,16 @@ data class RToken(
     val kind: TokenKind,
     val start: Int,
     val end: Int,
-    val defined: Boolean
+    val defined: Boolean,
+    /** What is drawn: [text] in the script the reader chose (traditional, as in the book). */
+    val display: String = text,
+    /** The reading of each character, in order; empty when unknown. Joined, they make [pinyin]. */
+    val syllables: List<String> = emptyList()
 )
 
 sealed interface ReaderBlock {
-    data class Text(val text: String, val heading: Boolean, val tokens: List<RToken>) : ReaderBlock
+    /** [text]: simplified (dictionary, search, cards); [shown]: as drawn, same length. */
+    data class Text(val text: String, val heading: Boolean, val tokens: List<RToken>, val shown: String = text) : ReaderBlock
     data class Image(val path: String) : ReaderBlock
 }
 
@@ -282,25 +307,45 @@ data class ChapterContent(
 )
 
 object ChapterBuilder {
-    fun build(book: BookSource, index: Int, engine: ZhEngine, extra: Set<String> = emptySet()): ChapterContent {
+    /**
+     * [script]: the characters to draw. A chapter in traditional script is segmented and looked up
+     * in simplified form (the dictionary's), every conversion keeping offsets.
+     */
+    fun build(
+        book: BookSource,
+        index: Int,
+        engine: ZhEngine,
+        extra: Set<String> = emptySet(),
+        script: ScriptMode = ScriptMode.AS_BOOK
+    ): ChapterContent {
         val t = System.nanoTime()
         var chars = 0
-        val blocks = book.blocks(index).map { b ->
+        val source = book.blocks(index)
+        val traditional = engine.script.looksTraditional(source.mapNotNull { (it as? EpubBlock.Text)?.text })
+        val blocks = source.map { b ->
             when (b) {
                 is EpubBlock.Image -> ReaderBlock.Image(b.path)
                 is EpubBlock.Text -> {
                     chars += b.text.length
-                    val tokens = engine.segmenter.segment(b.text, extra).map { tok ->
+                    val simple = if (traditional) engine.script.toSimplified(b.text) else b.text
+                    val shown = when (script) {
+                        ScriptMode.AS_BOOK -> b.text
+                        ScriptMode.SIMPLIFIED -> simple
+                        ScriptMode.TRADITIONAL -> if (traditional) b.text else engine.script.toTraditional(simple)
+                    }.takeIf { it.length == simple.length } ?: simple
+                    val tokens = engine.segmenter.segment(simple, extra).map { tok ->
                         RToken(
                             text = tok.text,
                             pinyin = engine.pinyinOf(tok),
                             kind = tok.kind,
                             start = tok.start,
                             end = tok.end,
-                            defined = tok.entry?.hasDefinition == true
+                            defined = tok.entry?.hasDefinition == true,
+                            display = if (shown === simple) tok.text else shown.substring(tok.start, tok.end),
+                            syllables = engine.syllablesOf(tok)
                         )
                     }
-                    ReaderBlock.Text(b.text, b.heading, tokens)
+                    ReaderBlock.Text(simple, b.heading, tokens, shown)
                 }
             }
         }
@@ -395,8 +440,10 @@ object KnownExpansion {
  */
 class KnownMatcher(private val known: Set<String>, private val engine: ZhEngine?) {
     private val cache = HashMap<String, Boolean>()
+    private val unknown: Set<String> = (known as? KnownWords)?.unknown ?: emptySet()
 
     fun isKnown(word: String): Boolean {
+        if (word in unknown) return false
         if (word in known) return true
         val e = engine ?: return false
         if (word.length < 2) return false

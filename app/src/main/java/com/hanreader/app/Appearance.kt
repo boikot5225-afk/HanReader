@@ -195,6 +195,14 @@ enum class ReadingMode(val title: String) { PAGES("Страницы"), SCROLL("�
 /** A short translation above the pinyin: none, over unknown words, or only over recommended ones. */
 enum class GlossMode(val title: String) { OFF("Выкл"), UNKNOWN("Над незнакомыми"), RECOMMENDED("Над рекомендуемыми") }
 
+/** Characters to draw: as the book has them, or converted (the dictionary always works in simplified). */
+enum class ScriptMode(val title: String) { AS_BOOK("Как в книге"), SIMPLIFIED("Упрощённые"), TRADITIONAL("Традиционные") }
+
+/** Colours by tone (1 red, 2 green, 3 blue, 4 purple, neutral grey), like study dictionaries. */
+enum class ToneColors(val title: String, val pinyin: Boolean, val han: Boolean) {
+    OFF("Выкл", false, false), PINYIN("Пиньинь", true, false), HAN("Иероглифы", false, true), BOTH("Оба", true, true)
+}
+
 /** Reader appearance, saved per device. Ranges are enforced on load. */
 data class Appearance(
     val theme: ReaderTheme = ReaderTheme.AUTO,
@@ -221,7 +229,9 @@ data class Appearance(
     val markRecommended: Boolean = false,
     /** How many recommended words a chapter shows at most. */
     val recommendedPerChapter: Int = 12,
-    val gloss: GlossMode = GlossMode.OFF
+    val gloss: GlossMode = GlossMode.OFF,
+    val script: ScriptMode = ScriptMode.AS_BOOK,
+    val tones: ToneColors = ToneColors.OFF
 ) {
     fun hanFontFor(spec: ThemeSpec): HanFont = hanFont ?: spec.defaultHanFont
 
@@ -264,7 +274,9 @@ object AppearanceStore {
             markUnknown = p.getBoolean("markUnknown", d.markUnknown),
             markRecommended = p.getBoolean("markRecommended", d.markRecommended),
             recommendedPerChapter = p.getInt("recommendedPerChapter", d.recommendedPerChapter).coerceIn(Appearance.RECOMMENDED),
-            gloss = GlossMode.entries.firstOrNull { it.name == p.getString("gloss", null) } ?: d.gloss
+            gloss = GlossMode.entries.firstOrNull { it.name == p.getString("gloss", null) } ?: d.gloss,
+            script = ScriptMode.entries.firstOrNull { it.name == p.getString("script", null) } ?: d.script,
+            tones = ToneColors.entries.firstOrNull { it.name == p.getString("tones", null) } ?: d.tones
         )
         appContext = context.applicationContext
     }
@@ -292,6 +304,8 @@ object AppearanceStore {
             putBoolean("markRecommended", next.markRecommended)
             putInt("recommendedPerChapter", next.recommendedPerChapter)
             putString("gloss", next.gloss.name)
+            putString("script", next.script.name)
+            putString("tones", next.tones.name)
             apply()
         }
     }

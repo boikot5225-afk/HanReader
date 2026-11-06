@@ -150,6 +150,47 @@ interface BookmarkDao {
     suspend fun delete(id: Long)
 }
 
+/**
+ * A highlighted passage: characters [startChar, endChar) of paragraph [blockIndex], a colour
+ * (index into the highlight palette) and an optional note.
+ */
+@Entity(
+    tableName = "highlights",
+    foreignKeys = [
+        ForeignKey(entity = BookEntity::class, parentColumns = ["id"], childColumns = ["bookId"], onDelete = ForeignKey.CASCADE)
+    ],
+    indices = [Index(value = ["bookId"])]
+)
+data class Highlight(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val bookId: Long,
+    val chapterIndex: Int,
+    val blockIndex: Int,
+    val startChar: Int,
+    val endChar: Int,
+    val color: Int,
+    val note: String = "",
+    /** The highlighted text, kept for the list and the export. */
+    val text: String,
+    val chapterTitle: String,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface HighlightDao {
+    @Query("SELECT * FROM highlights WHERE bookId = :bookId ORDER BY chapterIndex, blockIndex, startChar")
+    fun observe(bookId: Long): Flow<List<Highlight>>
+
+    @Insert
+    suspend fun insert(h: Highlight): Long
+
+    @Update
+    suspend fun update(h: Highlight)
+
+    @Query("DELETE FROM highlights WHERE id = :id")
+    suspend fun delete(id: Long)
+}
+
 /** How often a word occurs in a book, from the one-time book analysis. */
 @Entity(
     tableName = "book_words",
@@ -214,8 +255,16 @@ data class KnownWord(
 
 @Dao
 interface KnownWordDao {
-    @Query("SELECT word FROM known_words")
+    /** Words marked known (by hand or by level); not the ones marked «Не знаю». */
+    @Query("SELECT word FROM known_words WHERE source != 'unknown'")
     fun observeWords(): Flow<List<String>>
+
+    /** Words marked «Не знаю»: unknown whatever the level, cards or parts say. */
+    @Query("SELECT word FROM known_words WHERE source = 'unknown'")
+    fun observeUnknown(): Flow<List<String>>
+
+    @Query("SELECT * FROM known_words WHERE word = :word")
+    fun observe(word: String): Flow<KnownWord?>
 
     @Query("SELECT * FROM known_words ORDER BY word")
     suspend fun all(): List<KnownWord>
@@ -516,13 +565,13 @@ interface CardDao {
 // so no database of version 3 exists under this name; Lexicon data arrives through backups.
 // Version 5 (0.2.0): known_words. Schemas are exported to app/schemas for migration checks.
 // Version 6 (0.3.0): book_words and books.analyzedTokens (book vocabulary analysis).
-// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names. Version 9 (0.9.9): books.charOffset.
+// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names. Version 9 (0.9.9): books.charOffset. Version 10 (0.10.0): highlights.
 @Database(
     entities = [
         WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
-        Bookmark::class, UserName::class
+        Bookmark::class, UserName::class, Highlight::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
@@ -531,6 +580,7 @@ abstract class LexiconDatabase : RoomDatabase() {
     abstract fun knownWordDao(): KnownWordDao
     abstract fun bookmarkDao(): BookmarkDao
     abstract fun userNameDao(): UserNameDao
+    abstract fun highlightDao(): HighlightDao
 
     companion object {
         @Volatile private var instance: LexiconDatabase? = null
@@ -623,7 +673,21 @@ abstract class LexiconDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(HIGHLIGHTS_SQL)
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_highlights_bookId` ON `highlights` (`bookId`)")
+            }
+        }
+
+        // Copied from app/schemas/.../10.json; MigrationTest checks it against the entity.
+        private const val HIGHLIGHTS_SQL = "CREATE TABLE IF NOT EXISTS `highlights` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+            "`bookId` INTEGER NOT NULL, `chapterIndex` INTEGER NOT NULL, `blockIndex` INTEGER NOT NULL, " +
+            "`startChar` INTEGER NOT NULL, `endChar` INTEGER NOT NULL, `color` INTEGER NOT NULL, `note` TEXT NOT NULL, " +
+            "`text` TEXT NOT NULL, `chapterTitle` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, " +
+            "FOREIGN KEY(`bookId`) REFERENCES `books`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {

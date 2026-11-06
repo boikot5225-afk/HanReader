@@ -57,6 +57,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -102,6 +103,7 @@ import com.hanreader.app.AppearanceStore
 import com.hanreader.app.LocalThemeSpec
 import com.hanreader.app.WordFont
 import com.hanreader.app.zh.TokenKind
+import com.hanreader.app.zh.isHan
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -120,7 +122,6 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val studying by vm.studyingWords.collectAsState()
     val engine by vm.engine.collectAsState()
     val known by vm.knownWords.collectAsState()
-    val marked by vm.markedKnown.collectAsState()
     val pinyinMode by vm.pinyinMode.collectAsState()
     val speed by vm.speed.collectAsState()
     val book = open ?: run {
@@ -146,6 +147,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // One subscription per book: calling vm.bookmarks() in every recomposition re-queried the database each time.
     val bookmarksFlow = remember(book.entity.id) { vm.bookmarks(book.entity.id) }
     val bookmarks by bookmarksFlow.collectAsState(initial = emptyList())
+    val highlightsFlow = remember(book.entity.id) { vm.highlights(book.entity.id) }
+    val highlights by highlightsFlow.collectAsState(initial = emptyList())
 
     val sheetOpen = showAppearance || showToc || showPrepare || selection != null
     ImmersiveEffects(hideBars = !chrome && !sheetOpen, keepOn = appearance.keepScreenOn, brightness = appearance.brightness)
@@ -213,8 +216,12 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // Page mode exposes its controls to the bottom panel through these.
     var jumpToPage by remember { mutableStateOf<((Int) -> Unit)?>(null) }
 
+    val highlightsHere = remember(highlights, chapter?.index) { highlights.filter { it.chapterIndex == chapter?.index }.groupBy { it.blockIndex } }
     val paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit = { block, i, lines ->
+        val (hlMarked, hlNoted) = remember(block, highlightsHere[i]) { Highlights.tokens(block, highlightsHere[i]) }
         RubyParagraph(
+            marked = hlMarked,
+            noted = hlNoted,
             block = block,
             metrics = metrics,
             showPinyin = showPinyin,
@@ -405,6 +412,22 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 jump(b.chapterIndex, b.blockIndex)
             },
             onRemoveBookmark = { vm.removeBookmark(it.id) },
+            highlights = highlights,
+            onHighlight = { h ->
+                showToc = false
+                highlight = null
+                jump(h.chapterIndex, h.blockIndex)
+            },
+            onRemoveHighlight = { vm.removeHighlight(it.id) },
+            onExport = {
+                val md = Highlights.markdown(book.entity.title, book.entity.author, highlights)
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_SUBJECT, book.entity.title + " — выделения")
+                    putExtra(android.content.Intent.EXTRA_TEXT, md)
+                }
+                runCatching { context.startActivity(android.content.Intent.createChooser(send, "Экспорт выделений")) }
+            },
             onHit = { h ->
                 showToc = false
                 highlight = h
@@ -423,9 +446,18 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             engine = eng,
             saved = saved,
             known = known,
-            marked = marked,
+            isKnown = matcher::isKnown,
+            markOf = vm::knownMark,
             speaker = speaker,
             onKnown = vm::setKnown,
+            onClearKnown = vm::clearKnown,
+            highlight = Highlights.at(highlights, chapter.index, sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end),
+            onHighlight = { color, existing ->
+                if (existing != null) vm.updateHighlight(existing.copy(color = color))
+                else vm.addHighlight(chapter, sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end, color)
+            },
+            onNote = { h, note -> vm.updateHighlight(h.copy(note = note)) },
+            onRemoveHighlight = { vm.removeHighlight(it.id) },
             onChange = { selection = it },
             onDismiss = { selection = null },
             recommendations = recommended.associateBy { it.word },
@@ -1001,9 +1033,17 @@ private fun WordSheet(
     engine: ZhEngine,
     saved: Set<String>,
     known: Set<String>,
-    marked: Set<String>,
+    /** Whether a word counts as known (marks, level, cards or known parts). */
+    isKnown: (String) -> Boolean,
+    /** The reader's / the level's mark of a word. */
+    markOf: (String) -> kotlinx.coroutines.flow.Flow<com.hanreader.app.KnownWord?>,
     speaker: Speaker,
     onKnown: (String, Boolean) -> Unit,
+    onClearKnown: (String) -> Unit,
+    highlight: com.hanreader.app.Highlight?,
+    onHighlight: (Int, com.hanreader.app.Highlight?) -> Unit,
+    onNote: (com.hanreader.app.Highlight, String) -> Unit,
+    onRemoveHighlight: (com.hanreader.app.Highlight) -> Unit,
     onChange: (Selection) -> Unit,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String, (Result<Boolean>) -> Unit) -> Unit,
@@ -1039,7 +1079,13 @@ private fun WordSheet(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(word, fontFamily = WordFont, fontSize = 40.sp, fontWeight = FontWeight.SemiBold)
+                val shownWord = block.shown.substring(first.start, last.end)
+                Text(shownWord, fontFamily = WordFont, fontSize = if (word.length > 6) 28.sp else 40.sp, fontWeight = FontWeight.SemiBold)
+                if (shownWord != word) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(word, fontFamily = WordFont, style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+                }
                 Spacer(Modifier.width(12.dp))
                 Text(reading, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 6.dp))
@@ -1151,28 +1197,70 @@ private fun WordSheet(
                     Text(if (isUserName) "Это не имя" else "Это имя — не учить, не подчёркивать")
                 }
             }
-            val isMarked = word in marked
-            val learnedInCards = word in known && !isMarked
-            OutlinedButton(
-                onClick = { onKnown(word, !isMarked) },
-                enabled = !learnedInCards,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                if (isMarked) {
-                    Icon(LexiconIcons.Check, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-                }
-                Text(
-                    when {
-                        learnedInCards -> "Выучено в карточках"
-                        isMarked -> "Знаю · нажми, чтобы снять"
-                        else -> "Знаю это слово"
-                    },
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
+            val sentenceRange = remember(selection) { Highlights.sentence(block, selection.first, selection.last) }
+            HighlightPanel(
+                current = highlight,
+                canWiden = sentenceRange != selection.first..selection.last,
+                onColor = { onHighlight(it, highlight) },
+                onSentence = { onChange(selection.copy(first = sentenceRange.first, last = sentenceRange.last)) },
+                onNote = { n -> highlight?.let { onNote(it, n) } },
+                onRemove = { highlight?.let(onRemoveHighlight) }
+            )
+            val markFlow = remember(word) { markOf(word) }
+            val mark by markFlow.collectAsState(initial = null)
+            val knownNow = isKnown(word)
+            if (word.length <= 8 && word.all { it.isHan() }) KnownChoice(
+                known = knownNow,
+                reason = when {
+                    mark?.source == ReaderViewModel.UNKNOWN -> "Отмечено «Не знаю»"
+                    mark?.source == "manual" -> "Отмечено «Знаю»"
+                    mark != null -> "Знакомо по уровню " + mark!!.source.replace("hsk3:", "HSK 3.0 · ").replace("hsk2:", "HSK 2.0 · ")
+                    word in known -> "Выучено в карточках"
+                    knownNow -> "Знакомо по частям слова"
+                    else -> null
+                },
+                canReset = mark?.source == ReaderViewModel.UNKNOWN || mark?.source == "manual",
+                onKnown = { onKnown(word, it) },
+                onReset = { onClearKnown(word) }
+            )
             status?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             speaker.message.takeIf { it.isNotEmpty() }?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        }
+    }
+}
+
+/** «Знаю» / «Не знаю» side by side; the current state is filled, with why the word counts so. */
+@Composable
+private fun KnownChoice(
+    known: Boolean,
+    reason: String?,
+    canReset: Boolean,
+    onKnown: (Boolean) -> Unit,
+    onReset: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            for (value in listOf(true, false)) {
+                val selected = known == value
+                val label = if (value) "Знаю" else "Не знаю"
+                val mod = Modifier.weight(1f).height(52.dp)
+                if (selected) {
+                    Button(onClick = { onKnown(value) }, modifier = mod, shape = RoundedCornerShape(18.dp)) {
+                        Icon(LexiconIcons.Check, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+                        Text(label, style = MaterialTheme.typography.titleMedium)
+                    }
+                } else {
+                    OutlinedButton(onClick = { onKnown(value) }, modifier = mod, shape = RoundedCornerShape(18.dp)) {
+                        Text(label, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            reason?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+            } ?: Spacer(Modifier.weight(1f))
+            if (canReset) TextButton(onClick = onReset) { Text("Сбросить") }
         }
     }
 }

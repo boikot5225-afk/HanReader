@@ -47,7 +47,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hanreader.app.Appearance
 import com.hanreader.app.AppearanceStore
+import androidx.compose.foundation.horizontalScroll
 import com.hanreader.app.GlossMode
+import com.hanreader.app.ScriptMode
+import com.hanreader.app.ToneColors
 import com.hanreader.app.HanFont
 import com.hanreader.app.LexiconIcons
 import com.hanreader.app.LocalThemeSpec
@@ -144,6 +147,32 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
                     style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
                 )
             }
+
+            Text("Цвет тонов", style = MaterialTheme.typography.bodyLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                ToneColors.entries.forEach { m ->
+                    FilterChip(selected = a.tones == m, onClick = { AppearanceStore.update { it.copy(tones = m) } }, label = { Text(m.title) })
+                }
+            }
+            if (a.tones != ToneColors.OFF) {
+                val pal = if (spec.dark) Tones.DARK else Tones.LIGHT
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    listOf("1 mā", "2 má", "3 mǎ", "4 mà", "· ma").forEachIndexed { i, t ->
+                        Text(t, color = pal[i], style = MaterialTheme.typography.bodyMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                    }
+                }
+            }
+
+            Text("Иероглифы", style = MaterialTheme.typography.bodyLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                ScriptMode.entries.forEach { m ->
+                    FilterChip(selected = a.script == m, onClick = { AppearanceStore.update { it.copy(script = m) } }, label = { Text(m.title) })
+                }
+            }
+            Text(
+                "Книгу в традиционных иероглифах словарь понимает всегда; здесь — как их показывать.",
+                style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
+            )
 
             Section("Тема")
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

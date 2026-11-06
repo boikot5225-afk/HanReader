@@ -59,12 +59,16 @@ fun NavigationSheet(
     onChapter: (Int) -> Unit,
     onBookmark: (Bookmark) -> Unit,
     onRemoveBookmark: (Bookmark) -> Unit,
-    onHit: (SearchHit) -> Unit
+    onHit: (SearchHit) -> Unit,
+    highlights: List<com.hanreader.app.Highlight> = emptyList(),
+    onHighlight: (com.hanreader.app.Highlight) -> Unit = {},
+    onRemoveHighlight: (com.hanreader.app.Highlight) -> Unit = {},
+    onExport: () -> Unit = {}
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         TabRow(selectedTabIndex = tab, containerColor = MaterialTheme.colorScheme.surface) {
-            listOf("Оглавление", "Закладки", "Поиск").forEachIndexed { i, title ->
+            listOf("Оглавление", "Закладки", "Выделения", "Поиск").forEachIndexed { i, title ->
                 Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })
             }
         }
@@ -72,6 +76,7 @@ fun NavigationSheet(
             when (tab) {
                 0 -> Contents(book, onChapter)
                 1 -> Bookmarks(bookmarks, book, onBookmark, onRemoveBookmark)
+                2 -> HighlightList(highlights, book.epub.chapters.size, onHighlight, onRemoveHighlight, onExport)
                 else -> Search(vm, onHit)
             }
         }

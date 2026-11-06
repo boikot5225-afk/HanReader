@@ -143,7 +143,19 @@ class ReaderFlowTest {
         assertEquals(listOf("终于"), runBlocking { dao.all() }.map { it.word })
         assertEquals(LevelMark(HskSystem.HSK3, 0), vm.levelMark.value)
 
+        // «Не знаю» is a mark of its own that a level never overrides; «Сбросить» removes it.
         vm.setKnown("终于", false)
+        waitFor { runBlocking { dao.all() }.singleOrNull()?.source == ReaderViewModel.UNKNOWN }
+        r = null
+        vm.setLevel(HskSystem.HSK3, 4) { r = it }
+        waitFor(60_000) { r != null }
+        assertEquals(ReaderViewModel.UNKNOWN, runBlocking { dao.all() }.single { it.word == "终于" }.source)
+        vm.clearKnown("终于")
+        waitFor(60_000) { runBlocking { dao.all() }.firstOrNull { it.word == "终于" }?.source == "hsk3:4" } // 终于 is HSK 3.0 level 3
+        r = null
+        vm.setLevel(HskSystem.HSK3, 0) { r = it }
+        waitFor { r != null }
+        vm.clearKnown("终于")
         waitFor { runBlocking { dao.all() }.isEmpty() }
     }
 

@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -90,12 +92,18 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     /** Everything the reader treats as known: marked words plus cards learned in reviews (30+ days). */
-    val knownWords: StateFlow<Set<String>> = combine(knownDao.observeWords(), studyCards) { marked, list ->
-        HashSet<String>(marked.size + list.size).apply {
+    val knownWords: StateFlow<Set<String>> = combine(knownDao.observeWords(), knownDao.observeUnknown(), studyCards) { marked, unknown, list ->
+        val no = unknown.toHashSet()
+        val words = HashSet<String>(marked.size + list.size).apply {
             addAll(marked)
             list.filter { it.isLearned() }.forEach { add(it.word) }
-        } as Set<String>
+            removeAll(no)
+        }
+        KnownWords(words, no) as Set<String>
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    /** How [word] is marked: "manual", "hsk3:4", "unknown"... or null. */
+    fun knownMark(word: String) = knownDao.observe(word)
 
     private val _pinyinMode = MutableStateFlow(
         PinyinMode.entries.firstOrNull { it.name == prefs.getString("pinyin", null) } ?: PinyinMode.ALL
@@ -115,10 +123,33 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     )
     val levelMark: StateFlow<LevelMark> = _levelMark.asStateFlow()
 
+    /** «Знаю» / «Не знаю»: both override the level, the cards and the word's parts. */
     fun setKnown(word: String, known: Boolean) {
+        viewModelScope.launch { knownDao.put(KnownWord(word, if (known) "manual" else UNKNOWN)) }
+    }
+
+    /** Removes the reader's own mark: the word is known again only if the chosen level has it. */
+    fun clearKnown(word: String) {
         viewModelScope.launch {
-            if (known) knownDao.put(KnownWord(word, "manual")) else knownDao.remove(word)
+            knownDao.remove(word)
+            val mark = _levelMark.value
+            if (mark.level == 0) return@launch
+            val engine = runCatching { engineDeferred.await() }.getOrNull() ?: return@launch
+            val inLevel = withContext(Dispatchers.Default) { levelWords(engine, mark.system, mark.level).contains(word) }
+            if (inLevel) knownDao.put(KnownWord(word, levelTag(mark.system, mark.level)))
         }
+    }
+
+    private fun levelTag(system: HskSystem, level: Int) = (if (system == HskSystem.HSK3) "hsk3:" else "hsk2:") + level
+
+    private fun levelWords(engine: ZhEngine, system: HskSystem, level: Int): Set<String> {
+        if (level == 0) return emptySet()
+        // Both lists: HSK 2.0 leaves out words HSK 3.0 has at low levels (事, 那些) and the
+        // other way round, so the same vocabulary size of the other system counts too.
+        val listed = engine.hsk.wordsUpTo(system, level).toHashSet()
+        val other = if (system == HskSystem.HSK2) HskSystem.HSK3 else HskSystem.HSK2
+        listed += engine.hsk.wordsUpTo(other, HskLevels.equivalent(system, level))
+        return listed + KnownExpansion.expand(listed, engine.dictionary)
     }
 
     /** Marks every word up to [level] of [system] as known (0 removes the level marks). Manual marks stay. */
@@ -126,17 +157,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             onDone(runCatching {
                 val engine = engineDeferred.await()
-                val words = withContext(Dispatchers.Default) {
-                    if (level == 0) emptyList() else {
-                        // Both lists: HSK 2.0 leaves out words HSK 3.0 has at low levels (事, 那些) and the
-                        // other way round, so the same vocabulary size of the other system counts too.
-                        val listed = engine.hsk.wordsUpTo(system, level).toHashSet()
-                        val other = if (system == HskSystem.HSK2) HskSystem.HSK3 else HskSystem.HSK2
-                        listed += engine.hsk.wordsUpTo(other, HskLevels.equivalent(system, level))
-                        listed + KnownExpansion.expand(listed, engine.dictionary)
-                    }
-                }
-                val tag = (if (system == HskSystem.HSK3) "hsk3:" else "hsk2:") + level
+                val words = withContext(Dispatchers.Default) { levelWords(engine, system, level) }
+                val tag = levelTag(system, level)
                 val added = knownDao.setLevelMarks(words.map { KnownWord(it, tag) })
                 _levelMark.value = LevelMark(system, level)
                 prefs.edit().putString("hskSystem", system.name).putInt("hskLevel", level)
@@ -164,11 +186,19 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         // HSK lists were corrected after the level was chosen: mark the same level again with the new data.
         val mark = _levelMark.value
         if (mark.level > 0 && prefs.getInt("hskData", 1) < HSK_DATA_VERSION) setLevel(mark.system, mark.level) {}
+        // Simplified / traditional chosen in the settings: redraw the open chapter in that script.
+        viewModelScope.launch {
+            com.hanreader.app.AppearanceStore.appearance.map { it.script }.distinctUntilChanged().drop(1)
+                .collect { _open.value?.let { rebuildOpenChapter(it) } }
+        }
     }
 
     companion object {
         /** 2: official HSK 2.0 lists, erhua forms, derived words; 3: the other system's words of the same size. */
         const val HSK_DATA_VERSION = 3
+
+        /** Source of a «Не знаю» mark in known_words. */
+        const val UNKNOWN = "unknown"
 
         /** Saved block index meaning "the end of the chapter". */
         const val END_OF_CHAPTER = Int.MAX_VALUE / 2
@@ -340,7 +370,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         val result = runCatching {
             val engine = engineCore.await()
             val extra = namesToKeepWhole(current.entity.id)
-            withContext(Dispatchers.Default) { ChapterBuilder.build(current.epub, index, engine, extra) }
+            withContext(Dispatchers.Default) { ChapterBuilder.build(current.epub, index, engine, extra, com.hanreader.app.AppearanceStore.appearance.value.script) }
         }
         val now = _open.value ?: return
         _open.value = result.fold(
@@ -431,6 +461,36 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { bookmarkDao.delete(id) }
     }
 
+    // ---- Highlights and notes ----
+
+    private val highlightDao = db.highlightDao()
+
+    fun highlights(bookId: Long) = highlightDao.observe(bookId)
+
+    /** Highlights characters [start, end) of paragraph [block]. */
+    fun addHighlight(chapter: ChapterContent, block: Int, start: Int, end: Int, color: Int) {
+        val o = _open.value ?: return
+        val b = chapter.blocks.getOrNull(block) as? ReaderBlock.Text ?: return
+        if (start < 0 || end > b.shown.length || start >= end) return
+        viewModelScope.launch {
+            highlightDao.insert(
+                com.hanreader.app.Highlight(
+                    bookId = o.entity.id, chapterIndex = chapter.index, blockIndex = block,
+                    startChar = start, endChar = end, color = color,
+                    text = b.shown.substring(start, end), chapterTitle = chapter.title
+                )
+            )
+        }
+    }
+
+    fun updateHighlight(h: com.hanreader.app.Highlight) {
+        viewModelScope.launch { highlightDao.update(h) }
+    }
+
+    fun removeHighlight(id: Long) {
+        viewModelScope.launch { highlightDao.delete(id) }
+    }
+
     // ---- Search in the book ----
 
     data class SearchState(
@@ -509,7 +569,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 val engine = engineCore.await()
                 val result = withContext(Dispatchers.Default) {
                     BookFiles.open(File(booksDir, entity.fileName)).use { epub ->
-                        BookAnalyzer.analyze(bookId, epub, engine.segmenter, engine.dictionary) { done, total ->
+                        BookAnalyzer.analyze(bookId, epub, engine.segmenter, engine.dictionary, script = engine.script) { done, total ->
                             _analysis.value = _analysis.value + (bookId to done.toFloat() / total)
                         }
                     }

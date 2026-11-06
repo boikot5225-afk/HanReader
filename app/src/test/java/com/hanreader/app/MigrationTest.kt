@@ -90,17 +90,21 @@ class MigrationTest {
             db.bookDao().setIgnored(7, "终于", true)
             db.bookDao().saveAnalysis(7, listOf(BookWord(7, "终于", 4, 5)), 11)
             assertEquals(listOf("终于"), db.bookDao().ignoredWords(7)) // ignore marks survive re-analysis
+            // v10: highlights, removed with their book
+            db.highlightDao().insert(Highlight(bookId = 7, chapterIndex = 5, blockIndex = 12, startChar = 0, endChar = 4, color = 1, text = "他终于回", chapterTitle = "第五章"))
+            assertEquals("他终于回", db.highlightDao().observe(7).first().single().text)
             // v7: bookmarks, removed with their book
             db.bookmarkDao().insert(Bookmark(bookId = 7, chapterIndex = 5, blockIndex = 12, chapterTitle = "第五章", snippet = "他终于回来了"))
             assertEquals(1, db.bookmarkDao().observe(7).first().size)
             db.bookDao().delete(7)
             assertEquals(0, db.bookmarkDao().observe(7).first().size)
+            assertEquals(0, db.highlightDao().observe(7).first().size)
             // v8: names marked by the reader
             db.userNameDao().put(UserName("雷蒙德"))
             assertEquals(listOf("雷蒙德"), db.userNameDao().all().map { it.word })
             assertEquals(emptyList<String>(), db.bookDao().ignoredWords(7)) // cascade
         }
-        assertEquals(9, db.openHelper.readableDatabase.version)
+        assertEquals(10, db.openHelper.readableDatabase.version)
         db.close()
     }
 }
