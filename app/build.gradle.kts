@@ -11,8 +11,8 @@ android {
         applicationId = "com.hanreader.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.3.0"
+        versionCode = 5
+        versionName = "0.3.1"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -31,6 +31,9 @@ android {
             }
             providers.environmentVariable("HANREADER_TEST_EPUB").orNull?.let {
                 test.environment("HANREADER_TEST_EPUB", it)
+            }
+            providers.environmentVariable("HANREADER_COUNTS_OUT").orNull?.let {
+                test.environment("HANREADER_COUNTS_OUT", it)
             }
         }
     }

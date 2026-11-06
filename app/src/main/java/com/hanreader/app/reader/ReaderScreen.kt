@@ -434,8 +434,9 @@ private fun WordSheet(
     val entry = remember(word) { engine.lookup(word)?.takeIf { it.hasDefinition } }
     val chars = remember(word) { if (entry == null) engine.characters(word) else emptyList() }
     val reading = entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
-    val translation = entry?.shortGloss()
-        ?: chars.joinToString(" + ") { it.shortGloss(1) }.ifEmpty { "нет в словаре" }
+    val russian = remember(word) { engine.russianSenses(word) }
+    val translation = engine.cardTranslation(word)
+        ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
     var status by remember(word) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -457,9 +458,22 @@ private fun WordSheet(
                 Text(reading, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 6.dp))
             }
-            if (entry != null) {
-                entry.gloss.split("; ", "/").map { it.trim() }.filter { it.isNotEmpty() }.take(6).forEachIndexed { i, sense ->
+            if (russian.isNotEmpty()) {
+                russian.forEachIndexed { i, sense ->
                     Text("${i + 1}. $sense", style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            if (entry != null) {
+                if (russian.isNotEmpty()) {
+                    Text("English", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                entry.gloss.split("; ", "/").map { it.trim() }.filter { it.isNotEmpty() }
+                    .take(if (russian.isEmpty()) 6 else 3).forEachIndexed { i, sense ->
+                    Text(
+                        "${i + 1}. $sense",
+                        style = if (russian.isEmpty()) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                        color = if (russian.isEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 if (entry.rank > 0) {
                     Text("Частотность: №${entry.rank}", style = MaterialTheme.typography.bodySmall,
@@ -468,7 +482,7 @@ private fun WordSheet(
             } else {
                 Text("Слова нет в словаре. По иероглифам:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 chars.forEach { c ->
-                    Text("${c.word}  ${c.pinyin} — ${c.shortGloss(2)}", style = MaterialTheme.typography.bodyLarge)
+                    Text("${c.word}  ${c.pinyin} — ${engine.cardTranslation(c.word) ?: c.shortGloss(2)}", style = MaterialTheme.typography.bodyLarge)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

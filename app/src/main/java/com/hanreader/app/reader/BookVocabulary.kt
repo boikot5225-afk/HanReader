@@ -132,7 +132,7 @@ object VocabularyStats {
 
     fun candidate(word: String, count: Int, firstChapter: Int, engine: ZhEngine): StudyCandidate {
         val e = engine.dictionary.lookup(word)
-        return StudyCandidate(word, count, e?.pinyin.orEmpty(), e?.shortGloss(2).orEmpty(), firstChapter)
+        return StudyCandidate(word, count, e?.pinyin.orEmpty(), engine.cardTranslation(word).orEmpty(), firstChapter)
     }
 
     fun book(

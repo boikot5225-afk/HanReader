@@ -324,7 +324,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                             }
                         val sentence = VocabularyStats.firstSentence(c, w.word) ?: w.word
                         val reading = engine.lookup(w.word)?.pinyin ?: w.pinyin
-                        val translation = engine.lookup(w.word)?.shortGloss() ?: w.gloss
+                        val translation = engine.cardTranslation(w.word) ?: w.gloss
                         val isNew = cards.saveFromReader(
                             STUDY_LANGUAGE,
                             ReaderSave(w.word, reading, translation, sentence, book.id, book.title, c.index, c.title)

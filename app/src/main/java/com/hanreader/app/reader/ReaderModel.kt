@@ -49,7 +49,28 @@ class HskLevels(private val levels: Map<String, Int>) {
 }
 
 /** Dictionary + segmenter, loaded once per process in the background. */
-class ZhEngine(val dictionary: ZhDictionary, val loadMs: Long, val hsk: HskLevels = HskLevels(emptyMap())) {
+class ZhEngine(
+    val dictionary: ZhDictionary,
+    val loadMs: Long,
+    val hsk: HskLevels = HskLevels(emptyMap()),
+    /** Russian meanings from the Russian Wiktionary (about 11.7k words), senses joined by " ; ". */
+    private val russian: Map<String, String> = emptyMap()
+) {
+    /** Russian senses of a word, or empty when the Russian Wiktionary has none. */
+    fun russianSenses(word: String): List<String> =
+        russian[word]?.split(" ; ")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+
+    /**
+     * The meaning stored on a flash card: Russian when available (first two senses), otherwise
+     * the short English CC-CEDICT gloss, otherwise null.
+     */
+    fun cardTranslation(word: String): String? {
+        val ru = russianSenses(word)
+        if (ru.isNotEmpty()) return ru.take(2).joinToString("; ")
+        return dictionary.lookup(word)?.takeIf { it.hasDefinition }?.shortGloss()
+    }
+
+
     val segmenter = ZhSegmenter(dictionary)
 
     /** Word pinyin without spaces ("Zhōngguó"); for words without a CEDICT entry, built from characters. */
@@ -72,6 +93,15 @@ class ZhEngine(val dictionary: ZhDictionary, val loadMs: Long, val hsk: HskLevel
         word.mapNotNull { dictionary.lookup(it.toString())?.takeIf { e -> e.hasDefinition } }
 
     companion object {
+        fun parseRussian(lines: Sequence<String>): Map<String, String> {
+            val map = HashMap<String, String>(16_000)
+            for (line in lines) {
+                val tab = line.indexOf('\t')
+                if (tab > 0) map[line.substring(0, tab)] = line.substring(tab + 1)
+            }
+            return map
+        }
+
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         @Volatile private var deferred: CompletableDeferred<ZhEngine>? = null
 
@@ -88,7 +118,8 @@ class ZhEngine(val dictionary: ZhDictionary, val loadMs: Long, val hsk: HskLevel
                         val t = System.nanoTime()
                         val dict = app.assets.open("zh/lexicon.dat").use { ZhDictionary.load(it) }
                         val hsk = app.assets.open("zh/hsk.tsv").bufferedReader().useLines { HskLevels.parse(it) }
-                        ZhEngine(dict, (System.nanoTime() - t) / 1_000_000, hsk)
+                        val ru = app.assets.open("zh/ru.tsv").bufferedReader().useLines { parseRussian(it) }
+                        ZhEngine(dict, (System.nanoTime() - t) / 1_000_000, hsk, ru)
                     }.onSuccess { d.complete(it) }.onFailure { d.completeExceptionally(it) }
                 }
                 return d

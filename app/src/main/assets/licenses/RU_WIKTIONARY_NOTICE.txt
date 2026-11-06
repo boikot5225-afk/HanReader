@@ -1,0 +1,6 @@
+Russian meanings (zh/ru.tsv): Russian Wiktionary (ru.wiktionary.org), Chinese (Mandarin) words and
+Chinese characters, via the wiktextract extract published at https://kaikki.org/ruwiktionary/
+(downloaded November 2026).
+Wiktionary text: Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0), authors: Wiktionary contributors.
+https://creativecommons.org/licenses/by-sa/4.0/
+The derived file zh/ru.tsv is distributed under the same licence.

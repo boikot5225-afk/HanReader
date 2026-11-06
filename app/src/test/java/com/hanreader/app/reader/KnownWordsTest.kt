@@ -66,4 +66,16 @@ class KnownWordsTest {
         val lexicon = BackupFormat.decode(BackupFormat.encode(backup.copy(knownWords = null)))
         assertNull(lexicon.knownWords)
     }
+
+    @Test
+    fun russianMeaningsComeFirstOnCards() {
+        val ru = File("src/main/assets/zh/ru.tsv").bufferedReader().useLines { ZhEngine.parseRussian(it) }
+        assertTrue(ru.size > 11_000)
+        val engine = ZhEngine(ZhSegmenterTest.dict, 0, hsk, ru)
+        assertEquals(listOf("они"), engine.russianSenses("他们"))
+        assertEquals("немедленно, тотчас, сразу же", engine.cardTranslation("立刻"))
+        // No Russian entry: English CC-CEDICT gloss.
+        assertTrue(engine.russianSenses("终于").isEmpty())
+        assertTrue(engine.cardTranslation("终于")!!.contains("finally"))
+    }
 }
