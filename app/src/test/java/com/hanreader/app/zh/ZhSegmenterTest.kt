@@ -11,7 +11,7 @@ class ZhSegmenterTest {
     companion object {
         // Unit tests run with the module directory as the working directory.
         val dict: ZhDictionary by lazy {
-            File("src/main/assets/zh/lexicon.dat").inputStream().use { ZhDictionary.load(it) }
+            ZhDictionary.map(File("src/main/assets/zh/lexicon.bin"))
         }
         val segmenter by lazy { ZhSegmenter(dict) }
     }
@@ -25,6 +25,28 @@ class ZhSegmenterTest {
         val e = dict.lookup("中国")
         assertNotNull(e)
         assertEquals("Zhōng guó", e!!.pinyin)
+    }
+
+    /** The binary lexicon holds exactly what the source TSV (data/zh/lexicon.dat) holds. */
+    @Test
+    fun binaryLexiconMatchesTheSource() {
+        var n = 0
+        java.util.zip.GZIPInputStream(File("../data/zh/lexicon.dat").inputStream()).bufferedReader().useLines { lines ->
+            for (line in lines) {
+                val p = line.split('\t')
+                if (p.size < 5 || p[0].isEmpty()) continue
+                val e = dict.lookup(p[0])
+                assertNotNull(p[0], e)
+                assertEquals(p[1], e!!.pinyin)
+                assertEquals(p[2], e.gloss)
+                assertEquals(p[3].toInt(), e.rank)
+                assertEquals(p[4].toInt(), e.freq)
+                n++
+            }
+        }
+        assertEquals(n, dict.size)
+        assertEquals(-1, dict.freq("不是一个词语啊"))
+        assertTrue(!dict.contains(""))
     }
 
     @Test

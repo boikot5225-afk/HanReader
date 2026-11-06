@@ -1,6 +1,7 @@
 package com.hanreader.app.reader
 
 import android.content.Context
+import java.io.File
 import com.hanreader.app.epub.EpubBlock
 import com.hanreader.app.epub.BookSource
 import com.hanreader.app.zh.TokenKind
@@ -47,11 +48,12 @@ class HskLevels(private val levels: Map<String, Int>) {
         fun parse(lines: Sequence<String>): HskLevels {
             val map = HashMap<String, Int>(16_000)
             for (line in lines) {
-                val p = line.split('\t')
-                if (p.size < 3) continue
-                val n = p[1].toIntOrNull() ?: 0
-                val o = p[2].toIntOrNull() ?: 0
-                map[p[0]] = (n shl 4) or o
+                val a = line.indexOf('\t')
+                val b = line.indexOf('\t', a + 1)
+                if (a <= 0 || b < 0) continue
+                val n = line.substring(a + 1, b).toIntOrNull() ?: 0
+                val o = line.substring(b + 1).trim().toIntOrNull() ?: 0
+                map[line.substring(0, a)] = (n shl 4) or o
             }
             return HskLevels(map)
         }
@@ -165,29 +167,59 @@ class ZhEngine(
         }
 
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        @Volatile private var deferred: CompletableDeferred<ZhEngine>? = null
 
         /** Starts loading if needed; await the result where the engine is required. */
-        fun warmUp(context: Context): CompletableDeferred<ZhEngine> {
-            deferred?.let { return it }
+        @Volatile private var full: CompletableDeferred<ZhEngine>? = null
+        @Volatile private var core: CompletableDeferred<ZhEngine>? = null
+
+        /** The complete engine: dictionary plus Russian meanings, HSK levels and names. */
+        fun warmUp(context: Context): CompletableDeferred<ZhEngine> { start(context); return full!! }
+
+        /** The dictionary alone, ready in milliseconds: enough to segment and show a chapter. */
+        fun core(context: Context): CompletableDeferred<ZhEngine> { start(context); return core!! }
+
+        private fun start(context: Context) {
+            if (full != null) return
             synchronized(this) {
-                deferred?.let { return it }
-                val d = CompletableDeferred<ZhEngine>()
-                deferred = d
+                if (full != null) return
+                val c = CompletableDeferred<ZhEngine>()
+                val f = CompletableDeferred<ZhEngine>()
+                core = c
+                full = f
                 val app = context.applicationContext
                 scope.launch {
-                    runCatching {
+                    try {
                         val t = System.nanoTime()
-                        val dict = app.assets.open("zh/lexicon.dat").use { ZhDictionary.load(it) }
+                        val dict = ZhDictionary.map(lexiconFile(app))
+                        val ms = (System.nanoTime() - t) / 1_000_000
+                        c.complete(ZhEngine(dict, ms))
                         val hsk = app.assets.open("zh/hsk.tsv").bufferedReader().useLines { HskLevels.parse(it) }
                         val ru = app.assets.open("zh/ru.tsv").bufferedReader().useLines { parseRussian(it) }
                         val ruAi = app.assets.open("zh/ru_ai.tsv").bufferedReader().useLines { parseRussian(it) }
                         val names = app.assets.open("zh/names.tsv").bufferedReader().useLines { parseNames(it) }
-                        ZhEngine(dict, (System.nanoTime() - t) / 1_000_000, hsk, ru, ruAi, names)
-                    }.onSuccess { d.complete(it) }.onFailure { d.completeExceptionally(it) }
+                        f.complete(ZhEngine(dict, ms, hsk, ru, ruAi, names))
+                    } catch (e: Throwable) {
+                        c.completeExceptionally(e)
+                        f.completeExceptionally(e)
+                    }
                 }
-                return d
             }
+        }
+
+        /**
+         * The binary lexicon, copied once from the APK (where it is compressed) into app storage,
+         * so it can be mapped into memory. A new install or update makes a fresh copy.
+         */
+        private fun lexiconFile(app: Context): File {
+            val stamp = runCatching { app.packageManager.getPackageInfo(app.packageName, 0).lastUpdateTime }.getOrDefault(0L)
+            val dir = File(app.filesDir, "lexicon").apply { mkdirs() }
+            val file = File(dir, "lexicon-$stamp.bin")
+            if (file.exists() && file.length() > 0) return file
+            dir.listFiles()?.forEach { it.delete() }
+            val tmp = File(dir, "copy.tmp")
+            app.assets.open("zh/lexicon.bin").use { src -> tmp.outputStream().use { src.copyTo(it, 1 shl 16) } }
+            if (!tmp.renameTo(file)) { tmp.copyTo(file, overwrite = true); tmp.delete() }
+            return file
         }
     }
 }

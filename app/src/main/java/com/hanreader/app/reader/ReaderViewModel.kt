@@ -61,6 +61,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val knownDao = db.knownWordDao()
     private val prefs = app.getSharedPreferences("reader_settings", android.content.Context.MODE_PRIVATE)
     private val engineDeferred = ZhEngine.warmUp(app)
+    /** The dictionary alone: chapters, analysis and search need nothing more and start at once. */
+    private val engineCore = ZhEngine.core(app)
     private val booksDir = File(app.filesDir, "books").apply { mkdirs() }
     private val openMutex = Mutex()
     private val images = object : LruCache<String, Bitmap>(24 * 1024 * 1024) {
@@ -154,7 +156,11 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     val message: StateFlow<String?> = _message.asStateFlow()
 
     init {
-        viewModelScope.launch { _engine.value = runCatching { engineDeferred.await() }.getOrNull() }
+        // First the dictionary (milliseconds), then the full engine with Russian, HSK and names.
+        viewModelScope.launch {
+            runCatching { engineCore.await() }.getOrNull()?.let { if (_engine.value == null) _engine.value = it }
+            _engine.value = runCatching { engineDeferred.await() }.getOrNull() ?: _engine.value
+        }
         // HSK lists were corrected after the level was chosen: mark the same level again with the new data.
         val mark = _levelMark.value
         if (mark.level > 0 && prefs.getInt("hskData", 1) < HSK_DATA_VERSION) setLevel(mark.system, mark.level) {}
@@ -323,7 +329,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         if (index !in current.epub.chapters.indices) return
         _open.value = current.copy(loading = true, error = null)
         val result = runCatching {
-            val engine = engineDeferred.await()
+            val engine = engineCore.await()
             val extra = namesToKeepWhole(current.entity.id)
             withContext(Dispatchers.Default) { ChapterBuilder.build(current.epub, index, engine, extra) }
         }
@@ -437,7 +443,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         val epub = _open.value?.epub ?: return
         _search.value = SearchState(q, emptyList(), running = true)
         searchJob = viewModelScope.launch {
-            val engine = engineDeferred.await()
+            val engine = engineCore.await()
             val found = ArrayList<SearchHit>()
             withContext(Dispatchers.Default) {
                 BookSearch.search(epub, q, engine, onProgress = { done, total ->
@@ -492,7 +498,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             runCatching {
                 val entity = books.get(bookId) ?: return@runCatching
-                val engine = engineDeferred.await()
+                val engine = engineCore.await()
                 val result = withContext(Dispatchers.Default) {
                     BookFiles.open(File(booksDir, entity.fileName)).use { epub ->
                         BookAnalyzer.analyze(bookId, epub, engine.segmenter, engine.dictionary) { done, total ->

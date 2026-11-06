@@ -11,7 +11,7 @@ Android-приложение для чтения китайских книг и 
 | Часть | Как сделано |
 |---|---|
 | EPUB | `epub/EpubBook.kt`: container.xml → OPF → spine, оглавление из EPUB3 nav или NCX, глава → абзацы / заголовки / картинки (Jsoup) |
-| Словарь | `assets/zh/lexicon.dat`: 121 тыс. статей CC-CEDICT + 69 тыс. слов Jieba для сегментации, загружается в фоне при запуске |
+| Словарь | `assets/zh/lexicon.bin`: 121 тыс. статей CC-CEDICT + 69 тыс. слов Jieba; двоичный файл с готовой хеш-таблицей (`tools/build_lexicon_bin.py` из `data/zh/lexicon.dat`), при первом запуске копируется из APK и дальше отображается в память — без разбора при старте; русские значения, HSK и имена догружаются в фоне |
 | Сегментация | `zh/ZhSegmenter.kt`: модель Jieba без HMM — граф слов словаря + динамическое программирование по частотам |
 | Пиньинь | основное чтение слова или иероглифа из pypinyin, иначе из CC-CEDICT; три режима: над всеми, только над незнакомыми, выключен |
 | Знакомые слова | таблица `known_words`: «Знаю» в карточке слова и отметка всех слов до уровня HSK 3.0 / 2.0; выученные карточки (30+ дней) тоже считаются знакомыми; в конце раздела — доля знакомых слов |
@@ -53,7 +53,7 @@ JDK 17, Gradle 8.13+, Android SDK 36.
 Релизная подпись — см. [SIGNING.md](SIGNING.md).
 
 Данные пересобираются так:
-`python3 tools/build_zh_dict.py zh_dict_core.json zh_vocab_frequency.txt.gz jieba/dict.txt pypinyin/ app/src/main/assets/zh/lexicon.dat`
+`python3 tools/build_zh_dict.py zh_dict_core.json zh_vocab_frequency.txt.gz jieba/dict.txt pypinyin/ data/zh/lexicon.dat` и `python3 tools/build_lexicon_bin.py data/zh/lexicon.dat app/src/main/assets/zh/lexicon.bin`
 и `python3 tools/build_hsk.py complete.min.json app/src/main/assets/zh/hsk.tsv`.
 
 Схемы базы каждой версии лежат в `app/schemas`; `MigrationTest` поднимает базу 0.1.0 и проверяет переход на текущую версию.

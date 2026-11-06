@@ -2,7 +2,7 @@
 """One-time translation of CC-CEDICT meanings into Russian with the DeepSeek chat API.
 
 Builds the input from the app's own data:
-  app/src/main/assets/zh/lexicon.dat  word, pinyin, English (CC-CEDICT), HSK rank, Jieba freq
+  data/zh/lexicon.dat                 word, pinyin, English (CC-CEDICT), HSK rank, Jieba freq
   app/src/main/assets/zh/hsk.tsv      every HSK word goes first
   app/src/main/assets/zh/ru.tsv       words the Russian Wiktionary already covers are skipped
 Selection: all HSK words, then the most frequent other CC-CEDICT words, up to --top words.
@@ -47,7 +47,7 @@ def load_selection(top: int):
     hsk = {line.split("\t")[0] for line in open(os.path.join(ASSETS, "hsk.tsv"), encoding="utf-8")}
     ru = {line.split("\t")[0] for line in open(os.path.join(ASSETS, "ru.tsv"), encoding="utf-8")}
     rows = []
-    with gzip.open(os.path.join(ASSETS, "lexicon.dat"), "rt", encoding="utf-8") as f:
+    with gzip.open(os.path.join(os.path.dirname(__file__), "..", "data", "zh", "lexicon.dat"), "rt", encoding="utf-8") as f:
         for line in f:
             w, p, g, _rank, freq = line.rstrip("\n").split("\t")
             if g and not p[:1].isupper():

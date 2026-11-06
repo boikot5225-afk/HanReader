@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build app/src/main/assets/zh/lexicon.dat, the offline Chinese lexicon.
+"""Build data/zh/lexicon.dat, the source of the offline Chinese lexicon (then tools/build_lexicon_bin.py).
 
 Inputs:
   zh_dict_core.json          CC-CEDICT compact map from Reader AI (boikot5225-afk/Test, data/):
