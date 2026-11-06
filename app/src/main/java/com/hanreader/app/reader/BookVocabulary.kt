@@ -44,7 +44,51 @@ object NameRuns {
     }
 }
 
+/**
+ * Full foreign names in Chinese translations are written with a middle dot: 名·姓. The words
+ * right next to the dot are parts of a name even when they occur only once: runs of single
+ * characters or of words the dictionary does not define, up to [MAX_PART] characters a side.
+ */
+object DotNames {
+    private const val DOTS = "·・•‧"
+    private const val MAX_PART = 5
+
+    fun <T> runs(
+        tokens: List<T>,
+        text: (T) -> String,
+        isHan: (T) -> Boolean,
+        dict: ZhDictionary
+    ): List<IntRange> {
+        fun namePart(t: T): Boolean {
+            if (!isHan(t)) return false
+            val w = text(t)
+            return w.length == 1 || dict.lookup(w)?.hasDefinition != true
+        }
+        val out = ArrayList<IntRange>()
+        for ((i, t) in tokens.withIndex()) {
+            val w = text(t)
+            if (w.length != 1 || w[0] !in DOTS) continue
+            var a = i
+            var chars = 0
+            while (a - 1 >= 0 && namePart(tokens[a - 1]) && chars + text(tokens[a - 1]).length <= MAX_PART) {
+                a--; chars += text(tokens[a]).length
+            }
+            if (a < i && chars >= 2) out += a until i
+            var b = i
+            chars = 0
+            while (b + 1 < tokens.size && namePart(tokens[b + 1]) && chars + text(tokens[b + 1]).length <= MAX_PART) {
+                b++; chars += text(tokens[b]).length
+            }
+            if (b > i && chars >= 2) out += (i + 1)..b
+        }
+        return out
+    }
+}
+
 object BookAnalyzer {
+    /** Bumped when the analysis finds more (2: names next to a middle dot). Older books are re-analysed. */
+    const val VERSION = 2
+
     /**
      * Segments every chapter once and counts Han words. Name runs repeated in the book are stored
      * as ignored words, and their characters are not counted on their own. [onProgress] gets
@@ -59,6 +103,7 @@ object BookAnalyzer {
     ): BookAnalysis {
         val counts = HashMap<String, IntArray>(32_000) // [count, firstChapter]
         val runs = HashMap<String, IntArray>()          // [count, firstChapter]
+        val dotNames = HashSet<String>()
         var tokens = 0
         val total = epub.chapters.size
         for (c in epub.chapters) {
@@ -74,12 +119,19 @@ object BookAnalyzer {
                     val name = r.joinToString("") { seg[it].text }
                     runs.getOrPut(name) { intArrayOf(0, c.index) }[0]++
                 }
+                // Names next to a middle dot count from the first occurrence.
+                for (r in DotNames.runs(seg, { it.text }, { it.kind == TokenKind.HAN }, dict)) {
+                    val name = r.joinToString("") { seg[it].text }
+                    val e = runs.getOrPut(name) { intArrayOf(0, c.index) }
+                    e[0]++
+                    if (e[0] < NameRuns.MIN_REPEATS) dotNames += name
+                }
             }
             onProgress(c.index + 1, total)
         }
         val names = ArrayList<BookWord>()
         for ((name, e) in runs) {
-            if (e[0] < NameRuns.MIN_REPEATS) continue
+            if (e[0] < NameRuns.MIN_REPEATS && name !in dotNames) continue
             names += BookWord(bookId, name, e[0], e[1], ignored = true)
             for (ch in name) counts[ch.toString()]?.let { it[0] -= e[0] }
             tokens -= e[0] * name.length
@@ -195,11 +247,11 @@ object VocabularyStats {
 
     /** Indexes of tokens that belong to a known name of the book ([names]: the book's ignored words). */
     fun nameTokens(block: ReaderBlock.Text, names: Set<String>, engine: ZhEngine): Set<Int> {
-        if (names.isEmpty()) return emptySet()
         val out = HashSet<Int>()
         for (r in NameRuns.runs(block.tokens, { it.text }, { it.kind == TokenKind.HAN }, engine.dictionary)) {
             if (r.joinToString("") { block.tokens[it].text } in names) out.addAll(r)
         }
+        for (r in DotNames.runs(block.tokens, { it.text }, { it.kind == TokenKind.HAN }, engine.dictionary)) out.addAll(r)
         return out
     }
 

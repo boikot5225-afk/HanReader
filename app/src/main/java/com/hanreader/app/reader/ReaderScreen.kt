@@ -1069,6 +1069,9 @@ private fun WordSheet(
                     Text(if (isSaved) "Добавить пример к карточке" else "Сохранить в карточки", style = MaterialTheme.typography.titleMedium)
                 }
             }
+            if (entry?.gloss?.contains("(idiom)") == true) {
+                Text("成语 · идиома", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             val lexiconName = engine.nameKind(word)
             val isUserName = word in userNames
             if (lexiconName != null || isUserName) {

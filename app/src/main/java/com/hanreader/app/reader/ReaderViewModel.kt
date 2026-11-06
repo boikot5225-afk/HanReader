@@ -302,7 +302,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 _open.value = OpenBook(entity, epub)
                 loadChapterLocked(entity.chapterIndex.coerceIn(0, epub.chapters.lastIndex))
-                if (entity.analyzedTokens == 0) analyzeBook(entity.id)
+                if (entity.analyzedTokens == 0 || prefs.getInt("analysis_v_${entity.id}", 1) < BookAnalyzer.VERSION) analyzeBook(entity.id)
             }
         }
     }
@@ -495,6 +495,9 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 books.saveAnalysis(bookId, result.words, result.tokens)
+                prefs.edit().putInt("analysis_v_$bookId", BookAnalyzer.VERSION).apply()
+                // Names found now are kept whole: rebuild the open chapter in place.
+                _open.value?.let { o -> if (o.entity.id == bookId) o.chapter?.let { c -> goToChapter(c.index, block = o.entity.blockIndex) } }
                 _open.value?.let { o -> if (o.entity.id == bookId) _open.value = o.copy(entity = o.entity.copy(analyzedTokens = result.tokens)) }
             }.onFailure { _message.value = "Не удалось разобрать словарь книги: ${it.message}" }
             _analysis.value = _analysis.value - bookId

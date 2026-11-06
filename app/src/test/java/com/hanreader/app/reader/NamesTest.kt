@@ -58,4 +58,17 @@ class NamesTest {
         assertEquals(listOf("雷蒙德", "莉娜"), BackupFormat.decode(BackupFormat.encode(b)).userNames)
         assertNull(BackupFormat.decode(BackupFormat.encode(b.copy(userNames = null))).userNames)
     }
+
+    @Test
+    fun namesNextToAMiddleDot() {
+        val text = "索琪丹·莫琳塔先生在一家公司工作。"
+        val toks = engine.segmenter.segment(text)
+        val runs = DotNames.runs(toks, { it.text }, { it.kind == TokenKind.HAN }, engine.dictionary)
+        val found = runs.map { r -> r.joinToString("") { toks[it].text } }
+        assertEquals(listOf("索琪丹", "莫琳塔"), found) // 先生 is an ordinary word: not part of the name
+        // Ordinary words around a dot are not names.
+        val t2 = "中国·北京"
+        val toks2 = engine.segmenter.segment(t2)
+        assertTrue(DotNames.runs(toks2, { it.text }, { it.kind == TokenKind.HAN }, engine.dictionary).isEmpty())
+    }
 }
