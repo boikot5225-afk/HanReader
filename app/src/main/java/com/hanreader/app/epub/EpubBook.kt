@@ -6,7 +6,6 @@ import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 import org.jsoup.parser.Parser
-import java.io.Closeable
 import java.io.File
 import java.net.URLDecoder
 import java.util.zip.ZipFile
@@ -29,18 +28,20 @@ class EpubException(message: String) : Exception(message)
  * Minimal EPUB 2/3 reader: container.xml → OPF (metadata, manifest, spine) → NCX or nav TOC.
  * Chapters are parsed on demand; nothing is kept in memory except the spine and TOC.
  */
-class EpubBook(file: File) : Closeable {
+class EpubBook(file: File) : BookSource {
     private val zip = try {
         ZipFile(file)
     } catch (e: Exception) {
         throw EpubException("Файл не является EPUB (не ZIP-архив)")
     }
 
-    val title: String
-    val author: String
+    override val title: String
+    override val author: String
     val language: String
-    val chapters: List<EpubChapter>
-    val toc: List<TocEntry>
+    override val chapters: List<EpubChapter>
+    override val toc: List<TocEntry>
+    /** Archive path of the cover image, from the OPF (EPUB 3 cover-image or EPUB 2 <meta name="cover">). */
+    private val coverPath: String?
 
     init {
         val container = xml(text("META-INF/container.xml") ?: throw EpubException("В EPUB нет META-INF/container.xml"))
@@ -58,6 +59,9 @@ class EpubBook(file: File) : Closeable {
         opf.select("manifest > item").forEach {
             manifest[it.attr("id")] = Item(resolve(base, it.attr("href")), it.attr("media-type"), it.attr("properties"))
         }
+        val coverId = opf.select("metadata > meta").firstOrNull { it.attr("name") == "cover" }?.attr("content")
+        coverPath = manifest.values.firstOrNull { "cover-image" in it.properties.split(' ') }?.path
+            ?: coverId?.let { manifest[it] }?.takeIf { it.type.startsWith("image/") }?.path
         val spine = opf.selectFirst("spine")
         val spinePaths = spine?.select("itemref")?.mapNotNull { manifest[it.attr("idref")]?.path }.orEmpty()
         if (spinePaths.isEmpty()) throw EpubException("В книге нет глав (пустой spine)")
@@ -79,7 +83,7 @@ class EpubBook(file: File) : Closeable {
     }
 
     /** Paragraphs, headings and images of one spine item, in order. */
-    fun blocks(chapterIndex: Int): List<EpubBlock> {
+    override fun blocks(chapterIndex: Int): List<EpubBlock> {
         val chapter = chapters[chapterIndex]
         val html = text(chapter.path) ?: return emptyList()
         val doc = Jsoup.parse(html)
@@ -88,7 +92,16 @@ class EpubBook(file: File) : Closeable {
         return out
     }
 
-    fun bytes(path: String): ByteArray? = zip.getEntry(path)?.let { e -> zip.getInputStream(e).use { it.readBytes() } }
+    override fun cover(): ByteArray? {
+        coverPath?.let { p -> bytes(p)?.let { return it } }
+        // Fallback: the first image of the first chapters.
+        for (i in 0 until minOf(3, chapters.size)) {
+            blocks(i).firstOrNull { it is EpubBlock.Image }?.let { return bytes((it as EpubBlock.Image).path) }
+        }
+        return null
+    }
+
+    override fun bytes(path: String): ByteArray? = zip.getEntry(path)?.let { e -> zip.getInputStream(e).use { it.readBytes() } }
 
     override fun close() = zip.close()
 

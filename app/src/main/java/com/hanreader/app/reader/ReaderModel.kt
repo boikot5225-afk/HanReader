@@ -2,7 +2,7 @@ package com.hanreader.app.reader
 
 import android.content.Context
 import com.hanreader.app.epub.EpubBlock
-import com.hanreader.app.epub.EpubBook
+import com.hanreader.app.epub.BookSource
 import com.hanreader.app.zh.TokenKind
 import com.hanreader.app.zh.ZhDictionary
 import com.hanreader.app.zh.ZhEntry
@@ -169,7 +169,7 @@ data class ChapterContent(
 )
 
 object ChapterBuilder {
-    fun build(book: EpubBook, index: Int, engine: ZhEngine): ChapterContent {
+    fun build(book: BookSource, index: Int, engine: ZhEngine): ChapterContent {
         val t = System.nanoTime()
         var chars = 0
         val blocks = book.blocks(index).map { b ->

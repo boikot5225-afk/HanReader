@@ -276,3 +276,20 @@ object ReaderKeys {
     @Volatile var active: Boolean = false
     val turns = kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 8)
 }
+
+/** A book file another app asked HanReader to open (VIEW / SEND), waiting to be imported. */
+object IncomingBooks {
+    val pending = MutableStateFlow<android.net.Uri?>(null)
+
+    fun take(intent: android.content.Intent?) {
+        intent ?: return
+        val uri = when (intent.action) {
+            android.content.Intent.ACTION_VIEW -> intent.data
+            android.content.Intent.ACTION_SEND ->
+                if (android.os.Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(android.content.Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                else @Suppress("DEPRECATION") intent.getParcelableExtra(android.content.Intent.EXTRA_STREAM)
+            else -> null
+        } ?: return
+        pending.value = uri
+    }
+}

@@ -43,11 +43,35 @@ import com.hanreader.app.LexiconIcons
 import com.hanreader.app.Overline
 import com.hanreader.app.Panel
 import com.hanreader.app.ProgressBar
+import com.hanreader.app.LocalThemeSpec
 import com.hanreader.app.WordFont
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
+
+/** File types the picker offers: EPUB, FB2 (also zipped) and plain text. */
+val BOOK_MIME_TYPES = arrayOf(
+    "application/epub+zip", "application/x-fictionbook+xml", "application/x-fictionbook", "text/xml",
+    "text/plain", "application/zip", "application/x-zip-compressed", "application/octet-stream"
+)
 
 @Composable
 fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) -> Unit, onStats: (Long) -> Unit) {
-    val books by vm.library.collectAsState()
+    val all by vm.library.collectAsState()
+    val sort by vm.sort.collectAsState()
+    val grid by vm.grid.collectAsState()
+    val books = remember(all, sort) { vm.sorted(all, sort) }
     val analysis by vm.analysis.collectAsState()
     val known by vm.knownWords.collectAsState()
     val levelMark by vm.levelMark.collectAsState()
@@ -76,18 +100,29 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Overline("Моя библиотека")
+            KnownWordsPanel(known.size, levelMark, onChoose = { showLevel = true })
         }
         item {
-            KnownWordsPanel(known.size, levelMark, onChoose = { showLevel = true })
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Overline("Моя библиотека", Modifier.weight(1f))
+                if (books.isNotEmpty()) {
+                    SortMenu(sort, vm::setSort)
+                    IconButton(onClick = { vm.setGrid(!grid) }) {
+                        Icon(
+                            if (grid) LexiconIcons.ListBullets else LexiconIcons.Library,
+                            contentDescription = if (grid) "Показать списком" else "Показать обложками"
+                        )
+                    }
+                }
+            }
         }
         if (books.isEmpty()) {
             item {
                 Panel(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Добавь китайскую книгу в формате EPUB", style = MaterialTheme.typography.titleMedium)
+                        Text("Добавь китайскую книгу: EPUB, FB2 или TXT", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Над словами появится пиньинь. Нажми на слово — увидишь перевод и сохранишь его в карточки вместе с предложением из книги.",
+                            "Над словами появится пиньинь. Нажми на слово — увидишь перевод и сохранишь его в карточки вместе с предложением из книги. Книгу можно открыть и прямо из файлового менеджера или Telegram: «Открыть с помощью» → HanReader.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -95,14 +130,26 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
                 }
             }
         }
-        items(books, key = { it.id }) { book ->
-            BookRow(
-                book,
-                progress = analysis[book.id],
-                onOpen = { onOpen(book.id) },
-                onStats = { onStats(book.id) },
-                onDelete = { confirmDelete = book }
-            )
+        if (grid) {
+            items(books.chunked(3), key = { row -> row.first().id }) { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { book ->
+                        BookTile(vm, book, analysis[book.id], Modifier.weight(1f), onOpen = { onOpen(book.id) }, onStats = { onStats(book.id) }, onDelete = { confirmDelete = book })
+                    }
+                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        } else {
+            items(books, key = { it.id }) { book ->
+                BookRow(
+                    vm,
+                    book,
+                    progress = analysis[book.id],
+                    onOpen = { onOpen(book.id) },
+                    onStats = { onStats(book.id) },
+                    onDelete = { confirmDelete = book }
+                )
+            }
         }
         item {
             Spacer(Modifier.height(4.dp))
@@ -112,9 +159,14 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
                     Text("Добавляю книгу…")
                 }
             } else {
-                BigButton("Добавить EPUB", onClick = {
-                    picker.launch(arrayOf("application/epub+zip", "application/octet-stream"))
-                })
+                BigButton("Добавить книгу", onClick = { picker.launch(BOOK_MIME_TYPES) })
+                Text(
+                    "EPUB, FB2, FB2.ZIP, TXT",
+                    Modifier.fillMaxWidth().padding(top = 6.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
             }
             error?.let {
                 Text(it, Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.error)
@@ -140,20 +192,21 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
 }
 
 @Composable
-private fun BookRow(book: BookEntity, progress: Float?, onOpen: () -> Unit, onStats: () -> Unit, onDelete: () -> Unit) {
-    Surface(onClick = onOpen, shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface,
+private fun BookRow(vm: ReaderViewModel, book: BookEntity, progress: Float?, onOpen: () -> Unit, onStats: () -> Unit, onDelete: () -> Unit) {
+    Surface(onClick = onOpen, shape = RoundedCornerShape(LocalThemeSpec.current.corner), color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-        Row(Modifier.fillMaxWidth().padding(start = 18.dp, top = 14.dp, bottom = 14.dp, end = 4.dp),
+        Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
+            BookCover(vm, book, Modifier.width(64.dp))
+            Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(book.title, fontFamily = WordFont, fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (book.author.isNotBlank()) {
-                    Text(book.author, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(book.author, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
-                val progress = if (book.chapterCount > 0) (book.chapterIndex + 1f) / book.chapterCount else 0f
                 Spacer(Modifier.height(4.dp))
-                ProgressBar(progress)
+                ProgressBar(readFraction(book))
                 Text(
                     if (book.lastOpenedAt == 0L) "Ещё не открыта · ${book.chapterCount} разделов"
                     else "Раздел ${book.chapterIndex + 1} из ${book.chapterCount}",
@@ -165,6 +218,74 @@ private fun BookRow(book: BookEntity, progress: Float?, onOpen: () -> Unit, onSt
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = onDelete) {
                 Icon(LexiconIcons.Trash, contentDescription = "Удалить книгу", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+private fun readFraction(book: BookEntity) = if (book.chapterCount > 0 && book.lastOpenedAt > 0) (book.chapterIndex + 1f) / book.chapterCount else 0f
+
+/** A book in the cover grid; long press offers the book's vocabulary and deleting. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun BookTile(vm: ReaderViewModel, book: BookEntity, progress: Float?, modifier: Modifier, onOpen: () -> Unit, onStats: () -> Unit, onDelete: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box {
+            BookCover(
+                vm, book,
+                Modifier.fillMaxWidth().combinedClickable(onClick = onOpen, onLongClick = { menu = true }, onClickLabel = "Открыть", onLongClickLabel = "Действия")
+            )
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("Словарь книги") }, onClick = { menu = false; onStats() })
+                DropdownMenuItem(text = { Text("Удалить", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onDelete() })
+            }
+        }
+        ProgressBar(readFraction(book))
+        Text(book.title, fontFamily = WordFont, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (progress != null) {
+            Text("Словарь… ${(progress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** The book's own cover, or one drawn from its title in the theme's colours. */
+@Composable
+fun BookCover(vm: ReaderViewModel, book: BookEntity, modifier: Modifier = Modifier) {
+    val spec = LocalThemeSpec.current
+    val bitmap by produceState<android.graphics.Bitmap?>(null, book.id) { value = vm.cover(book) }
+    val shape = RoundedCornerShape(if (spec.corner > 0.dp) 8.dp else 2.dp)
+    Box(
+        modifier.aspectRatio(0.68f).clip(shape).background(spec.surfaceHigh)
+            .border(1.dp, spec.border, shape),
+        contentAlignment = Alignment.Center
+    ) {
+        val bmp = bitmap
+        if (bmp != null) {
+            Image(bmp.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+        } else {
+            Column(Modifier.matchParentSize().padding(8.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                Box(Modifier.width(24.dp).height(3.dp).background(spec.accent))
+                Text(book.title, color = spec.text, fontFamily = WordFont, fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                Text(book.author, color = spec.muted, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SortMenu(sort: ReaderViewModel.LibrarySort, onPick: (ReaderViewModel.LibrarySort) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { open = true }) { Text(sort.title) }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            ReaderViewModel.LibrarySort.entries.forEach { s ->
+                DropdownMenuItem(
+                    text = { Text(s.title) },
+                    onClick = { open = false; onPick(s) },
+                    trailingIcon = { if (s == sort) Icon(LexiconIcons.Check, contentDescription = "Выбрано", tint = MaterialTheme.colorScheme.primary) }
+                )
             }
         }
     }

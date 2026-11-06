@@ -1,7 +1,7 @@
 package com.hanreader.app.reader
 
 import com.hanreader.app.epub.EpubBlock
-import com.hanreader.app.epub.EpubBook
+import com.hanreader.app.epub.BookSource
 import com.hanreader.app.zh.TokenKind
 import com.hanreader.app.zh.isHan
 import java.text.Normalizer
@@ -40,7 +40,7 @@ object BookSearch {
      * after each chapter. Stops at [MAX_HITS]. Cancellable between paragraphs.
      */
     suspend fun search(
-        epub: EpubBook,
+        epub: BookSource,
         query: String,
         engine: ZhEngine,
         onProgress: (Int, Int) -> Unit,

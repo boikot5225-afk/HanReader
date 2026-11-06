@@ -2,7 +2,7 @@ package com.hanreader.app.reader
 
 import com.hanreader.app.BookWord
 import com.hanreader.app.epub.EpubBlock
-import com.hanreader.app.epub.EpubBook
+import com.hanreader.app.epub.BookSource
 import com.hanreader.app.zh.TokenKind
 import com.hanreader.app.zh.ZhDictionary
 import com.hanreader.app.zh.ZhSegmenter
@@ -52,7 +52,7 @@ object BookAnalyzer {
      */
     fun analyze(
         bookId: Long,
-        epub: EpubBook,
+        epub: BookSource,
         segmenter: ZhSegmenter,
         dict: ZhDictionary,
         onProgress: (Int, Int) -> Unit = { _, _ -> }

@@ -10,10 +10,34 @@
         android:allowBackup="true"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- «Открыть с помощью» from a file manager, Telegram, a browser's downloads. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="content"/>
+                <data android:scheme="file"/>
+                <data android:mimeType="application/epub+zip"/>
+                <data android:mimeType="application/x-fictionbook+xml"/>
+                <data android:mimeType="application/x-fictionbook"/>
+                <data android:mimeType="application/x-zip-compressed-fb2"/>
+                <data android:mimeType="text/plain"/>
+                <data android:mimeType="application/octet-stream"/>
+            </intent-filter>
+            <!-- «Поделиться» a book file. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/epub+zip"/>
+                <data android:mimeType="application/x-fictionbook+xml"/>
+                <data android:mimeType="application/x-fictionbook"/>
+                <data android:mimeType="application/x-zip-compressed-fb2"/>
+                <data android:mimeType="application/octet-stream"/>
             </intent-filter>
         </activity>
     </application>

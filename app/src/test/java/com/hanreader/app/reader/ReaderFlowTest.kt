@@ -198,4 +198,40 @@ class ReaderFlowTest {
         vm.removeBookmark(b.id)
         waitFor { runBlocking { dao.observe(bookId).first() }.isEmpty() }
     }
+
+    @Test
+    fun importsFb2AndTxtWithTitlesAndCovers() {
+        val vm = ReaderViewModel(app)
+        val txt = File(app.cacheDir, "雨夜的故事.txt").apply { writeText("第一章 雨夜\n那天晚上一直在下雨。\n第二章 早上\n天亮了。") }
+        var r: Result<Long>? = null
+        vm.importBook(Uri.fromFile(txt)) { r = it }
+        waitFor { r != null }
+        val dao = LexiconDatabase.get(app).bookDao()
+        val txtBook = runBlocking { dao.get(r!!.getOrThrow())!! }
+        assertEquals("雨夜的故事", txtBook.title)
+        assertEquals(2, txtBook.chapterCount)
+        assertTrue(txtBook.fileName.endsWith(".txt"))
+
+        val fb2 = File(app.cacheDir, "download.bin").apply {
+            writeText("<?xml version=\"1.0\" encoding=\"utf-8\"?><FictionBook><description><title-info><book-title>灯</book-title></title-info></description>" +
+                "<body><section><title><p>第一章</p></title><p>他站在门口。</p></section></body></FictionBook>")
+        }
+        r = null
+        vm.importBook(Uri.fromFile(fb2)) { r = it }
+        waitFor { r != null }
+        val fb2Book = runBlocking { dao.get(r!!.getOrThrow())!! }
+        assertEquals("灯", fb2Book.title)
+        assertTrue(fb2Book.fileName.endsWith(".fb2"))
+        vm.openBook(fb2Book.id)
+        waitFor(60_000) { vm.open.value?.chapter != null }
+        assertEquals("他站在门口。", (vm.open.value!!.chapter!!.blocks[1] as ReaderBlock.Text).text)
+
+        // Not a book: refused, nothing left behind.
+        val junk = File(app.cacheDir, "x.dat").apply { writeBytes(byteArrayOf(1, 0, 2, 0)) }
+        r = null
+        vm.importBook(Uri.fromFile(junk)) { r = it }
+        waitFor { r != null }
+        assertTrue(r!!.isFailure)
+        assertTrue(File(app.filesDir, "books").listFiles()!!.none { it.name.endsWith(".tmp") })
+    }
 }

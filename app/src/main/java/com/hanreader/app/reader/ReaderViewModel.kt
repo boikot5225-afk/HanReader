@@ -13,7 +13,10 @@ import com.hanreader.app.KnownWord
 import com.hanreader.app.isLearned
 import com.hanreader.app.LexiconDatabase
 import com.hanreader.app.ReaderSave
-import com.hanreader.app.epub.EpubBook
+import com.hanreader.app.epub.BookFiles
+import com.hanreader.app.epub.BookFormat
+import com.hanreader.app.epub.BookSource
+import com.hanreader.app.epub.EpubException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -43,7 +46,7 @@ data class LevelMark(val system: HskSystem, val level: Int)
 /** An open book: the EPUB file, its row in the database and the chapter on screen. */
 data class OpenBook(
     val entity: BookEntity,
-    val epub: EpubBook,
+    val epub: BookSource,
     val chapter: ChapterContent? = null,
     val loading: Boolean = true,
     val error: String? = null
@@ -153,32 +156,49 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         /** Saved block index meaning "the end of the chapter". */
         const val END_OF_CHAPTER = Int.MAX_VALUE / 2
 
+        private const val COVER_WIDTH = 360
+
         /** A cautious start for a learner: about 200 characters a minute. */
         const val DEFAULT_CPM = 200f
     }
 
     fun clearMessage() { _message.value = null }
 
-    /** Copies the chosen file into private storage, checks that it opens, and adds it to the library. */
+    /**
+     * Copies the chosen file into private storage, recognises its format (EPUB, FB2, FB2.ZIP, TXT)
+     * from the content, checks that it opens, saves a cover thumbnail and adds it to the library.
+     */
     fun importBook(uri: Uri, onDone: (Result<Long>) -> Unit) {
         val app = getApplication<Application>()
         viewModelScope.launch {
             onDone(runCatching<Long> {
                 withContext(Dispatchers.IO) {
-                    val name = "book-${System.currentTimeMillis()}.epub"
-                    val target = File(booksDir, name)
+                    val stamp = System.currentTimeMillis()
+                    val temp = File(booksDir, "import-$stamp.tmp")
                     val input = app.contentResolver.openInputStream(uri) ?: error("Не удалось открыть файл")
-                    input.use { src -> target.outputStream().use { src.copyTo(it, 1 shl 16) } }
+                    input.use { src -> temp.outputStream().use { src.copyTo(it, 1 shl 16) } }
+                    val format = BookFiles.sniff(temp)
+                    if (format == null) {
+                        temp.delete()
+                        throw EpubException("Это не книга: поддерживаются EPUB, FB2 и TXT")
+                    }
+                    val name = "book-$stamp.${format.extension}"
+                    val target = File(booksDir, name)
+                    if (!temp.renameTo(target)) { temp.copyTo(target, overwrite = true); temp.delete() }
                     try {
-                        EpubBook(target).use { epub ->
-                            books.insert(
+                        BookFiles.open(target, format).use { book ->
+                            val shown = displayName(uri)
+                            val title = if (format == BookFormat.TXT || book.title.startsWith("book-")) shown ?: book.title else book.title
+                            val id = books.insert(
                                 BookEntity(
-                                    title = epub.title.ifBlank { displayName(uri) ?: "Без названия" },
-                                    author = epub.author,
+                                    title = title.ifBlank { shown ?: "Без названия" },
+                                    author = book.author,
                                     fileName = name,
-                                    chapterCount = epub.chapters.size
+                                    chapterCount = book.chapters.size
                                 )
                             )
+                            runCatching { saveCover(id, book) }
+                            id
                         }
                     } catch (e: Exception) {
                         target.delete()
@@ -191,13 +211,74 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun displayName(uri: Uri): String? = runCatching {
         getApplication<Application>().contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-            ?.use { c -> if (c.moveToFirst()) c.getString(0)?.substringBeforeLast('.') else null }
-    }.getOrNull()
+            ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+    }.getOrNull()?.let { n -> n.replace(Regex("\\.(fb2\\.zip|epub|fb2|txt|zip)$", RegexOption.IGNORE_CASE), "") }
+        ?: uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.')
+
+    // ---- Covers ----
+
+    private val coversDir = File(app.filesDir, "covers").apply { mkdirs() }
+    private val coverCache = object : LruCache<Long, Bitmap>(8 * 1024 * 1024) {
+        override fun sizeOf(key: Long, value: Bitmap) = value.byteCount
+    }
+
+    private fun coverFile(id: Long) = File(coversDir, "$id.jpg")
+    private fun noCoverFile(id: Long) = File(coversDir, "$id.none")
+
+    /** Saves a small JPEG of the book's cover, or a marker that the book has none. */
+    private fun saveCover(id: Long, book: BookSource) {
+        val bytes = book.cover()
+        val bmp = bytes?.let {
+            val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(it, 0, it.size, o)
+            var sample = 1
+            while (o.outWidth / (sample * 2) >= COVER_WIDTH) sample *= 2
+            BitmapFactory.decodeByteArray(it, 0, it.size, BitmapFactory.Options().apply { inSampleSize = sample })
+        }
+        if (bmp == null) { noCoverFile(id).writeText(""); return }
+        coverFile(id).outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+    }
+
+    /** The cover thumbnail, made on first request for books imported before covers existed. */
+    suspend fun cover(book: BookEntity): Bitmap? {
+        coverCache.get(book.id)?.let { return it }
+        return withContext(Dispatchers.IO) {
+            val f = coverFile(book.id)
+            if (!f.exists() && !noCoverFile(book.id).exists()) {
+                runCatching { BookFiles.open(File(booksDir, book.fileName)).use { saveCover(book.id, it) } }
+            }
+            if (f.exists()) BitmapFactory.decodeFile(f.path) else null
+        }?.also { coverCache.put(book.id, it) }
+    }
+
+    // ---- Library view ----
+
+    enum class LibrarySort(val title: String) { RECENT("Недавние"), ADDED("Добавленные"), TITLE("Название"), AUTHOR("Автор"), PROGRESS("Прогресс") }
+
+    private val _sort = MutableStateFlow(LibrarySort.entries.firstOrNull { it.name == prefs.getString("librarySort", null) } ?: LibrarySort.RECENT)
+    val sort: StateFlow<LibrarySort> = _sort.asStateFlow()
+    private val _grid = MutableStateFlow(prefs.getBoolean("libraryGrid", true))
+    val grid: StateFlow<Boolean> = _grid.asStateFlow()
+
+    fun setSort(s: LibrarySort) { _sort.value = s; prefs.edit().putString("librarySort", s.name).apply() }
+    fun setGrid(on: Boolean) { _grid.value = on; prefs.edit().putBoolean("libraryGrid", on).apply() }
+
+    fun sorted(list: List<BookEntity>, sort: LibrarySort): List<BookEntity> = when (sort) {
+        LibrarySort.RECENT -> list // the DAO order: last opened, then added
+        LibrarySort.ADDED -> list.sortedByDescending { it.addedAt }
+        LibrarySort.TITLE -> list.sortedBy { it.title.lowercase() }
+        LibrarySort.AUTHOR -> list.sortedWith(compareBy({ it.author.ifBlank { "\uFFFF" }.lowercase() }, { it.title.lowercase() }))
+        LibrarySort.PROGRESS -> list.sortedByDescending { if (it.chapterCount > 0) (it.chapterIndex + 1f) / it.chapterCount else 0f }
+    }
 
     fun deleteBook(book: BookEntity) {
         viewModelScope.launch {
             if (_open.value?.entity?.id == book.id) closeBook()
-            withContext(Dispatchers.IO) { File(booksDir, book.fileName).delete() }
+            withContext(Dispatchers.IO) {
+                File(booksDir, book.fileName).delete()
+                coverFile(book.id).delete(); noCoverFile(book.id).delete()
+            }
+            coverCache.remove(book.id)
             books.delete(book.id)
         }
     }
@@ -208,7 +289,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 closeBookInternal()
                 val entity = books.get(id) ?: return@withLock
                 val epub = runCatching {
-                    withContext(Dispatchers.IO) { EpubBook(File(booksDir, entity.fileName)) }
+                    withContext(Dispatchers.IO) { BookFiles.open(File(booksDir, entity.fileName)) }
                 }.getOrElse {
                     _message.value = "Не удалось открыть книгу: ${it.message}"
                     return@withLock
@@ -375,7 +456,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 val entity = books.get(bookId) ?: return@runCatching
                 val engine = engineDeferred.await()
                 val result = withContext(Dispatchers.Default) {
-                    EpubBook(File(booksDir, entity.fileName)).use { epub ->
+                    BookFiles.open(File(booksDir, entity.fileName)).use { epub ->
                         BookAnalyzer.analyze(bookId, epub, engine.segmenter, engine.dictionary) { done, total ->
                             _analysis.value = _analysis.value + (bookId to done.toFloat() / total)
                         }
@@ -404,7 +485,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 chapter?.let { loaded[it.index] = it }
                 val epub = _open.value?.epub?.takeIf { _open.value?.entity?.id == book.id }
                 var created = 0
-                val own = if (epub == null) withContext(Dispatchers.IO) { EpubBook(File(booksDir, book.fileName)) } else null
+                val own = if (epub == null) withContext(Dispatchers.IO) { BookFiles.open(File(booksDir, book.fileName)) } else null
                 try {
                     for (w in words) {
                         val source = epub ?: own!!

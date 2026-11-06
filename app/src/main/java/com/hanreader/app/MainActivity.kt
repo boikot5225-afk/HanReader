@@ -6,6 +6,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 
 class MainActivity : ComponentActivity() {
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        IncomingBooks.take(intent)
+    }
+
     /** In page mode, volume down/up turn the page forward/back instead of changing the volume. */
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
         val code = event.keyCode
@@ -22,6 +28,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         AppearanceStore.load(this)
+        IncomingBooks.take(intent)
         // Load the Chinese dictionary in the background right away, so it is ready by the first tap.
         com.hanreader.app.reader.ZhEngine.warmUp(this)
         setContent { LexiconTheme { LexiconScreen() } }

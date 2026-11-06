@@ -90,6 +90,18 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = 
     LaunchedEffect(reading) { reading?.let { if (reader.open.value?.entity?.id != it) reader.openBook(it) } }
     // A running review session hides the navigation and takes the whole screen.
     var session by rememberSaveable { mutableStateOf<ReviewMode?>(null) }
+    // A book sent from another app: import it, then open it.
+    val incoming by IncomingBooks.pending.collectAsState()
+    val ctx = LocalContext.current
+    LaunchedEffect(incoming) {
+        val uri = incoming ?: return@LaunchedEffect
+        IncomingBooks.pending.value = null
+        android.widget.Toast.makeText(ctx, "Добавляю книгу…", android.widget.Toast.LENGTH_SHORT).show()
+        reader.importBook(uri) { r ->
+            r.onSuccess { id -> session = null; bookStats = null; tab = Tab.READ; reading = id }
+                .onFailure { e -> android.widget.Toast.makeText(ctx, e.message ?: "Не удалось открыть книгу", android.widget.Toast.LENGTH_LONG).show() }
+        }
+    }
     var wordFilter by rememberSaveable { mutableStateOf(WordFilter.ALL) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val selectedLanguage by vm.language.collectAsState()
