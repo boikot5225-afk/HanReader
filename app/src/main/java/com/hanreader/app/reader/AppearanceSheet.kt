@@ -75,7 +75,7 @@ private fun p(w: String, at: Int) = RToken(w, "", TokenKind.PUNCT, at, at + w.le
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppearanceSheet(onDismiss: () -> Unit) {
+fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
     val a by AppearanceStore.appearance.collectAsState()
     val spec = LocalThemeSpec.current
     val scheme = MaterialTheme.colorScheme
@@ -115,6 +115,21 @@ fun AppearanceSheet(onDismiss: () -> Unit) {
                 SwitchRow("Листать кнопками громкости", a.volumeKeys) { on -> AppearanceStore.update { it.copy(volumeKeys = on) } }
             }
             SwitchRow("Не гасить экран при чтении", a.keepScreenOn) { on -> AppearanceStore.update { it.copy(keepScreenOn = on) } }
+
+            Section("Подсказки в тексте")
+            SwitchRow("Подчёркивать незнакомые слова", a.markUnknown) { on -> AppearanceStore.update { it.copy(markUnknown = on) } }
+            LineSample(spec.unknownLine, "красная линия — слово ещё не знакомо")
+            SwitchRow("Подчёркивать рекомендуемые", a.markRecommended) { on -> AppearanceStore.update { it.copy(markRecommended = on) } }
+            LineSample(spec.recommendedLine, "синяя линия — стоит выучить сейчас: часто в книге и чуть выше твоего уровня")
+            if (a.markRecommended) {
+                LabeledSlider("Рекомендуемых на раздел", "${a.recommendedPerChapter}",
+                    a.recommendedPerChapter.toFloat(), Appearance.RECOMMENDED.first.toFloat()..Appearance.RECOMMENDED.last.toFloat()) { v ->
+                    AppearanceStore.update { it.copy(recommendedPerChapter = v.roundToInt()) }
+                }
+                levelText?.let {
+                    Text("Уровень: $it", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                }
+            }
 
             Section("Тема")
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -160,6 +175,15 @@ fun AppearanceSheet(onDismiss: () -> Unit) {
                 AppearanceStore.update { Appearance(theme = it.theme, mode = it.mode, volumeKeys = it.volumeKeys, keepScreenOn = it.keepScreenOn, brightness = it.brightness) }
             }) { Text("Сбросить настройки текста") }
         }
+    }
+}
+
+@Composable
+private fun LineSample(color: androidx.compose.ui.graphics.Color, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(28.dp).height(3.dp).background(color))
+        Spacer(Modifier.width(10.dp))
+        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

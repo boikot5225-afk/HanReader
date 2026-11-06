@@ -83,7 +83,8 @@ class ThemeRenderTest {
                                     val sel = if (i == 1) b.tokens.indexOfFirst { it.text == "顺着" } else -1
                                     RubyParagraph(
                                         b, metrics, showPinyin = true, hidePinyinFor = known, saved = setOf("雨水"),
-                                        selection = if (sel >= 0) sel..sel else null, colors = rubyColors(a, spec), onTap = {}
+                                        selection = if (sel >= 0) sel..sel else null, colors = rubyColors(a, spec), onTap = {},
+                                        unknownMarks = unknown, recommendedMarks = setOf("顺着", "街灯")
                                     )
                                 }
                             }

@@ -319,7 +319,7 @@ fun BookStatsScreen(vm: ReaderViewModel, bookId: Long, onClose: () -> Unit) {
 
 /** Shown at the top of a chapter: how many unknown words it has, with a way to prepare. */
 @Composable
-fun ChapterPrepareBanner(unknown: Int, percent: Int, onPrepare: () -> Unit) {
+fun ChapterPrepareBanner(unknown: Int, percent: Int, recommended: Int = 0, onPrepare: () -> Unit) {
     Surface(
         onClick = onPrepare,
         shape = RoundedCornerShape(16.dp),
@@ -328,6 +328,13 @@ fun ChapterPrepareBanner(unknown: Int, percent: Int, onPrepare: () -> Unit) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Знакомо $percent% · незнакомых слов: $unknown", style = MaterialTheme.typography.bodyMedium)
+                if (recommended > 0) {
+                    Text(
+                        "Рекомендуемых для твоего уровня: $recommended",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = com.hanreader.app.LocalThemeSpec.current.recommendedLine
+                    )
+                }
                 Text("Подготовиться к разделу →", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             }
         }

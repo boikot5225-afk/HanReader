@@ -37,6 +37,7 @@ const val STUDY_LANGUAGE = "zh-CN"
 enum class PinyinMode(val title: String) {
     ALL("Над всеми словами"),
     UNKNOWN("Только над незнакомыми"),
+    RECOMMENDED("Только над рекомендуемыми"),
     OFF("Выключен")
 }
 

@@ -79,6 +79,9 @@ data class ThemeSpec(
     val selection: Color,
     val pinyin: Color,
     val saved: Color,
+    /** Underline of words not known yet (red) and of words recommended for the reader's level (blue). */
+    val unknownLine: Color,
+    val recommendedLine: Color,
     /** Dark "hero" block used by the study screens and the main buttons. */
     val hero: Color,
     val onHero: Color,
@@ -116,7 +119,8 @@ private val NoirSpec = ThemeSpec(
     background = Color(0xFF0D0D0D), surface = Color(0xFF161616), surfaceHigh = Color(0xFF222222),
     text = Color(0xFFEDE9E2), muted = Color(0xFF9A968F), border = Color(0xFF333333),
     accent = Color(0xFFE0574A), accentText = Color(0xFFE0574A), onAccent = Color(0xFF0D0D0D),
-    selection = Color(0xFF3B1513), pinyin = Color(0xFF9A968F), saved = Color(0xFFE0574A),
+    selection = Color(0xFF3B1513), pinyin = Color(0xFF9A968F), saved = Color(0xFFEDE9E2),
+    unknownLine = Color(0xFFE0574A), recommendedLine = Color(0xFF6EA8FF),
     hero = Color(0xFFEDE9E2), onHero = Color(0xFF0D0D0D),
     display = AppFonts.Oswald, body = AppFonts.Inter, pinyinFont = AppFonts.Inter, pinyinItalic = false,
     corner = 0.dp, defaultHanFont = HanFont.SERIF
@@ -127,7 +131,8 @@ private val NeonSpec = ThemeSpec(
     background = Color(0xFF0A0C14), surface = Color(0xFF11142A), surfaceHigh = Color(0xFF1A1F3A),
     text = Color(0xFFE7E4F2), muted = Color(0xFF8F93AD), border = Color(0xFF2E3355),
     accent = Color(0xFFFF4F9E), accentText = Color(0xFFFF6FB0), onAccent = Color(0xFF14050C),
-    selection = Color(0xFF36182D), pinyin = Color(0xFF4FD8E6), saved = Color(0xFF4FD8E6),
+    selection = Color(0xFF36182D), pinyin = Color(0xFF4FD8E6), saved = Color(0xFFF2B66B),
+    unknownLine = Color(0xFFFF5C6C), recommendedLine = Color(0xFF6EA8FF),
     hero = Color(0xFFFF4F9E), onHero = Color(0xFF14050C),
     display = AppFonts.PlexMono, body = AppFonts.Inter, pinyinFont = AppFonts.PlexMono, pinyinItalic = false,
     corner = 14.dp, defaultHanFont = HanFont.SERIF
@@ -138,7 +143,8 @@ private val ClassicSpec = ThemeSpec(
     background = Color(0xFFF3EDE1), surface = Color(0xFFFBF7EF), surfaceHigh = Color(0xFFE9E0CF),
     text = Color(0xFF1D1B18), muted = Color(0xFF6B6459), border = Color(0xFFCFC3AE),
     accent = Color(0xFF7A2E2A), accentText = Color(0xFF7A2E2A), onAccent = Color(0xFFFBF7EF),
-    selection = Color(0xFFE6D3C2), pinyin = Color(0xFF6B6459), saved = Color(0xFF7A2E2A),
+    selection = Color(0xFFE6D3C2), pinyin = Color(0xFF6B6459), saved = Color(0xFF2E6B5E),
+    unknownLine = Color(0xFFB3261E), recommendedLine = Color(0xFF1E5BB8),
     hero = Color(0xFF7A2E2A), onHero = Color(0xFFFBF7EF),
     display = AppFonts.Cormorant, body = AppFonts.Cormorant, pinyinFont = AppFonts.Cormorant, pinyinItalic = true, pinyinBoost = 1.15f,
     corner = 0.dp, defaultHanFont = HanFont.SERIF
@@ -150,6 +156,7 @@ private val PaperSpec = ThemeSpec(
     text = Color(0xFF1F1E1C), muted = Color(0xFF5F5B54), border = Color(0xFFDAD5CB),
     accent = Color(0xFF1F6F66), accentText = Color(0xFF1F6F66), onAccent = Color(0xFFFFFFFF),
     selection = Color(0xFFD6EFEA), pinyin = Color(0xFF5F5B54), saved = Color(0xFF1F6F66),
+    unknownLine = Color(0xFFC62828), recommendedLine = Color(0xFF1E5BB8),
     hero = Color(0xFF1F1E1C), onHero = Color(0xFFF7F5F0),
     display = AppFonts.Inter, body = AppFonts.Inter, pinyinFont = AppFonts.Inter, pinyinItalic = false,
     corner = 16.dp, defaultHanFont = HanFont.SANS
@@ -204,7 +211,13 @@ data class Appearance(
     val volumeKeys: Boolean = true,
     val keepScreenOn: Boolean = true,
     /** Screen brightness while reading, 0..1; negative = the system setting. */
-    val brightness: Float = -1f
+    val brightness: Float = -1f,
+    /** Underline words not known yet (red line). */
+    val markUnknown: Boolean = false,
+    /** Underline words recommended for the reader's level (blue line). */
+    val markRecommended: Boolean = false,
+    /** How many recommended words a chapter shows at most. */
+    val recommendedPerChapter: Int = 12
 ) {
     fun hanFontFor(spec: ThemeSpec): HanFont = hanFont ?: spec.defaultHanFont
 
@@ -214,6 +227,7 @@ data class Appearance(
         val PARAGRAPH_SPACING = 4..32
         val MARGINS = 8..44
         val PINYIN_SCALE = 0.38f..0.7f
+        val RECOMMENDED = 3..40
     }
 }
 
@@ -242,7 +256,10 @@ object AppearanceStore {
             mode = ReadingMode.entries.firstOrNull { it.name == p.getString("mode", null) } ?: d.mode,
             volumeKeys = p.getBoolean("volumeKeys", d.volumeKeys),
             keepScreenOn = p.getBoolean("keepScreenOn", d.keepScreenOn),
-            brightness = p.getFloat("brightness", d.brightness).coerceAtMost(1f)
+            brightness = p.getFloat("brightness", d.brightness).coerceAtMost(1f),
+            markUnknown = p.getBoolean("markUnknown", d.markUnknown),
+            markRecommended = p.getBoolean("markRecommended", d.markRecommended),
+            recommendedPerChapter = p.getInt("recommendedPerChapter", d.recommendedPerChapter).coerceIn(Appearance.RECOMMENDED)
         )
         appContext = context.applicationContext
     }
@@ -266,6 +283,9 @@ object AppearanceStore {
             putBoolean("volumeKeys", next.volumeKeys)
             putBoolean("keepScreenOn", next.keepScreenOn)
             putFloat("brightness", next.brightness)
+            putBoolean("markUnknown", next.markUnknown)
+            putBoolean("markRecommended", next.markRecommended)
+            putInt("recommendedPerChapter", next.recommendedPerChapter)
             apply()
         }
     }

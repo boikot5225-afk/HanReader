@@ -174,7 +174,10 @@ fun RubyParagraph(
     /** Only these lines (page mode: a paragraph split across pages); null draws the whole paragraph. */
     lines: IntRange? = null,
     /** Tokens to mark as a search match. */
-    highlight: IntRange? = null
+    highlight: IntRange? = null,
+    /** Words to underline in red (not known yet) and in blue (recommended); null: no marks. */
+    unknownMarks: Set<String>? = null,
+    recommendedMarks: Set<String>? = null
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val density = LocalDensity.current
@@ -244,10 +247,17 @@ fun RubyParagraph(
                     color = colors.text,
                     topLeft = Offset(p.x + (inner - hanW) / 2f, p.lineTop + laid.hanTop)
                 )
-                if (isSaved) {
+                val lineColor = when {
+                    t.kind != TokenKind.HAN -> null
+                    isSaved -> colors.saved
+                    recommendedMarks != null && t.text in recommendedMarks -> colors.recommendedLine
+                    unknownMarks != null && t.text in unknownMarks -> colors.unknownLine
+                    else -> null
+                }
+                if (lineColor != null) {
                     val yLine = p.lineTop + laid.hanTop + laid.hanHeight - 2f
                     drawLine(
-                        colors.saved,
+                        lineColor,
                         Offset(p.x + (inner - hanW) / 2f, yLine),
                         Offset(p.x + (inner + hanW) / 2f, yLine),
                         strokeWidth = 3f
@@ -267,7 +277,9 @@ data class RubyColors(
     val wordGap: androidx.compose.ui.unit.Dp,
     val lineGap: androidx.compose.ui.unit.Dp,
     val justify: Boolean = false,
-    val indent: Boolean = true
+    val indent: Boolean = true,
+    val unknownLine: Color = Color(0xFFC62828),
+    val recommendedLine: Color = Color(0xFF1E5BB8)
 )
 
 /** Text styles of the reader from the appearance settings and the theme. */
@@ -298,5 +310,7 @@ fun rubyColors(a: Appearance, spec: ThemeSpec) = RubyColors(
     wordGap = 3.dp,
     lineGap = (a.fontSize * a.lineSpacing).dp,
     justify = a.align == TextAlignMode.JUSTIFY,
-    indent = a.indent
+    indent = a.indent,
+    unknownLine = spec.unknownLine,
+    recommendedLine = spec.recommendedLine
 )

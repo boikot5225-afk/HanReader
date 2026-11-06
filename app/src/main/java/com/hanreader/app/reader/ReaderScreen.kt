@@ -160,7 +160,28 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val names = remember(bookWords) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word } }
     val coverage = remember(chapter, matcher, names) { chapter?.let { KnownCoverage.of(it, matcher, names, engine) } }
     val showPinyin = pinyinMode != PinyinMode.OFF
-    val hidePinyinFor = if (pinyinMode == PinyinMode.UNKNOWN) knownHere else null
+    // Recommended words for the reader's level (blue), words not known yet (red).
+    val levelMark by vm.levelMark.collectAsState()
+    val readerLevel = remember(matcher, levelMark, engine) { engine?.let { Recommendations.level(levelMark, matcher, it.hsk) } }
+    val bookWordMap = remember(bookWords) { bookWords.associateBy { it.word } }
+    val wantRecommended = appearance.markRecommended || pinyinMode == PinyinMode.RECOMMENDED
+    val recommended = remember(chapter, matcher, saved, names, bookWordMap, readerLevel, appearance.recommendedPerChapter, wantRecommended) {
+        val eng = engine
+        if (!wantRecommended || chapter == null || eng == null || readerLevel == null) emptyList()
+        else Recommendations.forChapter(chapter, matcher, saved, names, bookWordMap, eng, readerLevel, appearance.recommendedPerChapter)
+    }
+    val recommendedSet = remember(recommended) { recommended.mapTo(HashSet()) { it.word } }
+    val chapterWords = remember(chapter) {
+        chapter?.blocks?.flatMap { b -> (b as? ReaderBlock.Text)?.tokens?.filter { it.kind == TokenKind.HAN }?.map { it.text }.orEmpty() }?.toHashSet() ?: hashSetOf()
+    }
+    val unknownSet = remember(chapterWords, knownHere, saved, names, appearance.markUnknown) {
+        if (!appearance.markUnknown) emptySet() else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names }
+    }
+    val hidePinyinFor = when (pinyinMode) {
+        PinyinMode.UNKNOWN -> knownHere
+        PinyinMode.RECOMMENDED -> chapterWords - recommendedSet
+        else -> null
+    }
     val chapterCount = book.epub.chapters.size
 
     // Fixed insets: hiding the system bars must not reflow the text.
@@ -181,6 +202,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             colors = colors,
             onTap = { t -> selection = Selection(i, t, t); chrome = false; highlight = null },
             lines = lines,
+            unknownMarks = if (appearance.markUnknown) unknownSet else null,
+            recommendedMarks = if (appearance.markRecommended) recommendedSet else null,
             highlight = highlight?.takeIf { it.chapter == chapter?.index && it.block == i }?.let { h ->
                 val first = block.tokens.indexOfFirst { it.end > h.start }
                 val last = block.tokens.indexOfLast { it.start < h.end }
@@ -221,7 +244,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 showPinyin = showPinyin,
                 hidePinyinFor = hidePinyinFor,
                 showBanner = engine != null && coverage != null && coverage.unknownDistinct > 0,
-                banner = { coverage?.let { c -> ChapterPrepareBanner(c.unknownDistinct, c.percent) { showPrepare = true } } },
+                banner = { coverage?.let { c -> ChapterPrepareBanner(c.unknownDistinct, c.percent, if (appearance.markRecommended) recommended.size else 0) { showPrepare = true } } },
                 paragraph = paragraph,
                 bars = bars,
                 speed = speed,
@@ -243,7 +266,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 speed = speed,
                 banner = {
                     if (engine != null && coverage != null && coverage.total > 0 && coverage.unknownDistinct > 0) {
-                        ChapterPrepareBanner(coverage.unknownDistinct, coverage.percent) { showPrepare = true }
+                        ChapterPrepareBanner(coverage.unknownDistinct, coverage.percent, if (appearance.markRecommended) recommended.size else 0) { showPrepare = true }
                     }
                 },
                 footer = {
@@ -319,7 +342,10 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     }
 
     if (showAppearance) {
-        AppearanceSheet(onDismiss = { showAppearance = false })
+        AppearanceSheet(
+            onDismiss = { showAppearance = false },
+            levelText = readerLevel?.let { it.title + if (it.auto) " — определён автоматически" else " — выбран в библиотеке" }
+        )
     }
 
     if (showToc) {
@@ -363,6 +389,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onKnown = vm::setKnown,
             onChange = { selection = it },
             onDismiss = { selection = null },
+            recommendations = recommended.associateBy { it.word },
             onSave = { word, reading, translation, sentence, done ->
                 vm.saveWord(
                     ReaderSave(
@@ -819,6 +846,7 @@ private fun PinyinMenu(mode: PinyinMode, onPick: (PinyinMode) -> Unit) {
                 when (mode) {
                     PinyinMode.ALL -> "pīn"
                     PinyinMode.UNKNOWN -> "pīn·?"
+                    PinyinMode.RECOMMENDED -> "pīn·★"
                     PinyinMode.OFF -> "pīn"
                 },
                 color = if (mode == PinyinMode.OFF) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
@@ -915,7 +943,8 @@ private fun WordSheet(
     onKnown: (String, Boolean) -> Unit,
     onChange: (Selection) -> Unit,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, String, (Result<Boolean>) -> Unit) -> Unit
+    onSave: (String, String, String, String, (Result<Boolean>) -> Unit) -> Unit,
+    recommendations: Map<String, Recommendation> = emptyMap()
 ) {
     val tokens = block.tokens
     val first = tokens[selection.first]
@@ -970,6 +999,14 @@ private fun WordSheet(
                         "${i + 1}. $sense",
                         style = if (russian.isEmpty()) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
                         color = if (russian.isEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                recommendations[word]?.let { r ->
+                    Text(
+                        "Рекомендовано для твоего уровня: в книге ${r.bookCount} раз" +
+                            (if (r.level in 1..7) " · HSK ${HskSystem.HSK3.levelTitle(r.level)}" else ""),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LocalThemeSpec.current.recommendedLine
                     )
                 }
                 if (entry.rank > 0) {
