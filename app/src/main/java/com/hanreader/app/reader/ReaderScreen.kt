@@ -602,9 +602,14 @@ internal fun PagedChapter(
         val hasNext = chapter.index < book.epub.chapters.size - 1
         val lead = if (hasPrev) 1 else 0
         val total = list.size + lead + (if (hasNext) 1 else 0)
-        val savedBlock = if (book.entity.chapterIndex == chapter.index) book.entity.blockIndex else 0
+        val here = book.entity.chapterIndex == chapter.index
+        val savedBlock = if (here) book.entity.blockIndex else 0
+        val savedChar = if (here) book.entity.charOffset else 0
         key(chapter.index, list) {
-            val pager = rememberPagerState(initialPage = lead + Paginator.pageFor(list, savedBlock)) { total }
+            // The saved spot; pages are rebuilt when hints or fonts change, and a rebuilt page
+            // that still holds this spot must not overwrite it with its own (earlier) start.
+            val saved = remember { intArrayOf(savedBlock, savedChar) }
+            val pager = rememberPagerState(initialPage = lead + Paginator.pageFor(list, savedBlock, savedChar)) { total }
             val scope = rememberCoroutineScope()
             fun turn(by: Int) {
                 val target = (pager.currentPage + by).coerceIn(0, total - 1)
@@ -633,7 +638,10 @@ internal fun PagedChapter(
                         else -> {
                             val page = list[p - lead]
                             shownChars = page.chars
-                            vm.savePosition(chapter.index, page.firstBlock)
+                            if (Paginator.pageFor(list, saved[0], saved[1]) != p - lead) {
+                                saved[0] = page.firstBlock; saved[1] = page.firstChar
+                                vm.savePosition(chapter.index, page.firstBlock, page.firstChar)
+                            }
                             val left = list.subList(p - lead, list.size).sumOf { it.chars }
                             val blocks = page.items.filter { it !is PageItem.Banner }.map { it.block }
                             onProgress(
@@ -736,13 +744,16 @@ private fun ScrollChapter(
     // Restore the saved position once per chapter, then keep saving it while scrolling.
     LaunchedEffect(chapter.index) {
         val target = if (chapter.index == book.entity.chapterIndex) book.entity.blockIndex else 0
-        listState.scrollToItem(target.coerceIn(0, chapter.blocks.size))
+        // Item 0 is the chapter banner, paragraph i is item i + 1.
+        if (target > 0) listState.scrollToItem(target.coerceIn(0, chapter.blocks.size) + 1)
+        var saved = target
         snapshotFlow { listState.firstVisibleItemIndex }
             .distinctUntilChanged()
             .debounce(400)
             .collect { first ->
                 val block = (first - 1).coerceIn(0, (chapter.blocks.size - 1).coerceAtLeast(0))
-                vm.savePosition(chapter.index, block)
+                // Still the restored paragraph: keep the exact spot saved in page mode.
+                if (block != saved) { saved = block; vm.savePosition(chapter.index, block) }
                 val left = blockChars.drop(block).sum()
                 onProgress(
                     ReadingProgress(

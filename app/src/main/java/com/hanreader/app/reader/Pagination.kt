@@ -19,7 +19,8 @@ sealed interface PageItem {
     }
 }
 
-data class Page(val items: List<PageItem>, val firstBlock: Int, val chars: Int)
+/** [firstChar]: the character of paragraph [firstBlock] where the page starts. */
+data class Page(val items: List<PageItem>, val firstBlock: Int, val chars: Int, val firstChar: Int = 0)
 
 /** Everything that changes where lines break; pages are rebuilt when any of it changes. */
 data class PageSpec(
@@ -54,9 +55,10 @@ object Paginator {
         var y = 0f
         var chars = 0
         var first = 0
+        var firstChar = 0
         fun flush() {
-            if (items.isNotEmpty()) pages += Page(items, first, chars)
-            items = ArrayList(); y = 0f; chars = 0
+            if (items.isNotEmpty()) pages += Page(items, first, chars, firstChar)
+            items = ArrayList(); y = 0f; chars = 0; firstChar = 0
         }
         if (spec.showBanner) {
             items += PageItem.Banner
@@ -81,9 +83,12 @@ object Paginator {
                     )
                     if (laid.lineCount == 0) continue
                     val lineChars = IntArray(laid.lineCount)
+                    val lineStart = IntArray(laid.lineCount) { Int.MAX_VALUE }
                     for (p in laid.items) {
                         val t = block.tokens[p.token]
-                        if (t.kind == TokenKind.HAN) lineChars[laid.lineOf(p).coerceIn(0, laid.lineCount - 1)] += t.text.length
+                        val l = laid.lineOf(p).coerceIn(0, laid.lineCount - 1)
+                        if (t.kind == TokenKind.HAN) lineChars[l] += t.text.length
+                        if (t.start < lineStart[l]) lineStart[l] = t.start
                     }
                     var line = 0
                     while (line < laid.lineCount) {
@@ -94,7 +99,7 @@ object Paginator {
                             continue
                         }
                         val take = minOf(room, laid.lineCount - line)
-                        if (items.isEmpty()) first = i
+                        if (items.isEmpty()) { first = i; firstChar = if (line == 0) 0 else lineStart[line].takeIf { it != Int.MAX_VALUE } ?: 0 }
                         items += PageItem.Lines(i, line until line + take, spacingBefore = gap > 0f)
                         y += gap + take * laid.lineHeight
                         for (k in line until line + take) chars += lineChars[k]
@@ -109,12 +114,17 @@ object Paginator {
         return pages
     }
 
-    /** The page to open for a saved position: the last page starting at or before [block]. */
-    fun pageFor(pages: List<Page>, block: Int): Int {
+    /**
+     * The page to open for a saved position: the page holding character [char] of paragraph
+     * [block], i.e. the last page that starts at or before it. Works with any line breaking, so a
+     * change of font or hints between sessions still opens the same text.
+     */
+    fun pageFor(pages: List<Page>, block: Int, char: Int = 0): Int {
         var best = 0
         for ((k, p) in pages.withIndex()) {
             if (p.items.any { it !is PageItem.Banner }) {
-                if (p.firstBlock <= block) best = k else break
+                val before = p.firstBlock < block || (p.firstBlock == block && p.firstChar <= char)
+                if (before) best = k else break
             }
         }
         return best

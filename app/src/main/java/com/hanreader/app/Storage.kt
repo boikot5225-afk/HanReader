@@ -86,7 +86,10 @@ data class BookEntity(
     val blockIndex: Int = 0,
     /** Han word occurrences counted by the book analysis; 0 = not analysed yet. */
     @ColumnInfo(defaultValue = "0")
-    val analyzedTokens: Int = 0
+    val analyzedTokens: Int = 0,
+    /** Character inside paragraph [blockIndex] where the reader's page starts. */
+    @ColumnInfo(defaultValue = "0")
+    val charOffset: Int = 0
 )
 
 /** A word the reader marked «Это имя»: never taught, never underlined, kept whole by the segmenter. */
@@ -273,8 +276,8 @@ interface BookDao {
     @Insert
     suspend fun insert(book: BookEntity): Long
 
-    @Query("UPDATE books SET chapterIndex = :chapter, blockIndex = :block, lastOpenedAt = :at WHERE id = :id")
-    suspend fun savePosition(id: Long, chapter: Int, block: Int, at: Long = System.currentTimeMillis())
+    @Query("UPDATE books SET chapterIndex = :chapter, blockIndex = :block, charOffset = :char, lastOpenedAt = :at WHERE id = :id")
+    suspend fun savePosition(id: Long, chapter: Int, block: Int, char: Int = 0, at: Long = System.currentTimeMillis())
 
     @Query("DELETE FROM books WHERE id = :id")
     suspend fun delete(id: Long)
@@ -513,13 +516,13 @@ interface CardDao {
 // so no database of version 3 exists under this name; Lexicon data arrives through backups.
 // Version 5 (0.2.0): known_words. Schemas are exported to app/schemas for migration checks.
 // Version 6 (0.3.0): book_words and books.analyzedTokens (book vocabulary analysis).
-// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names.
+// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names. Version 9 (0.9.9): books.charOffset.
 @Database(
     entities = [
         WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
         Bookmark::class, UserName::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
@@ -614,7 +617,13 @@ abstract class LexiconDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE books ADD COLUMN charOffset INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {

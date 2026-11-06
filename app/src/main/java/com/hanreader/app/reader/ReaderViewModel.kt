@@ -319,12 +319,21 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** [atEnd]: open on the last page (turning back from the next chapter); [block]: open at that paragraph. */
-    fun goToChapter(index: Int, atEnd: Boolean = false, block: Int? = null) {
-        viewModelScope.launch { openMutex.withLock { loadChapterLocked(index, atEnd, block) } }
+    /**
+     * [atEnd]: open on the last page (turning back from the next chapter); [block]: open at that
+     * paragraph, at character [char] of it.
+     */
+    fun goToChapter(index: Int, atEnd: Boolean = false, block: Int? = null, char: Int = 0) {
+        viewModelScope.launch { openMutex.withLock { loadChapterLocked(index, atEnd, block, char) } }
     }
 
-    private suspend fun loadChapterLocked(index: Int, atEnd: Boolean = false, block: Int? = null) {
+    /** Rebuilds the open chapter (names changed) without moving the reader. */
+    private fun rebuildOpenChapter(o: OpenBook) {
+        val c = o.chapter ?: return
+        goToChapter(c.index, block = o.entity.blockIndex, char = o.entity.charOffset)
+    }
+
+    private suspend fun loadChapterLocked(index: Int, atEnd: Boolean = false, block: Int? = null, char: Int = 0) {
         val current = _open.value ?: return
         if (index !in current.epub.chapters.indices) return
         _open.value = current.copy(loading = true, error = null)
@@ -339,15 +348,16 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             onFailure = { now.copy(loading = false, error = "Глава не открылась: ${it.message}") }
         )
         if (result.isSuccess && (index != now.entity.chapterIndex || atEnd || block != null)) {
-            savePosition(index, block ?: if (atEnd) END_OF_CHAPTER else 0)
+            savePosition(index, block ?: if (atEnd) END_OF_CHAPTER else 0, if (block != null) char else 0)
         }
     }
 
-    fun savePosition(chapter: Int, block: Int) {
+    /** [char]: the character inside paragraph [block] where the page starts (0: the paragraph's start). */
+    fun savePosition(chapter: Int, block: Int, char: Int = 0) {
         val current = _open.value ?: return
-        val entity = current.entity.copy(chapterIndex = chapter, blockIndex = block)
+        val entity = current.entity.copy(chapterIndex = chapter, blockIndex = block, charOffset = char)
         _open.value = current.copy(entity = entity)
-        viewModelScope.launch { books.savePosition(entity.id, chapter, block) }
+        viewModelScope.launch { books.savePosition(entity.id, chapter, block, char) }
     }
 
     fun closeBook() {
@@ -393,9 +403,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun setUserName(word: String, isName: Boolean) {
         viewModelScope.launch {
             if (isName) userNameDao.put(com.hanreader.app.UserName(word)) else userNameDao.remove(word)
-            val o = _open.value ?: return@launch
-            val c = o.chapter ?: return@launch
-            goToChapter(c.index, block = o.entity.blockIndex)
+            _open.value?.let { rebuildOpenChapter(it) }
         }
     }
 
@@ -509,7 +517,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 books.saveAnalysis(bookId, result.words, result.tokens)
                 prefs.edit().putInt("analysis_v_$bookId", BookAnalyzer.VERSION).apply()
                 // Names found now are kept whole: rebuild the open chapter in place.
-                _open.value?.let { o -> if (o.entity.id == bookId) o.chapter?.let { c -> goToChapter(c.index, block = o.entity.blockIndex) } }
+                _open.value?.let { o -> if (o.entity.id == bookId) rebuildOpenChapter(o) }
                 _open.value?.let { o -> if (o.entity.id == bookId) _open.value = o.copy(entity = o.entity.copy(analyzedTokens = result.tokens)) }
             }.onFailure { _message.value = "Не удалось разобрать словарь книги: ${it.message}" }
             _analysis.value = _analysis.value - bookId

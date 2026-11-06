@@ -114,6 +114,50 @@ class PaginationTest {
         assertTrue(pageSpec.heightPx > 0)
     }
 
+    /** A paragraph longer than a page: the saved spot inside it survives reopening and re-breaking. */
+    @Test
+    fun positionInsideLongParagraphSurvivesRepagination() {
+        val a = Appearance()
+        val spec = ReaderTheme.CLASSIC.spec
+        val long = block((0 until 40).joinToString("") { sentences[it % sentences.size] })
+        val ch = chapter.copy(blocks = listOf(chapter.blocks[0], long, chapter.blocks[1]))
+        var result by mutableStateOf<Pair<List<Page>, List<Page>>?>(null)
+        compose.setContent {
+            val metrics = rememberRubyMetrics(rememberTextMeasurer(cacheSize = 0), a, spec, spec.defaultHanFont.family)
+            val colors = rubyColors(a, spec)
+            val d = LocalDensity.current
+            fun specOf(w: Float, h: Float) = with(d) {
+                PageSpec(
+                    widthPx = w.dp.toPx(), heightPx = h.dp.toPx(), paragraphSpacingPx = a.paragraphSpacing.dp.toPx(),
+                    bannerHeightPx = 64.dp.toPx(), showBanner = true, gapPx = colors.wordGap.toPx(),
+                    lineGapPx = colors.lineGap.toPx(), showPinyin = true, hidePinyinFor = null,
+                    justify = colors.justify, indent = colors.indent
+                )
+            }
+            LaunchedEffect(Unit) {
+                result = Paginator.paginate(ch, metrics, specOf(340f, 420f)) { null } to
+                    Paginator.paginate(ch, metrics, specOf(300f, 380f)) { null }
+            }
+        }
+        compose.waitUntil(20_000) { result != null }
+        val (pages, other) = result!!
+        val inside = pages.withIndex().filter { it.value.firstBlock == 1 }
+        assertTrue("the long paragraph spans pages: ${inside.size}", inside.size >= 3)
+        // Continuation pages start further into the paragraph, each at its own character.
+        val starts = inside.map { it.value.firstChar }
+        assertEquals(starts.sorted(), starts)
+        assertEquals(starts.size, starts.toSet().size)
+        for ((k, p) in inside) {
+            // Reopening with the same breaks opens exactly the page that was read.
+            assertEquals(k, Paginator.pageFor(pages, p.firstBlock, p.firstChar))
+            // With other breaks (font, hints) it opens the page holding that character.
+            val o = Paginator.pageFor(other, p.firstBlock, p.firstChar)
+            val start = other[o]
+            assertTrue(start.firstBlock < 1 || start.firstChar <= p.firstChar)
+            other.getOrNull(o + 1)?.let { next -> assertTrue(next.firstBlock > 1 || next.firstChar > p.firstChar) }
+        }
+    }
+
     @Test
     fun twoPagesSideBySide() {
         val a = Appearance()

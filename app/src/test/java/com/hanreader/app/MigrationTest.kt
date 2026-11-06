@@ -83,6 +83,10 @@ class MigrationTest {
             assertEquals(0, book.analyzedTokens)
             db.bookDao().saveAnalysis(7, listOf(BookWord(7, "终于", 3, 5)), 10)
             assertEquals(10, db.bookDao().get(7)!!.analyzedTokens)
+            // v9: the spot inside the paragraph
+            assertEquals(0, book.charOffset)
+            db.bookDao().savePosition(7, 5, 33, 120)
+            assertEquals(120, db.bookDao().get(7)!!.charOffset)
             db.bookDao().setIgnored(7, "终于", true)
             db.bookDao().saveAnalysis(7, listOf(BookWord(7, "终于", 4, 5)), 11)
             assertEquals(listOf("终于"), db.bookDao().ignoredWords(7)) // ignore marks survive re-analysis
@@ -96,7 +100,7 @@ class MigrationTest {
             assertEquals(listOf("雷蒙德"), db.userNameDao().all().map { it.word })
             assertEquals(emptyList<String>(), db.bookDao().ignoredWords(7)) // cascade
         }
-        assertEquals(8, db.openHelper.readableDatabase.version)
+        assertEquals(9, db.openHelper.readableDatabase.version)
         db.close()
     }
 }
