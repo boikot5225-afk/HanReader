@@ -1,7 +1,10 @@
 package com.hanreader.app.reader
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -56,7 +59,7 @@ class RubyMetrics(
 }
 
 /** Spreads the free space of each full line evenly between its tokens. */
-private fun justifyLines(items: MutableList<Placed>, lines: List<IntRange>, widthPx: Float) {
+internal fun justifyLines(items: MutableList<Placed>, lines: List<IntRange>, widthPx: Float) {
     for (range in lines) {
         val first = items[range.first]
         val last = items[range.last]
@@ -74,7 +77,7 @@ private fun justifyLines(items: MutableList<Placed>, lines: List<IntRange>, widt
 }
 
 /** One token placed in the paragraph. */
-private class Placed(
+internal class Placed(
     val token: Int,
     val x: Float,
     val lineTop: Float,
@@ -83,11 +86,21 @@ private class Placed(
     val pinyinLayout: TextLayoutResult?
 )
 
-private class RubyLayout(val items: List<Placed>, val height: Float, val hanTop: Float, val hanHeight: Float)
+/** A laid-out paragraph: every line has the same height [lineHeight]; line k starts at k * lineHeight. */
+internal class RubyLayout(
+    val items: List<Placed>,
+    val height: Float,
+    val hanTop: Float,
+    val hanHeight: Float,
+    val lineHeight: Float,
+    val lineCount: Int
+) {
+    fun lineOf(p: Placed): Int = if (lineHeight <= 0f) 0 else (p.lineTop / lineHeight + 0.5f).toInt()
+}
 
 private const val CLOSING = "，。、；：？！”’）》」』〉】…—·,.;:?!)"
 
-private fun layout(
+internal fun layout(
     tokens: List<RToken>,
     widthPx: Float,
     metrics: RubyMetrics,
@@ -138,7 +151,8 @@ private fun layout(
         lineHasContent = true
     }
     if (justify && !heading) justifyLines(items, stretch, widthPx)
-    return RubyLayout(items, if (items.isEmpty()) 0f else y + lineH, pinH, hanH)
+    val count = if (items.isEmpty()) 0 else (y / lineH + 0.5f).toInt() + 1
+    return RubyLayout(items, if (items.isEmpty()) 0f else y + lineH, pinH, hanH, lineH, count)
 }
 
 /**
@@ -156,7 +170,9 @@ fun RubyParagraph(
     selection: IntRange?,
     colors: RubyColors,
     onTap: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Only these lines (page mode: a paragraph split across pages); null draws the whole paragraph. */
+    lines: IntRange? = null
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val density = LocalDensity.current
@@ -166,20 +182,33 @@ fun RubyParagraph(
         val laid = remember(block, widthPx, metrics, showPinyin, hidePinyinFor, colors) {
             layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx, colors.justify, colors.indent)
         }
-        val heightDp = with(density) { laid.height.toDp() }
+        val shown = lines ?: (0 until laid.lineCount)
+        val offsetY = shown.first * laid.lineHeight
+        val heightPx = if (lines == null) laid.height else (shown.last - shown.first + 1) * laid.lineHeight
+        val heightDp = with(density) { heightPx.toDp() }
         Canvas(
-            Modifier.fillMaxWidth().height(heightDp).pointerInput(laid) {
-                detectTapGestures { pos ->
+            Modifier.fillMaxWidth().height(heightDp).pointerInput(laid, shown) {
+                // Consume only taps on a word: other taps reach the page (turn, menu).
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val pos = down.position + Offset(0f, offsetY)
                     val hit = laid.items.firstOrNull {
-                        pos.x >= it.x && pos.x < it.x + it.width &&
+                        laid.lineOf(it) in shown &&
+                            pos.x >= it.x && pos.x < it.x + it.width &&
                             pos.y >= it.lineTop && pos.y < it.lineTop + laid.hanTop + laid.hanHeight + lineGapPx
+                    }?.takeIf { block.tokens[it.token].kind == TokenKind.HAN } ?: return@awaitEachGesture
+                    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+                    if ((up.position - down.position).getDistance() < viewConfiguration.touchSlop) {
+                        up.consume()
+                        onTap(hit.token)
                     }
-                    if (hit != null && block.tokens[hit.token].kind == TokenKind.HAN) onTap(hit.token)
                 }
             }
         ) {
             val pad = 2f
+            translate(top = -offsetY) {
             for (p in laid.items) {
+                if (lines != null && laid.lineOf(p) !in shown) continue
                 val t = block.tokens[p.token]
                 val selected = selection != null && p.token in selection
                 val isSaved = t.kind == TokenKind.HAN && t.text in saved
@@ -214,6 +243,7 @@ fun RubyParagraph(
                         strokeWidth = 3f
                     )
                 }
+            }
             }
         }
     }

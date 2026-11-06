@@ -183,6 +183,8 @@ fun ThemeSpec.colorScheme(): ColorScheme {
 
 enum class TextAlignMode(val title: String) { LEFT("По левому краю"), JUSTIFY("По ширине") }
 
+enum class ReadingMode(val title: String) { PAGES("Страницы"), SCROLL("Прокрутка") }
+
 /** Reader appearance, saved per device. Ranges are enforced on load. */
 data class Appearance(
     val theme: ReaderTheme = ReaderTheme.AUTO,
@@ -196,7 +198,13 @@ data class Appearance(
     val align: TextAlignMode = TextAlignMode.JUSTIFY,
     val indent: Boolean = true,
     /** Pinyin size relative to the characters. */
-    val pinyinScale: Float = 0.5f
+    val pinyinScale: Float = 0.5f,
+    val mode: ReadingMode = ReadingMode.PAGES,
+    /** Volume keys turn pages in page mode. */
+    val volumeKeys: Boolean = true,
+    val keepScreenOn: Boolean = true,
+    /** Screen brightness while reading, 0..1; negative = the system setting. */
+    val brightness: Float = -1f
 ) {
     fun hanFontFor(spec: ThemeSpec): HanFont = hanFont ?: spec.defaultHanFont
 
@@ -230,7 +238,11 @@ object AppearanceStore {
             margin = p.getInt("margin", d.margin).coerceIn(Appearance.MARGINS),
             align = TextAlignMode.entries.firstOrNull { it.name == p.getString("align", null) } ?: d.align,
             indent = p.getBoolean("indent", d.indent),
-            pinyinScale = p.getFloat("pinyinScale", d.pinyinScale).coerceIn(Appearance.PINYIN_SCALE)
+            pinyinScale = p.getFloat("pinyinScale", d.pinyinScale).coerceIn(Appearance.PINYIN_SCALE),
+            mode = ReadingMode.entries.firstOrNull { it.name == p.getString("mode", null) } ?: d.mode,
+            volumeKeys = p.getBoolean("volumeKeys", d.volumeKeys),
+            keepScreenOn = p.getBoolean("keepScreenOn", d.keepScreenOn),
+            brightness = p.getFloat("brightness", d.brightness).coerceAtMost(1f)
         )
         appContext = context.applicationContext
     }
@@ -250,7 +262,17 @@ object AppearanceStore {
             putString("align", next.align.name)
             putBoolean("indent", next.indent)
             putFloat("pinyinScale", next.pinyinScale)
+            putString("mode", next.mode.name)
+            putBoolean("volumeKeys", next.volumeKeys)
+            putBoolean("keepScreenOn", next.keepScreenOn)
+            putFloat("brightness", next.brightness)
             apply()
         }
     }
+}
+
+/** Volume-key page turns: the reader switches this on, MainActivity forwards the keys. */
+object ReaderKeys {
+    @Volatile var active: Boolean = false
+    val turns = kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 8)
 }

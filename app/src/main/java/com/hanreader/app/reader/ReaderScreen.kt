@@ -1,5 +1,37 @@
 package com.hanreader.app.reader
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.WindowManager
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Slider
+import androidx.compose.runtime.key
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import com.hanreader.app.Appearance
+import com.hanreader.app.ReaderKeys
+import com.hanreader.app.ReadingMode
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -78,7 +110,7 @@ import kotlinx.coroutines.launch
 private data class Selection(val block: Int, val first: Int, val last: Int)
 
 
-@OptIn(ExperimentalMaterial3Api::class, FlowPreview::class)
+@OptIn(ExperimentalMaterial3Api::class, FlowPreview::class, ExperimentalLayoutApi::class)
 @Composable
 fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val open by vm.open.collectAsState()
@@ -87,6 +119,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val known by vm.knownWords.collectAsState()
     val marked by vm.markedKnown.collectAsState()
     val pinyinMode by vm.pinyinMode.collectAsState()
+    val speed by vm.speed.collectAsState()
     val book = open ?: run {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
@@ -100,7 +133,12 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     var showToc by remember { mutableStateOf(false) }
     var showPrepare by remember { mutableStateOf(false) }
     var selection by remember { mutableStateOf<Selection?>(null) }
-    BackHandler { onClose() }
+    // The menu over the text: hidden while reading, a tap in the middle shows it.
+    var chrome by remember { mutableStateOf(false) }
+    BackHandler { if (chrome) chrome = false else onClose() }
+
+    val sheetOpen = showAppearance || showToc || showPrepare || selection != null
+    ImmersiveEffects(hideBars = !chrome && !sheetOpen, keepOn = appearance.keepScreenOn, brightness = appearance.brightness)
 
     val spec = LocalThemeSpec.current
     val scheme = MaterialTheme.colorScheme
@@ -115,86 +153,123 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val knownHere = remember(chapter, matcher) { chapter?.let { matcher.knownIn(it) } ?: emptySet() }
     val bookWords by vm.bookWords(book.entity.id).collectAsState(initial = emptyList())
     val names = remember(bookWords) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word } }
-    val listState = rememberLazyListState()
-    // Restore the saved position once per chapter, then keep saving it while scrolling.
-    LaunchedEffect(chapter?.index) {
-        val c = chapter ?: return@LaunchedEffect
-        val target = if (c.index == book.entity.chapterIndex) book.entity.blockIndex else 0
-        listState.scrollToItem(target.coerceIn(0, (c.blocks.size).coerceAtLeast(0)))
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .distinctUntilChanged()
-            .debounce(600)
-            .collect { vm.savePosition(c.index, it) }
+    val coverage = remember(chapter, matcher, names) { chapter?.let { KnownCoverage.of(it, matcher, names, engine) } }
+    val showPinyin = pinyinMode != PinyinMode.OFF
+    val hidePinyinFor = if (pinyinMode == PinyinMode.UNKNOWN) knownHere else null
+    val chapterCount = book.epub.chapters.size
+
+    // Fixed insets: hiding the system bars must not reflow the text.
+    val bars = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout).asPaddingValues()
+    var progress by remember { mutableStateOf(ReadingProgress()) }
+    val scope = rememberCoroutineScope()
+    // Page mode exposes its controls to the bottom panel through these.
+    var jumpToPage by remember { mutableStateOf<((Int) -> Unit)?>(null) }
+
+    val paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit = { block, i, lines ->
+        RubyParagraph(
+            block = block,
+            metrics = metrics,
+            showPinyin = showPinyin,
+            hidePinyinFor = hidePinyinFor,
+            saved = saved,
+            selection = selection?.takeIf { it.block == i }?.let { it.first..it.last },
+            colors = colors,
+            onTap = { t -> selection = Selection(i, t, t); chrome = false },
+            lines = lines
+        )
     }
 
-    Column(Modifier.fillMaxSize().background(scheme.background)) {
-        ReaderTopBar(
-            title = chapter?.title ?: book.entity.title,
-            subtitle = book.entity.title,
-            pinyinMode = pinyinMode,
-            onBack = onClose,
-            onToc = { showToc = true },
-            onPinyin = vm::setPinyinMode,
-            appearanceOpen = showAppearance,
-            onAppearance = { showAppearance = true }
-        )
-        HorizontalDivider(color = scheme.outlineVariant)
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            when {
-                book.error != null -> Text(book.error, Modifier.padding(24.dp), color = scheme.error)
-                chapter == null || book.loading && chapter.index != book.entity.chapterIndex -> Column(
-                    Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CircularProgressIndicator()
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        if (engine == null) "Загружаю словарь…" else "Открываю главу…",
-                        color = scheme.onSurfaceVariant
-                    )
-                }
-                else -> LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = appearance.margin.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(appearance.paragraphSpacing.dp)
-                ) {
-                    item(key = "prepare:${chapter.index}") {
-                        val coverage = remember(chapter, matcher, names) { KnownCoverage.of(chapter, matcher, names, engine) }
-                        if (engine != null && coverage.total > 0 && coverage.unknownDistinct > 0) {
-                            ChapterPrepareBanner(coverage.unknownDistinct, coverage.percent) { showPrepare = true }
-                        }
-                    }
-                    itemsIndexed(chapter.blocks, key = { i, _ -> "${chapter.index}:$i" }) { i, block ->
-                        when (block) {
-                            is ReaderBlock.Text -> RubyParagraph(
-                                block = block,
-                                metrics = metrics,
-                                showPinyin = pinyinMode != PinyinMode.OFF,
-                                hidePinyinFor = if (pinyinMode == PinyinMode.UNKNOWN) knownHere else null,
-                                saved = saved,
-                                selection = selection?.takeIf { it.block == i }?.let { it.first..it.last },
-                                colors = colors,
-                                onTap = { t -> selection = Selection(i, t, t) }
-                            )
-                            is ReaderBlock.Image -> BookImage(vm, block.path)
-                        }
-                    }
-                    item(key = "footer:${chapter.index}") {
-                        ChapterFooter(
-                            chapter = chapter,
-                            matcher = matcher,
-                            names = names,
-                            engine = engine,
-                            count = book.epub.chapters.size,
-                            engineMs = engine?.loadMs,
-                            onPrev = { vm.goToChapter(chapter.index - 1) },
-                            onNext = { vm.goToChapter(chapter.index + 1) }
-                        )
-                    }
-                }
+    Box(Modifier.fillMaxSize().background(scheme.background)) {
+        when {
+            book.error != null -> Text(book.error, Modifier.padding(bars).padding(24.dp), color = scheme.error)
+            chapter == null || book.loading && chapter.index != book.entity.chapterIndex -> Column(
+                Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator()
+                Spacer(Modifier.height(12.dp))
+                Text(if (engine == null) "Загружаю словарь…" else "Открываю главу…", color = scheme.onSurfaceVariant)
             }
+            appearance.mode == ReadingMode.PAGES -> PagedChapter(
+                vm = vm,
+                book = book,
+                chapter = chapter,
+                metrics = metrics,
+                colors = colors,
+                appearance = appearance,
+                showPinyin = showPinyin,
+                hidePinyinFor = hidePinyinFor,
+                showBanner = engine != null && coverage != null && coverage.unknownDistinct > 0,
+                banner = { coverage?.let { c -> ChapterPrepareBanner(c.unknownDistinct, c.percent) { showPrepare = true } } },
+                paragraph = paragraph,
+                bars = bars,
+                speed = speed,
+                keysEnabled = appearance.volumeKeys && !sheetOpen,
+                onTapCenter = { chrome = !chrome },
+                onAnyTap = { if (chrome) { chrome = false; true } else false },
+                onProgress = { progress = it },
+                registerJump = { jumpToPage = it }
+            )
+            else -> ScrollChapter(
+                vm = vm,
+                book = book,
+                chapter = chapter,
+                appearance = appearance,
+                paragraph = paragraph,
+                bars = bars,
+                speed = speed,
+                banner = {
+                    if (engine != null && coverage != null && coverage.total > 0 && coverage.unknownDistinct > 0) {
+                        ChapterPrepareBanner(coverage.unknownDistinct, coverage.percent) { showPrepare = true }
+                    }
+                },
+                footer = {
+                    ChapterFooter(
+                        chapter = chapter, matcher = matcher, names = names, engine = engine, count = chapterCount,
+                        engineMs = engine?.loadMs,
+                        onPrev = { vm.goToChapter(chapter.index - 1) },
+                        onNext = { vm.goToChapter(chapter.index + 1) }
+                    )
+                },
+                onTap = { chrome = !chrome },
+                onProgress = { progress = it },
+                registerJump = { jumpToPage = it }
+            )
+        }
+
+        // ---- the menu over the text ----
+        AnimatedVisibility(chrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter)) {
+            Column(
+                Modifier.fillMaxWidth().background(scheme.surface)
+                    .windowInsetsPadding(WindowInsets.systemBarsIgnoringVisibility.only(WindowInsetsSides.Top))
+            ) {
+                ReaderTopBar(
+                    title = chapter?.title ?: book.entity.title,
+                    subtitle = book.entity.title,
+                    pinyinMode = pinyinMode,
+                    onBack = onClose,
+                    onToc = { showToc = true },
+                    onPinyin = vm::setPinyinMode,
+                    appearanceOpen = showAppearance,
+                    onAppearance = { showAppearance = true }
+                )
+                HorizontalDivider(color = scheme.outlineVariant)
+            }
+        }
+        AnimatedVisibility(chrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
+            ReaderBottomPanel(
+                progress = progress,
+                chapterIndex = chapter?.index ?: 0,
+                chapterCount = chapterCount,
+                coverage = coverage,
+                appearance = appearance,
+                onJump = { target -> jumpToPage?.invoke(target) },
+                onPrevChapter = { chapter?.let { if (it.index > 0) vm.goToChapter(it.index - 1) } },
+                onNextChapter = { chapter?.let { if (it.index < chapterCount - 1) vm.goToChapter(it.index + 1) } },
+                onToc = { showToc = true },
+                onPrepare = { showPrepare = true }
+            )
         }
     }
 
@@ -211,6 +286,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         TocSheet(book, onDismiss = { showToc = false }) { index ->
             showToc = false
             selection = null
+            chrome = false
             vm.goToChapter(index)
         }
     }
@@ -246,6 +322,358 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 )
             }
         )
+    }
+}
+
+/** Where the reader is inside the chapter, for the running footer and the bottom panel. */
+data class ReadingProgress(
+    val position: Int = 0,
+    val count: Int = 1,
+    val minutesLeft: Int = 0,
+    val pages: Boolean = true
+)
+
+private fun minutesLeft(chars: Int, speed: Float): Int =
+    if (chars <= 0) 0 else kotlin.math.ceil(chars / speed.coerceAtLeast(30f)).toInt()
+
+private fun Context.findActivity(): Activity? {
+    var c: Context? = this
+    while (c is ContextWrapper) {
+        if (c is Activity) return c
+        c = c.baseContext
+    }
+    return null
+}
+
+/** Full-screen reading: system bars hidden while reading, screen kept on, reader brightness. */
+@Composable
+private fun ImmersiveEffects(hideBars: Boolean, keepOn: Boolean, brightness: Float) {
+    val view = LocalView.current
+    val window = remember(view) { view.context.findActivity()?.window }
+    DisposableEffect(window, hideBars) {
+        val w = window
+        if (w != null) {
+            val c = WindowCompat.getInsetsController(w, view)
+            c.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            if (hideBars) c.hide(WindowInsetsCompat.Type.systemBars()) else c.show(WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose { w?.let { WindowCompat.getInsetsController(it, view).show(WindowInsetsCompat.Type.systemBars()) } }
+    }
+    DisposableEffect(view, keepOn) {
+        view.keepScreenOn = keepOn
+        onDispose { view.keepScreenOn = false }
+    }
+    DisposableEffect(window, brightness) {
+        window?.let { w ->
+            val lp = w.attributes
+            lp.screenBrightness = if (brightness < 0f) WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE else brightness.coerceIn(0.02f, 1f)
+            w.attributes = lp
+        }
+        onDispose {
+            window?.let { w ->
+                val lp = w.attributes
+                lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                w.attributes = lp
+            }
+        }
+    }
+}
+
+private val HEADER_H = 30.dp
+private val FOOTER_H = 30.dp
+private val BANNER_H = 64.dp
+
+@Composable
+private fun RunningHeader(text: String) {
+    val spec = LocalThemeSpec.current
+    Box(Modifier.fillMaxWidth().height(HEADER_H), contentAlignment = Alignment.CenterStart) {
+        Text(text, color = spec.muted, fontFamily = spec.display, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun RunningFooter(left: String, right: String) {
+    val spec = LocalThemeSpec.current
+    Row(Modifier.fillMaxWidth().height(FOOTER_H), verticalAlignment = Alignment.CenterVertically) {
+        Text(left, Modifier.weight(1f), color = spec.muted, fontFamily = spec.display, fontSize = 12.sp, maxLines = 1)
+        Text(right, color = spec.muted, fontFamily = spec.display, fontSize = 12.sp)
+    }
+}
+
+/** Page mode: the chapter split into screens, turned by swipe, side taps or the volume keys. */
+@Composable
+private fun PagedChapter(
+    vm: ReaderViewModel,
+    book: OpenBook,
+    chapter: ChapterContent,
+    metrics: RubyMetrics,
+    colors: RubyColors,
+    appearance: Appearance,
+    showPinyin: Boolean,
+    hidePinyinFor: Set<String>?,
+    showBanner: Boolean,
+    banner: @Composable () -> Unit,
+    paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit,
+    bars: PaddingValues,
+    speed: Float,
+    keysEnabled: Boolean,
+    onTapCenter: () -> Unit,
+    onAnyTap: () -> Boolean,
+    onProgress: (ReadingProgress) -> Unit,
+    registerJump: (((Int) -> Unit)?) -> Unit
+) {
+    val density = LocalDensity.current
+    val spec = LocalThemeSpec.current
+    BoxWithConstraints(Modifier.fillMaxSize().padding(bars)) {
+        val margin = appearance.margin.dp
+        val widthPx = with(density) { (maxWidth - margin * 2).toPx() }
+        val heightPx = with(density) { (maxHeight - HEADER_H - FOOTER_H).toPx() }
+        val pageSpec = PageSpec(
+            widthPx = widthPx,
+            heightPx = heightPx,
+            paragraphSpacingPx = with(density) { appearance.paragraphSpacing.dp.toPx() },
+            bannerHeightPx = with(density) { BANNER_H.toPx() },
+            showBanner = showBanner,
+            gapPx = with(density) { colors.wordGap.toPx() },
+            lineGapPx = with(density) { colors.lineGap.toPx() },
+            showPinyin = showPinyin,
+            hidePinyinFor = hidePinyinFor,
+            justify = colors.justify,
+            indent = colors.indent
+        )
+        val pages by produceState<List<Page>?>(null, chapter, pageSpec, metrics) {
+            value = Paginator.paginate(chapter, metrics, pageSpec) { vm.imageAspect(it) }
+        }
+        val list = pages
+        if (list == null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            return@BoxWithConstraints
+        }
+        val hasPrev = chapter.index > 0
+        val hasNext = chapter.index < book.epub.chapters.size - 1
+        val lead = if (hasPrev) 1 else 0
+        val total = list.size + lead + (if (hasNext) 1 else 0)
+        val savedBlock = if (book.entity.chapterIndex == chapter.index) book.entity.blockIndex else 0
+        key(chapter.index, list) {
+            val pager = rememberPagerState(initialPage = lead + Paginator.pageFor(list, savedBlock)) { total }
+            val scope = rememberCoroutineScope()
+            fun turn(by: Int) {
+                val target = (pager.currentPage + by).coerceIn(0, total - 1)
+                scope.launch { pager.animateScrollToPage(target) }
+            }
+            DisposableEffect(pager) {
+                registerJump { page -> scope.launch { pager.scrollToPage(lead + page.coerceIn(0, list.size - 1)) } }
+                onDispose { registerJump(null) }
+            }
+            DisposableEffect(keysEnabled) {
+                ReaderKeys.active = keysEnabled
+                onDispose { ReaderKeys.active = false }
+            }
+            LaunchedEffect(pager) { ReaderKeys.turns.collect { turn(it) } }
+            LaunchedEffect(pager, speed) {
+                var shownAt = System.currentTimeMillis()
+                var shownChars = 0
+                snapshotFlow { pager.settledPage }.collect { p ->
+                    val now = System.currentTimeMillis()
+                    vm.recordPage(shownChars, now - shownAt)
+                    shownAt = now
+                    when {
+                        p < lead -> vm.goToChapter(chapter.index - 1, atEnd = true)
+                        p >= lead + list.size -> vm.goToChapter(chapter.index + 1)
+                        else -> {
+                            val page = list[p - lead]
+                            shownChars = page.chars
+                            vm.savePosition(chapter.index, page.firstBlock)
+                            val left = list.subList(p - lead, list.size).sumOf { it.chars }
+                            onProgress(ReadingProgress(p - lead, list.size, minutesLeft(left, speed), pages = true))
+                        }
+                    }
+                }
+            }
+            HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1) { index ->
+                Column(
+                    Modifier.fillMaxSize().background(spec.background).padding(horizontal = margin)
+                        .pointerInput(Unit) {
+                            detectTapGestures { pos ->
+                                if (onAnyTap()) return@detectTapGestures
+                                when {
+                                    pos.x < size.width * 0.3f -> turn(-1)
+                                    pos.x > size.width * 0.7f -> turn(1)
+                                    else -> onTapCenter()
+                                }
+                            }
+                        }
+                ) {
+                    val pageIndex = index - lead
+                    RunningHeader(chapter.title)
+                    Column(Modifier.weight(1f).fillMaxWidth()) {
+                        if (pageIndex < 0 || pageIndex >= list.size) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    if (pageIndex < 0) "← Предыдущий раздел" else "Следующий раздел →",
+                                    color = spec.muted, fontFamily = spec.display
+                                )
+                            }
+                        } else {
+                            for (item in list[pageIndex].items) {
+                                when (item) {
+                                    PageItem.Banner -> Box(Modifier.fillMaxWidth().height(BANNER_H)) { banner() }
+                                    is PageItem.Lines -> {
+                                        if (item.spacingBefore) Spacer(Modifier.height(appearance.paragraphSpacing.dp))
+                                        (chapter.blocks[item.block] as? ReaderBlock.Text)?.let { paragraph(it, item.block, item.lines) }
+                                    }
+                                    is PageItem.Image -> {
+                                        if (item.spacingBefore) Spacer(Modifier.height(appearance.paragraphSpacing.dp))
+                                        val path = (chapter.blocks[item.block] as ReaderBlock.Image).path
+                                        Box(Modifier.fillMaxWidth().height(with(density) { item.heightPx.toDp() })) { BookImage(vm, path) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    val shown = pageIndex.coerceIn(0, list.size - 1)
+                    val left = list.subList(shown, list.size).sumOf { it.chars }
+                    RunningFooter(
+                        left = if (left > 0) "≈ ${minutesLeft(left, speed)} мин до конца раздела" else "",
+                        right = "${shown + 1} / ${list.size}"
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Scroll mode: the chapter as one long column. */
+@OptIn(FlowPreview::class)
+@Composable
+private fun ScrollChapter(
+    vm: ReaderViewModel,
+    book: OpenBook,
+    chapter: ChapterContent,
+    appearance: Appearance,
+    paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit,
+    bars: PaddingValues,
+    speed: Float,
+    banner: @Composable () -> Unit,
+    footer: @Composable () -> Unit,
+    onTap: () -> Unit,
+    onProgress: (ReadingProgress) -> Unit,
+    registerJump: (((Int) -> Unit)?) -> Unit
+) {
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val blockChars = remember(chapter) {
+        chapter.blocks.map { b -> if (b is ReaderBlock.Text) b.tokens.sumOf { t -> if (t.kind == TokenKind.HAN) t.text.length else 0 } else 0 }
+    }
+    DisposableEffect(listState) {
+        registerJump { block -> scope.launch { listState.scrollToItem(block.coerceIn(0, chapter.blocks.size) + 1) } }
+        onDispose { registerJump(null) }
+    }
+    // Restore the saved position once per chapter, then keep saving it while scrolling.
+    LaunchedEffect(chapter.index) {
+        val target = if (chapter.index == book.entity.chapterIndex) book.entity.blockIndex else 0
+        listState.scrollToItem(target.coerceIn(0, chapter.blocks.size))
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .debounce(400)
+            .collect { first ->
+                val block = (first - 1).coerceIn(0, (chapter.blocks.size - 1).coerceAtLeast(0))
+                vm.savePosition(chapter.index, block)
+                val left = blockChars.drop(block).sum()
+                onProgress(ReadingProgress(block, chapter.blocks.size.coerceAtLeast(1), minutesLeft(left, speed), pages = false))
+            }
+    }
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onTap() } },
+        contentPadding = PaddingValues(
+            start = appearance.margin.dp, end = appearance.margin.dp,
+            top = bars.calculateTopPadding() + 16.dp, bottom = bars.calculateBottomPadding() + 16.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(appearance.paragraphSpacing.dp)
+    ) {
+        item(key = "prepare:${chapter.index}") { banner() }
+        itemsIndexed(chapter.blocks, key = { i, _ -> "${chapter.index}:$i" }) { i, block ->
+            when (block) {
+                is ReaderBlock.Text -> paragraph(block, i, null)
+                is ReaderBlock.Image -> BookImage(vm, block.path)
+            }
+        }
+        item(key = "footer:${chapter.index}") { footer() }
+    }
+}
+
+/** The bottom half of the menu: position in the chapter, time left, chapters, brightness. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ReaderBottomPanel(
+    progress: ReadingProgress,
+    chapterIndex: Int,
+    chapterCount: Int,
+    coverage: KnownCoverage?,
+    appearance: Appearance,
+    onJump: (Int) -> Unit,
+    onPrevChapter: () -> Unit,
+    onNextChapter: () -> Unit,
+    onToc: () -> Unit,
+    onPrepare: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    Column(
+        Modifier.fillMaxWidth().background(scheme.surface)
+            .windowInsetsPadding(WindowInsets.systemBarsIgnoringVisibility.only(WindowInsetsSides.Bottom))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        HorizontalDivider(color = scheme.outlineVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val shown = (dragging?.toInt() ?: progress.position) + 1
+            Text(
+                "Раздел ${chapterIndex + 1} из $chapterCount · " + (if (progress.pages) "стр. $shown из ${progress.count}" else "абзац $shown из ${progress.count}"),
+                Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium
+            )
+            if (progress.minutesLeft > 0) {
+                Text("≈ ${progress.minutesLeft} мин", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            }
+        }
+        if (progress.count > 1) {
+            Slider(
+                value = dragging ?: progress.position.toFloat(),
+                onValueChange = { dragging = it },
+                onValueChangeFinished = { dragging?.let { onJump(it.toInt()) }; dragging = null },
+                valueRange = 0f..(progress.count - 1).toFloat()
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onPrevChapter, enabled = chapterIndex > 0) { Text("← Раздел") }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onToc) { Text("Оглавление") }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onNextChapter, enabled = chapterIndex < chapterCount - 1) { Text("Раздел →") }
+        }
+        if (coverage != null && coverage.total > 0) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Знакомо ${coverage.percent}% · незнакомых слов: ${coverage.unknownDistinct}", Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                if (coverage.unknownDistinct > 0) TextButton(onClick = onPrepare) { Text("Подготовиться") }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(LexiconIcons.Sun, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            val system = appearance.brightness < 0f
+            Slider(
+                value = if (system) 0.5f else appearance.brightness,
+                onValueChange = { v -> AppearanceStore.update { it.copy(brightness = v.coerceIn(0.02f, 1f)) } },
+                modifier = Modifier.weight(1f).semantics { contentDescription = "Яркость" }
+            )
+            FilterChip(
+                selected = system,
+                onClick = { AppearanceStore.update { it.copy(brightness = if (system) 0.5f else -1f) } },
+                label = { Text("Как в системе") }
+            )
+        }
     }
 }
 

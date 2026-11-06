@@ -51,6 +51,7 @@ import com.hanreader.app.HanFont
 import com.hanreader.app.LexiconIcons
 import com.hanreader.app.LocalThemeSpec
 import com.hanreader.app.ReaderTheme
+import com.hanreader.app.ReadingMode
 import com.hanreader.app.TextAlignMode
 import com.hanreader.app.WordFont
 import com.hanreader.app.zh.TokenKind
@@ -100,6 +101,21 @@ fun AppearanceSheet(onDismiss: () -> Unit) {
                 )
             }
 
+            Section("Чтение")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ReadingMode.entries.forEach { m ->
+                    FilterChip(selected = a.mode == m, onClick = { AppearanceStore.update { it.copy(mode = m) } }, label = { Text(m.title) })
+                }
+            }
+            if (a.mode == ReadingMode.PAGES) {
+                Text(
+                    "Листание: свайп или касание по краю страницы; касание в центре — меню.",
+                    style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
+                )
+                SwitchRow("Листать кнопками громкости", a.volumeKeys) { on -> AppearanceStore.update { it.copy(volumeKeys = on) } }
+            }
+            SwitchRow("Не гасить экран при чтении", a.keepScreenOn) { on -> AppearanceStore.update { it.copy(keepScreenOn = on) } }
+
             Section("Тема")
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(ReaderTheme.entries) { theme -> ThemeCard(theme, selected = a.theme == theme) { AppearanceStore.update { it.copy(theme = theme) } } }
@@ -138,13 +154,20 @@ fun AppearanceSheet(onDismiss: () -> Unit) {
                     FilterChip(selected = a.align == m, onClick = { AppearanceStore.update { it.copy(align = m) } }, label = { Text(m.title) })
                 }
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Красная строка", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                Switch(checked = a.indent, onCheckedChange = { on -> AppearanceStore.update { it.copy(indent = on) } })
-            }
+            SwitchRow("Красная строка", a.indent) { on -> AppearanceStore.update { it.copy(indent = on) } }
             HorizontalDivider(color = scheme.outlineVariant)
-            TextButton(onClick = { AppearanceStore.update { Appearance(theme = it.theme) } }) { Text("Сбросить настройки текста") }
+            TextButton(onClick = {
+                AppearanceStore.update { Appearance(theme = it.theme, mode = it.mode, volumeKeys = it.volumeKeys, keepScreenOn = it.keepScreenOn, brightness = it.brightness) }
+            }) { Text("Сбросить настройки текста") }
         }
+    }
+}
+
+@Composable
+private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 

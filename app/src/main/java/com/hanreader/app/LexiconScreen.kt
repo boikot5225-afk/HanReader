@@ -121,7 +121,8 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = 
     )
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+        // The reader handles the system bars itself (full-screen reading); other screens stay inside them.
+        Box(Modifier.fillMaxSize().then(if (reading != null) Modifier else Modifier.safeDrawingPadding())) {
             val active = session
             val book = reading
             val statsId = bookStats

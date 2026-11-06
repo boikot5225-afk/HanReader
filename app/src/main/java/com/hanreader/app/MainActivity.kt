@@ -6,6 +6,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 
 class MainActivity : ComponentActivity() {
+    /** In page mode, volume down/up turn the page forward/back instead of changing the volume. */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        val code = event.keyCode
+        if (ReaderKeys.active && (code == android.view.KeyEvent.KEYCODE_VOLUME_DOWN || code == android.view.KeyEvent.KEYCODE_VOLUME_UP)) {
+            if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+                ReaderKeys.turns.tryEmit(if (code == android.view.KeyEvent.KEYCODE_VOLUME_DOWN) 1 else -1)
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)

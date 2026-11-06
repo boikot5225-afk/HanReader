@@ -149,6 +149,12 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         /** 2: official HSK 2.0 lists, erhua forms, derived words (他们, 那些, 没有). */
         const val HSK_DATA_VERSION = 2
+
+        /** Saved block index meaning "the end of the chapter". */
+        const val END_OF_CHAPTER = Int.MAX_VALUE / 2
+
+        /** A cautious start for a learner: about 200 characters a minute. */
+        const val DEFAULT_CPM = 200f
     }
 
     fun clearMessage() { _message.value = null }
@@ -214,11 +220,12 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun goToChapter(index: Int) {
-        viewModelScope.launch { openMutex.withLock { loadChapterLocked(index) } }
+    /** [atEnd]: open on the last page (turning back from the next chapter). */
+    fun goToChapter(index: Int, atEnd: Boolean = false) {
+        viewModelScope.launch { openMutex.withLock { loadChapterLocked(index, atEnd) } }
     }
 
-    private suspend fun loadChapterLocked(index: Int) {
+    private suspend fun loadChapterLocked(index: Int, atEnd: Boolean = false) {
         val current = _open.value ?: return
         if (index !in current.epub.chapters.indices) return
         _open.value = current.copy(loading = true, error = null)
@@ -231,8 +238,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             onSuccess = { now.copy(chapter = it, loading = false) },
             onFailure = { now.copy(loading = false, error = "Глава не открылась: ${it.message}") }
         )
-        if (result.isSuccess && index != now.entity.chapterIndex) {
-            savePosition(index, 0)
+        if (result.isSuccess && (index != now.entity.chapterIndex || atEnd)) {
+            savePosition(index, if (atEnd) END_OF_CHAPTER else 0)
         }
     }
 
@@ -251,6 +258,34 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         _open.value?.epub?.let { runCatching { it.close() } }
         _open.value = null
         images.evictAll()
+    }
+
+    private val aspects = HashMap<String, Float>()
+
+    /** Height / width of a book image, from its header only; null if it cannot be read. */
+    suspend fun imageAspect(path: String): Float? {
+        aspects[path]?.let { return it }
+        val epub = _open.value?.epub ?: return null
+        return withContext(Dispatchers.IO) {
+            val bytes = runCatching { epub.bytes(path) }.getOrNull() ?: return@withContext null
+            val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, o)
+            if (o.outWidth > 0) o.outHeight.toFloat() / o.outWidth else null
+        }?.also { aspects[path] = it }
+    }
+
+    // ---- Reading speed (Han characters per minute), for "≈ N min left" ----
+
+    private val _speed = MutableStateFlow(prefs.getFloat("cpm", DEFAULT_CPM))
+    val speed: StateFlow<Float> = _speed.asStateFlow()
+
+    /** A page of [chars] characters was read in [millis]; implausible times are ignored. */
+    fun recordPage(chars: Int, millis: Long) {
+        if (chars < 20 || millis < 3_000 || millis > 5 * 60_000) return
+        val sample = (chars / (millis / 60_000f)).coerceIn(30f, 1_500f)
+        val next = _speed.value * 0.8f + sample * 0.2f
+        _speed.value = next
+        prefs.edit().putFloat("cpm", next).apply()
     }
 
     /** Decodes a book image, downsampled to at most [maxWidth] pixels wide. */
