@@ -1,0 +1,4 @@
+Proper names (zh/names.tsv): entries of the Jieba 0.42.1 lexicon (dict.txt, MIT licence)
+tagged as people (nr, nrt, nrfg), places (ns) or organisations (nt), filtered by
+tools/build_names.py (surname or transliteration shape, place/organisation suffixes;
+HSK words and ordinary CC-CEDICT words excluded).

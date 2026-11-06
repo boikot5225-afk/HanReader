@@ -91,9 +91,12 @@ class MigrationTest {
             assertEquals(1, db.bookmarkDao().observe(7).first().size)
             db.bookDao().delete(7)
             assertEquals(0, db.bookmarkDao().observe(7).first().size)
+            // v8: names marked by the reader
+            db.userNameDao().put(UserName("雷蒙德"))
+            assertEquals(listOf("雷蒙德"), db.userNameDao().all().map { it.word })
             assertEquals(emptyList<String>(), db.bookDao().ignoredWords(7)) // cascade
         }
-        assertEquals(7, db.openHelper.readableDatabase.version)
+        assertEquals(8, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

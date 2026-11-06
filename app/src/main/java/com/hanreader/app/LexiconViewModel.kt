@@ -128,7 +128,8 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                     cards = cards,
                     examples = dao.allExamples(),
                     settings = languages.map { settingsStore.load(it.tag) },
-                    knownWords = knownDao.all()
+                    knownWords = knownDao.all(),
+                    userNames = LexiconDatabase.get(app).userNameDao().all().map { it.word }
                 )
                 val text = BackupFormat.encode(backup)
                 withContext(Dispatchers.IO) {
@@ -164,6 +165,11 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                 LexiconDatabase.get(getApplication()).withTransaction {
                     dao.replaceAll(backup.cards, backup.examples)
                     backup.knownWords?.let { knownDao.replaceAll(it) }
+                    backup.userNames?.let { names ->
+                        val dao = LexiconDatabase.get(getApplication()).userNameDao()
+                        dao.removeAll()
+                        dao.putAll(names.map { UserName(it) })
+                    }
                 }
                 backup.settings
                     .filter { s -> languages.any { it.tag == s.language } }

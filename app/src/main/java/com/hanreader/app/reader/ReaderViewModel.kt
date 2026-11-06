@@ -17,6 +17,7 @@ import com.hanreader.app.epub.BookFiles
 import com.hanreader.app.epub.BookFormat
 import com.hanreader.app.epub.BookSource
 import com.hanreader.app.epub.EpubException
+import com.hanreader.app.zh.isHan
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -317,7 +318,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         _open.value = current.copy(loading = true, error = null)
         val result = runCatching {
             val engine = engineDeferred.await()
-            withContext(Dispatchers.Default) { ChapterBuilder.build(current.epub, index, engine) }
+            val extra = namesToKeepWhole(current.entity.id)
+            withContext(Dispatchers.Default) { ChapterBuilder.build(current.epub, index, engine, extra) }
         }
         val now = _open.value ?: return
         _open.value = result.fold(
@@ -358,6 +360,31 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, o)
             if (o.outWidth > 0) o.outHeight.toFloat() / o.outWidth else null
         }?.also { aspects[path] = it }
+    }
+
+    // ---- Names ----
+
+    private val userNameDao = db.userNameDao()
+
+    /** Words the reader marked «Это имя». */
+    val userNames: StateFlow<Set<String>> = userNameDao.observeWords().map { it.toHashSet() as Set<String> }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    /** Names the segmenter keeps as one word: the reader's own and the ones found in this book. */
+    private suspend fun namesToKeepWhole(bookId: Long): Set<String> {
+        val own = userNameDao.all().map { it.word }
+        val found = books.ignoredWords(bookId)
+        return (own + found).filterTo(HashSet()) { it.length in 2..8 && it.all { c -> c.isHan() } }
+    }
+
+    /** Marks or unmarks [word] as a name; the chapter is rebuilt so the name stays whole. */
+    fun setUserName(word: String, isName: Boolean) {
+        viewModelScope.launch {
+            if (isName) userNameDao.put(com.hanreader.app.UserName(word)) else userNameDao.remove(word)
+            val o = _open.value ?: return@launch
+            val c = o.chapter ?: return@launch
+            goToChapter(c.index, block = o.entity.blockIndex)
+        }
     }
 
     // ---- Bookmarks ----
@@ -496,7 +523,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                         val source = epub ?: own!!
                         val c = chapter?.takeIf { ch -> VocabularyStats.firstSentence(ch, w.word) != null }
                             ?: loaded.getOrPut(w.firstChapter) {
-                                withContext(Dispatchers.Default) { ChapterBuilder.build(source, w.firstChapter, engine) }
+                                withContext(Dispatchers.Default) { ChapterBuilder.build(source, w.firstChapter, engine, namesToKeepWhole(book.id)) }
                             }
                         val sentence = VocabularyStats.firstSentence(c, w.word) ?: w.word
                         val reading = engine.lookup(w.word)?.pinyin ?: w.pinyin

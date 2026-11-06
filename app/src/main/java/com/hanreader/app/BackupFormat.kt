@@ -11,7 +11,9 @@ data class Backup(
     val examples: List<CardExample>,
     val settings: List<LearningSettings>,
     /** HanReader: known words. Null when the file has none (Lexicon backups): restoring keeps the current ones. */
-    val knownWords: List<KnownWord>? = null
+    val knownWords: List<KnownWord>? = null,
+    /** HanReader: words marked «Это имя». Null when the file has none: restoring keeps the current ones. */
+    val userNames: List<String>? = null
 )
 
 class BackupFormatException(message: String) : Exception(message)
@@ -82,6 +84,7 @@ object BackupFormat {
                 }
             })
         }
+        backup.userNames?.let { names -> root.put("userNames", JSONArray().apply { names.forEach { put(it) } }) }
         return root.toString(2)
     }
 
@@ -150,8 +153,11 @@ object BackupFormat {
                     KnownWord(k.getString("word"), k.optString("source", "manual"), k.optLong("addedAt", 0L))
                 }.filter { it.word.isNotBlank() }.distinctBy { it.word }
             }
+            val names = root.optJSONArray("userNames")?.let { arr ->
+                (0 until arr.length()).map { arr.getString(it).trim() }.filter { it.isNotEmpty() }.distinct()
+            }
             validate(cards, examples)
-            return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known)
+            return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known, names)
         } catch (e: JSONException) {
             throw BackupFormatException("Файл копии повреждён: " + (e.message ?: "неверная структура"))
         }

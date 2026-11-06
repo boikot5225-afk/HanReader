@@ -66,8 +66,20 @@ class ZhEngine(
     /** Russian meanings from the Russian Wiktionary (about 11.7k words), senses joined by " ; ". */
     private val russian: Map<String, String> = emptyMap(),
     /** Machine translation of CC-CEDICT meanings into Russian, senses joined by "; ". */
-    private val russianAi: Map<String, String> = emptyMap()
+    private val russianAi: Map<String, String> = emptyMap(),
+    /** Proper names (assets/zh/names.tsv): p = person, l = place, o = organisation. */
+    private val names: Map<String, Char> = emptyMap()
 ) {
+    enum class NameKind(val title: String) { PERSON("человек"), PLACE("место"), ORGANISATION("организация") }
+
+    /** Kind of a proper name from the names lexicon, or null for an ordinary word. */
+    fun nameKind(word: String): NameKind? = when (names[word]) {
+        'p' -> NameKind.PERSON
+        'l' -> NameKind.PLACE
+        'o' -> NameKind.ORGANISATION
+        else -> null
+    }
+
     enum class RussianSource(val label: String) {
         WIKTIONARY("Викисловарь"),
         AI("машинный перевод CC-CEDICT")
@@ -119,6 +131,15 @@ class ZhEngine(
         word.mapNotNull { dictionary.lookup(it.toString())?.takeIf { e -> e.hasDefinition } }
 
     companion object {
+        fun parseNames(lines: Sequence<String>): Map<String, Char> {
+            val map = HashMap<String, Char>(80_000)
+            for (line in lines) {
+                val tab = line.indexOf('\t')
+                if (tab > 0 && tab + 1 < line.length) map[line.substring(0, tab)] = line[tab + 1]
+            }
+            return map
+        }
+
         fun parseRussian(lines: Sequence<String>): Map<String, String> {
             val map = HashMap<String, String>(16_000)
             for (line in lines) {
@@ -146,7 +167,8 @@ class ZhEngine(
                         val hsk = app.assets.open("zh/hsk.tsv").bufferedReader().useLines { HskLevels.parse(it) }
                         val ru = app.assets.open("zh/ru.tsv").bufferedReader().useLines { parseRussian(it) }
                         val ruAi = app.assets.open("zh/ru_ai.tsv").bufferedReader().useLines { parseRussian(it) }
-                        ZhEngine(dict, (System.nanoTime() - t) / 1_000_000, hsk, ru, ruAi)
+                        val names = app.assets.open("zh/names.tsv").bufferedReader().useLines { parseNames(it) }
+                        ZhEngine(dict, (System.nanoTime() - t) / 1_000_000, hsk, ru, ruAi, names)
                     }.onSuccess { d.complete(it) }.onFailure { d.completeExceptionally(it) }
                 }
                 return d
@@ -179,7 +201,7 @@ data class ChapterContent(
 )
 
 object ChapterBuilder {
-    fun build(book: BookSource, index: Int, engine: ZhEngine): ChapterContent {
+    fun build(book: BookSource, index: Int, engine: ZhEngine, extra: Set<String> = emptySet()): ChapterContent {
         val t = System.nanoTime()
         var chars = 0
         val blocks = book.blocks(index).map { b ->
@@ -187,7 +209,7 @@ object ChapterBuilder {
                 is EpubBlock.Image -> ReaderBlock.Image(b.path)
                 is EpubBlock.Text -> {
                     chars += b.text.length
-                    val tokens = engine.segmenter.segment(b.text).map { tok ->
+                    val tokens = engine.segmenter.segment(b.text, extra).map { tok ->
                         RToken(
                             text = tok.text,
                             pinyin = engine.pinyinOf(tok),

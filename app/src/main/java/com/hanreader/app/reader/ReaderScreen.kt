@@ -157,7 +157,9 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // Words of this chapter treated as known (marked, learned or transparent compounds of them).
     val knownHere = remember(chapter, matcher) { chapter?.let { matcher.knownIn(it) } ?: emptySet() }
     val bookWords by vm.bookWords(book.entity.id).collectAsState(initial = emptyList())
-    val names = remember(bookWords) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word } }
+    val userNames by vm.userNames.collectAsState()
+    // Names of this book (found or «Не учить») and the reader's own «Это имя».
+    val names = remember(bookWords, userNames) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word }.apply { addAll(userNames) } }
     val coverage = remember(chapter, matcher, names) { chapter?.let { KnownCoverage.of(it, matcher, names, engine) } }
     val showPinyin = pinyinMode != PinyinMode.OFF
     // Recommended words for the reader's level (blue), words not known yet (red).
@@ -175,7 +177,9 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         chapter?.blocks?.flatMap { b -> (b as? ReaderBlock.Text)?.tokens?.filter { it.kind == TokenKind.HAN }?.map { it.text }.orEmpty() }?.toHashSet() ?: hashSetOf()
     }
     val unknownSet = remember(chapterWords, knownHere, saved, names, appearance.markUnknown) {
-        if (!appearance.markUnknown) emptySet() else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names }
+        val eng = engine
+        if (!appearance.markUnknown) emptySet()
+        else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
     val hidePinyinFor = when (pinyinMode) {
         PinyinMode.UNKNOWN -> knownHere
@@ -391,6 +395,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onChange = { selection = it },
             onDismiss = { selection = null },
             recommendations = recommended.associateBy { it.word },
+            userNames = userNames,
+            onUserName = { w, on -> vm.setUserName(w, on); selection = null },
             onSave = { word, reading, translation, sentence, done ->
                 vm.saveWord(
                     ReaderSave(
@@ -945,7 +951,9 @@ private fun WordSheet(
     onChange: (Selection) -> Unit,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String, (Result<Boolean>) -> Unit) -> Unit,
-    recommendations: Map<String, Recommendation> = emptyMap()
+    recommendations: Map<String, Recommendation> = emptyMap(),
+    userNames: Set<String> = emptySet(),
+    onUserName: (String, Boolean) -> Unit = { _, _ -> }
 ) {
     val tokens = block.tokens
     val first = tokens[selection.first]
@@ -1059,6 +1067,24 @@ private fun WordSheet(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(if (isSaved) "Добавить пример к карточке" else "Сохранить в карточки", style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            val lexiconName = engine.nameKind(word)
+            val isUserName = word in userNames
+            if (lexiconName != null || isUserName) {
+                Text(
+                    "Имя собственное · " + (lexiconName?.title ?: "отмечено тобой"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (lexiconName == null) {
+                OutlinedButton(
+                    onClick = { onUserName(word, !isUserName) },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Text(if (isUserName) "Это не имя" else "Это имя — не учить, не подчёркивать")
                 }
             }
             val isMarked = word in marked

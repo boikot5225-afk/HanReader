@@ -244,4 +244,23 @@ class ReaderFlowTest {
         assertTrue(r!!.isFailure)
         assertTrue(File(app.filesDir, "books").listFiles()!!.none { it.name.endsWith(".tmp") })
     }
+
+    @Test
+    fun markingANameRebuildsTheChapter() {
+        val vm = ReaderViewModel(app)
+        var imported: Result<Long>? = null
+        vm.importBook(Uri.fromFile(sampleBook())) { imported = it }
+        waitFor { imported != null }
+        vm.openBook(imported!!.getOrThrow())
+        waitFor(60_000) { vm.open.value?.chapter != null }
+        val before = vm.open.value!!.chapter!!
+        vm.setUserName("小明每", true) // a nonsense "name" across a word boundary: must become one token
+        waitFor(60_000) {
+            val c = vm.open.value?.chapter
+            c != null && c !== before && (c.blocks[1] as ReaderBlock.Text).tokens.any { it.text == "小明每" }
+        }
+        assertTrue("小明每" in runBlocking { LexiconDatabase.get(app).userNameDao().all() }.map { it.word })
+        vm.setUserName("小明每", false)
+        waitFor(60_000) { (vm.open.value?.chapter?.blocks?.get(1) as? ReaderBlock.Text)?.tokens?.none { it.text == "小明每" } == true }
+    }
 }

@@ -124,9 +124,10 @@ object VocabularyStats {
         return !(e.pinyin.firstOrNull()?.isUpperCase() ?: false)
     }
 
-    /** A proper noun outside the HSK lists (CC-CEDICT reading starts with a capital). */
+    /** A proper name outside the HSK lists: in the names lexicon, or a CC-CEDICT reading with a capital. */
     fun isName(word: String, engine: ZhEngine): Boolean {
         if (engine.hsk.hsk3(word) > 0 || engine.hsk.hsk2(word) > 0) return false
+        if (engine.nameKind(word) != null) return true
         return engine.dictionary.lookup(word)?.pinyin?.firstOrNull()?.isUpperCase() == true
     }
 
@@ -158,7 +159,7 @@ object VocabularyStats {
             LevelCoverage(level, percent(counted.sumOf { if (covered.isKnown(it.word)) it.count else 0 }, base))
         }
         val candidates = words.asSequence()
-            .filter { !it.ignored && !matcher.isKnown(it.word) && it.word !in saved && studyable(it.word, engine.dictionary) }
+            .filter { !it.ignored && !matcher.isKnown(it.word) && it.word !in saved && studyable(it.word, engine.dictionary) && !isName(it.word, engine) }
             .sortedByDescending { it.count }
             .take(limit)
             .map { candidate(it.word, it.count, it.firstChapter, engine) }
@@ -185,7 +186,7 @@ object VocabularyStats {
             }
         }
         return counts.entries.asSequence()
-            .filter { (w, _) -> !matcher.isKnown(w) && w !in saved && w !in ignored && studyable(w, engine.dictionary) }
+            .filter { (w, _) -> !matcher.isKnown(w) && w !in saved && w !in ignored && studyable(w, engine.dictionary) && !isName(w, engine) }
             .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
             .take(limit)
             .map { (w, n) -> candidate(w, n, chapter.index, engine) }

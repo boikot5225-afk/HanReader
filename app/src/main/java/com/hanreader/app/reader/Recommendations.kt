@@ -58,7 +58,8 @@ object Recommendations {
         return counts.entries.asSequence()
             .filter { (w, _) ->
                 w !in saved && w !in names && !known.isKnown(w) &&
-                    bookWords[w]?.ignored != true && VocabularyStats.studyable(w, engine.dictionary)
+                    bookWords[w]?.ignored != true && VocabularyStats.studyable(w, engine.dictionary) &&
+                    !VocabularyStats.isName(w, engine)
             }
             .map { (w, inChapter) ->
                 val wl = wordLevel(w, engine)

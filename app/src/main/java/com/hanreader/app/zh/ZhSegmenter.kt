@@ -27,7 +27,8 @@ fun Char.isHan(): Boolean {
  */
 class ZhSegmenter(private val dict: ZhDictionary) {
 
-    fun segment(text: String): List<ZhToken> {
+    /** [extra]: words to keep whole although the lexicon lacks them (names found in the book or marked by the reader). */
+    fun segment(text: String, extra: Set<String> = emptySet()): List<ZhToken> {
         val out = ArrayList<ZhToken>(text.length / 2 + 4)
         var i = 0
         while (i < text.length) {
@@ -36,7 +37,7 @@ class ZhSegmenter(private val dict: ZhDictionary) {
                 ch.isHan() -> {
                     var j = i
                     while (j < text.length && text[j].isHan()) j++
-                    segmentHan(text, i, j, out)
+                    segmentHan(text, i, j, out, extra)
                     i = j
                 }
                 ch.isWhitespace() -> {
@@ -60,7 +61,7 @@ class ZhSegmenter(private val dict: ZhDictionary) {
         return out
     }
 
-    private fun segmentHan(text: String, from: Int, to: Int, out: MutableList<ZhToken>) {
+    private fun segmentHan(text: String, from: Int, to: Int, out: MutableList<ZhToken>, extra: Set<String>) {
         val n = to - from
         val best = DoubleArray(n + 1) { Double.MAX_VALUE }
         val back = IntArray(n + 1)
@@ -75,6 +76,11 @@ class ZhSegmenter(private val dict: ZhDictionary) {
             for (len in 2..limit) {
                 val w = text.substring(base, base + len)
                 if (dict.contains(w)) relax(best, back, i, len, cost(w))
+            }
+            if (extra.isNotEmpty()) {
+                for (len in 2..minOf(MAX_WORD, n - i)) {
+                    if (text.substring(base, base + len) in extra) relax(best, back, i, len, extraCost)
+                }
             }
             val num = numberRun(text, base, to)
             if (num >= 2) relax(best, back, i, num, numberCost)
@@ -119,6 +125,9 @@ class ZhSegmenter(private val dict: ZhDictionary) {
 
     private val numberCost = logTotal - ln(NUMBER_FREQ)
 
+    /** A name kept whole costs like a fairly common word, so it beats splitting into characters. */
+    private val extraCost = logTotal - ln(EXTRA_FREQ)
+
     /** Length of a Chinese numeral run plus an optional unit at [start], or 0. */
     private fun numberRun(text: String, start: Int, end: Int): Int {
         var j = start
@@ -135,6 +144,7 @@ class ZhSegmenter(private val dict: ZhDictionary) {
         private const val CEDICT_ONLY_FREQ = 3.0
         private const val UNKNOWN_FREQ = 0.5
         private const val NUMBER_FREQ = 200.0
+        private const val EXTRA_FREQ = 5_000.0
         private const val NUMERALS = "零〇一二三四五六七八九十百千万亿两"
         private const val UNITS = "年月日号点分秒岁"
     }

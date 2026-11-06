@@ -89,6 +89,34 @@ data class BookEntity(
     val analyzedTokens: Int = 0
 )
 
+/** A word the reader marked «Это имя»: never taught, never underlined, kept whole by the segmenter. */
+@Entity(tableName = "user_names")
+data class UserName(
+    @PrimaryKey val word: String,
+    val addedAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface UserNameDao {
+    @Query("SELECT word FROM user_names")
+    fun observeWords(): Flow<List<String>>
+
+    @Query("SELECT * FROM user_names ORDER BY word")
+    suspend fun all(): List<UserName>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun put(n: UserName)
+
+    @Query("DELETE FROM user_names WHERE word = :word")
+    suspend fun remove(word: String)
+
+    @Query("DELETE FROM user_names")
+    suspend fun removeAll()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putAll(list: List<UserName>)
+}
+
 /** A bookmark: a paragraph of a chapter, with the start of its text to recognise it. */
 @Entity(
     tableName = "bookmarks",
@@ -485,13 +513,13 @@ interface CardDao {
 // so no database of version 3 exists under this name; Lexicon data arrives through backups.
 // Version 5 (0.2.0): known_words. Schemas are exported to app/schemas for migration checks.
 // Version 6 (0.3.0): book_words and books.analyzedTokens (book vocabulary analysis).
-// Version 7 (0.7.0): bookmarks.
+// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names.
 @Database(
     entities = [
         WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
-        Bookmark::class
+        Bookmark::class, UserName::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
@@ -499,6 +527,7 @@ abstract class LexiconDatabase : RoomDatabase() {
     abstract fun bookDao(): BookDao
     abstract fun knownWordDao(): KnownWordDao
     abstract fun bookmarkDao(): BookmarkDao
+    abstract fun userNameDao(): UserNameDao
 
     companion object {
         @Volatile private var instance: LexiconDatabase? = null
@@ -577,7 +606,15 @@ abstract class LexiconDatabase : RoomDatabase() {
             "`chapterTitle` TEXT NOT NULL, `snippet` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, " +
             "FOREIGN KEY(`bookId`) REFERENCES `books`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `user_names` (`word` TEXT NOT NULL, `addedAt` INTEGER NOT NULL, PRIMARY KEY(`word`))"
+                )
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {
