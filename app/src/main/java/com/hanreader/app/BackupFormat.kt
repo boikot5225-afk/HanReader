@@ -13,7 +13,21 @@ data class Backup(
     /** HanReader: known words. Null when the file has none (Lexicon backups): restoring keeps the current ones. */
     val knownWords: List<KnownWord>? = null,
     /** HanReader: words marked «Это имя». Null when the file has none: restoring keeps the current ones. */
-    val userNames: List<String>? = null
+    val userNames: List<String>? = null,
+    /** HanReader: where saved words were met. Null in older files: restoring keeps none (they belong to the cards). */
+    val sources: List<WordSource>? = null,
+    /** HanReader: the library. Null in older files and word-only copies: restoring keeps the current books. */
+    val library: LibraryBackup? = null,
+    /** Book files unpacked from the archive (file name -> temporary file); not part of the JSON. */
+    val bookFiles: Map<String, java.io.File> = emptyMap()
+)
+
+/** Books with their reading positions, bookmarks, highlights and «Не учить» marks. */
+data class LibraryBackup(
+    val books: List<BookEntity>,
+    val bookmarks: List<Bookmark>,
+    val highlights: List<Highlight>,
+    val ignored: List<BookWord>
 )
 
 class BackupFormatException(message: String) : Exception(message)
@@ -24,7 +38,8 @@ class BackupFormatException(message: String) : Exception(message)
  */
 object BackupFormat {
     private const val FORMAT = "lexicon-backup"
-    const val VERSION = 1
+    /** 2: HanReader library, word sources. Version 1 files still restore. */
+    const val VERSION = 2
 
     fun encode(backup: Backup): String {
         val root = JSONObject()
@@ -85,6 +100,50 @@ object BackupFormat {
             })
         }
         backup.userNames?.let { names -> root.put("userNames", JSONArray().apply { names.forEach { put(it) } }) }
+        backup.sources?.let { list ->
+            root.put("sources", JSONArray().apply {
+                list.forEach { w ->
+                    put(JSONObject().apply {
+                        put("cardId", w.cardId); put("bookId", w.bookId); put("bookTitle", w.bookTitle)
+                        put("chapterIndex", w.chapterIndex); put("chapterTitle", w.chapterTitle)
+                        put("sentence", w.sentence); put("createdAt", w.createdAt)
+                    })
+                }
+            })
+        }
+        backup.library?.let { lib ->
+            root.put("library", JSONObject().apply {
+                put("books", JSONArray().apply {
+                    lib.books.forEach { b ->
+                        put(JSONObject().apply {
+                            put("id", b.id); put("title", b.title); put("author", b.author); put("fileName", b.fileName)
+                            put("chapterCount", b.chapterCount); put("addedAt", b.addedAt); put("lastOpenedAt", b.lastOpenedAt)
+                            put("chapterIndex", b.chapterIndex); put("blockIndex", b.blockIndex); put("charOffset", b.charOffset)
+                        })
+                    }
+                })
+                put("bookmarks", JSONArray().apply {
+                    lib.bookmarks.forEach { m ->
+                        put(JSONObject().apply {
+                            put("bookId", m.bookId); put("chapterIndex", m.chapterIndex); put("blockIndex", m.blockIndex)
+                            put("chapterTitle", m.chapterTitle); put("snippet", m.snippet); put("createdAt", m.createdAt)
+                        })
+                    }
+                })
+                put("highlights", JSONArray().apply {
+                    lib.highlights.forEach { h ->
+                        put(JSONObject().apply {
+                            put("bookId", h.bookId); put("chapterIndex", h.chapterIndex); put("blockIndex", h.blockIndex)
+                            put("startChar", h.startChar); put("endChar", h.endChar); put("color", h.color); put("note", h.note)
+                            put("text", h.text); put("chapterTitle", h.chapterTitle); put("createdAt", h.createdAt)
+                        })
+                    }
+                })
+                put("ignored", JSONArray().apply {
+                    lib.ignored.forEach { w -> put(JSONObject().apply { put("bookId", w.bookId); put("word", w.word) }) }
+                })
+            })
+        }
         return root.toString(2)
     }
 
@@ -156,12 +215,72 @@ object BackupFormat {
             val names = root.optJSONArray("userNames")?.let { arr ->
                 (0 until arr.length()).map { arr.getString(it).trim() }.filter { it.isNotEmpty() }.distinct()
             }
+            val sources = root.optJSONArray("sources")?.let { arr ->
+                val ids = cards.mapTo(HashSet()) { it.id }
+                (0 until arr.length()).map { i ->
+                    val w = arr.getJSONObject(i)
+                    WordSource(
+                        cardId = w.getLong("cardId"), bookId = w.optLong("bookId", 0L), bookTitle = w.optString("bookTitle", ""),
+                        chapterIndex = w.optInt("chapterIndex", 0), chapterTitle = w.optString("chapterTitle", ""),
+                        sentence = w.optString("sentence", ""), createdAt = w.optLong("createdAt", 0L)
+                    )
+                }.filter { it.cardId in ids }
+            }
+            val library = root.optJSONObject("library")?.let { decodeLibrary(it) }
             validate(cards, examples)
-            return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known, names)
+            return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known, names, sources, library)
         } catch (e: JSONException) {
             throw BackupFormatException("Файл копии повреждён: " + (e.message ?: "неверная структура"))
         }
     }
+
+    private fun decodeLibrary(lib: JSONObject): LibraryBackup {
+        fun arr(name: String) = lib.optJSONArray(name) ?: JSONArray()
+        val booksJson = arr("books")
+        val books = (0 until booksJson.length()).map { i ->
+            val b = booksJson.getJSONObject(i)
+            BookEntity(
+                id = b.getLong("id"), title = b.getString("title"), author = b.optString("author", ""),
+                fileName = b.getString("fileName"), chapterCount = b.optInt("chapterCount", 0),
+                addedAt = b.optLong("addedAt", 0L), lastOpenedAt = b.optLong("lastOpenedAt", 0L),
+                chapterIndex = b.optInt("chapterIndex", 0), blockIndex = b.optInt("blockIndex", 0),
+                charOffset = b.optInt("charOffset", 0)
+            )
+        }
+        val ids = HashSet<Long>()
+        val names = HashSet<String>()
+        books.forEach { b ->
+            if (b.id <= 0L || !ids.add(b.id)) throw BackupFormatException("Файл копии повреждён: повторяется книга #" + b.id)
+            if (!safeName(b.fileName) || !names.add(b.fileName)) throw BackupFormatException("Файл копии повреждён: неверное имя файла книги")
+        }
+        val marksJson = arr("bookmarks")
+        val bookmarks = (0 until marksJson.length()).map { i ->
+            val m = marksJson.getJSONObject(i)
+            Bookmark(
+                bookId = m.getLong("bookId"), chapterIndex = m.getInt("chapterIndex"), blockIndex = m.getInt("blockIndex"),
+                chapterTitle = m.optString("chapterTitle", ""), snippet = m.optString("snippet", ""), createdAt = m.optLong("createdAt", 0L)
+            )
+        }.filter { it.bookId in ids }
+        val hlJson = arr("highlights")
+        val highlights = (0 until hlJson.length()).map { i ->
+            val h = hlJson.getJSONObject(i)
+            Highlight(
+                bookId = h.getLong("bookId"), chapterIndex = h.getInt("chapterIndex"), blockIndex = h.getInt("blockIndex"),
+                startChar = h.getInt("startChar"), endChar = h.getInt("endChar"), color = h.optInt("color", 0),
+                note = h.optString("note", ""), text = h.optString("text", ""), chapterTitle = h.optString("chapterTitle", ""),
+                createdAt = h.optLong("createdAt", 0L)
+            )
+        }.filter { it.bookId in ids && it.endChar > it.startChar }
+        val igJson = arr("ignored")
+        val ignored = (0 until igJson.length()).map { i ->
+            val w = igJson.getJSONObject(i)
+            BookWord(w.getLong("bookId"), w.getString("word"), 0, 0, ignored = true)
+        }.filter { it.bookId in ids && it.word.isNotBlank() }.distinctBy { it.bookId to it.word }
+        return LibraryBackup(books, bookmarks, highlights, ignored)
+    }
+
+    /** A plain file name: no folders, nothing that could leave the books folder. */
+    fun safeName(name: String) = name.isNotBlank() && name.length < 200 && name.none { it == '/' || it == '\\' } && name != "." && name != ".."
 
     private fun validate(cards: List<WordCard>, examples: List<CardExample>) {
         val ids = HashSet<Long>()

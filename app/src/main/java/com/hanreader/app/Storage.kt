@@ -143,6 +143,12 @@ interface BookmarkDao {
     @Query("SELECT * FROM bookmarks WHERE bookId = :bookId ORDER BY chapterIndex, blockIndex")
     fun observe(bookId: Long): Flow<List<Bookmark>>
 
+    @Query("SELECT * FROM bookmarks ORDER BY id")
+    suspend fun all(): List<Bookmark>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAllStrict(rows: List<Bookmark>)
+
     @Insert
     suspend fun insert(b: Bookmark): Long
 
@@ -180,6 +186,12 @@ data class Highlight(
 interface HighlightDao {
     @Query("SELECT * FROM highlights WHERE bookId = :bookId ORDER BY chapterIndex, blockIndex, startChar")
     fun observe(bookId: Long): Flow<List<Highlight>>
+
+    @Query("SELECT * FROM highlights ORDER BY id")
+    suspend fun all(): List<Highlight>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAllStrict(rows: List<Highlight>)
 
     @Insert
     suspend fun insert(h: Highlight): Long
@@ -316,6 +328,18 @@ data class ReaderSave(
 
 @Dao
 interface BookDao {
+    @Query("SELECT * FROM books ORDER BY id")
+    suspend fun all(): List<BookEntity>
+
+    /** Removes every book with its bookmarks, highlights and word counts (cascade). */
+    @Query("DELETE FROM books")
+    suspend fun deleteAll()
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAllStrict(books: List<BookEntity>)
+
+    @Query("SELECT * FROM book_words WHERE ignored = 1")
+    suspend fun allIgnored(): List<BookWord>
     @Query("SELECT * FROM books ORDER BY CASE WHEN lastOpenedAt > 0 THEN lastOpenedAt ELSE addedAt END DESC")
     fun observeAll(): Flow<List<BookEntity>>
 
@@ -545,6 +569,12 @@ interface CardDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertExamplesStrict(rows: List<CardExample>)
+
+    @Query("SELECT * FROM word_sources ORDER BY id")
+    suspend fun allSources(): List<WordSource>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertSourcesStrict(rows: List<WordSource>)
 
     /** Replace the whole dictionary with a backup. Any error rolls everything back. */
     @Transaction

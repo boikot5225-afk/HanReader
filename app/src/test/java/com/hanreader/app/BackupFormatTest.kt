@@ -50,9 +50,25 @@ class BackupFormatTest {
 
     @Test fun rejectsNewerVersion() {
         val json = BackupFormat.encode(Backup(1L, listOf(card), examples, settings))
-            .replace("\"version\": 1", "\"version\": 99")
+            .replace("\"version\": ${BackupFormat.VERSION}", "\"version\": 99")
         val error = assertThrows(BackupFormatException::class.java) { BackupFormat.decode(json) }
         assertTrue(error.message!!.contains("новой версией"))
+    }
+
+    /** A version 1 file (words only) still restores and leaves the library alone. */
+    @Test fun readsVersionOne() {
+        val json = BackupFormat.encode(Backup(1L, listOf(card), examples, settings))
+            .replace("\"version\": ${BackupFormat.VERSION}", "\"version\": 1")
+        val b = BackupFormat.decode(json)
+        assertEquals(1, b.cards.size)
+        assertEquals(null, b.library)
+        assertEquals(null, b.sources)
+    }
+
+    @Test fun rejectsUnsafeBookNames() {
+        val book = BookEntity(id = 3, title = "x", author = "", fileName = "../evil", chapterCount = 1)
+        val json = BackupFormat.encode(Backup(1L, listOf(card), examples, settings, library = LibraryBackup(listOf(book), emptyList(), emptyList(), emptyList())))
+        assertThrows(BackupFormatException::class.java) { BackupFormat.decode(json) }
     }
 
     @Test fun rejectsExamplesWithoutWord() {

@@ -41,7 +41,7 @@ fun BackupSection(vm: LexiconViewModel) {
     var pending by remember { mutableStateOf<Backup?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
+        ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         if (uri != null) {
             busy = true
@@ -82,16 +82,16 @@ fun BackupSection(vm: LexiconViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Overline("Резервная копия")
         Text(
-            "Все языки: слова, примеры, прогресс и настройки. Сохраняй копию перед переустановкой или сменой телефона.",
+            "Всё в одном файле: слова и прогресс, известные слова, книги с местом чтения, закладки, выделения и заметки. Сохраняй копию перед переустановкой или сменой телефона.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall
         )
         BackupButton(LexiconIcons.Download, "Сохранить копию в файл", enabled = !busy) {
             val day = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
-            exportLauncher.launch("hanreader-backup-$day.json")
+            exportLauncher.launch("hanreader-backup-$day.zip")
         }
         BackupButton(LexiconIcons.Paste, "Восстановить из файла", enabled = !busy) {
-            importLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/*"))
+            importLauncher.launch(arrayOf("application/zip", "application/json", "application/octet-stream", "text/*"))
         }
         if (status.isNotEmpty()) {
             Text(
@@ -114,7 +114,12 @@ fun BackupSection(vm: LexiconViewModel) {
                 Text(
                     "Копия от $date: ${backup.cards.size} " +
                         RussianText.plural(backup.cards.size, "слово", "слова", "слов") +
-                        ". Все слова и прогресс, которые сейчас есть в приложении, будут заменены данными из копии."
+                        (backup.library?.let { lib ->
+                            ", ${lib.books.size} " + RussianText.plural(lib.books.size, "книга", "книги", "книг") +
+                                ", ${lib.highlights.size} " + RussianText.plural(lib.highlights.size, "выделение", "выделения", "выделений")
+                        } ?: "") +
+                        ". Всё, что сейчас есть в приложении" + (if (backup.library != null) ", включая книги," else "") +
+                        " будет заменено данными из копии."
                 )
             },
             confirmButton = {
