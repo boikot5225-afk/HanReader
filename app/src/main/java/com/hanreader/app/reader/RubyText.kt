@@ -19,6 +19,14 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.hanreader.app.Appearance
+import com.hanreader.app.TextAlignMode
+import com.hanreader.app.ThemeSpec
 import com.hanreader.app.zh.TokenKind
 
 /**
@@ -47,6 +55,24 @@ class RubyMetrics(
     val pinyinHeight: Int by lazy { pinyin("hàn").size.height }
 }
 
+/** Spreads the free space of each full line evenly between its tokens. */
+private fun justifyLines(items: MutableList<Placed>, lines: List<IntRange>, widthPx: Float) {
+    for (range in lines) {
+        val first = items[range.first]
+        val last = items[range.last]
+        val used = last.x + last.width - first.x
+        val free = widthPx - first.x - used
+        if (free <= 0f) continue
+        val step = free / (range.last - range.first)
+        // Do not stretch absurdly when a long token pushed the line break early.
+        if (step > first.hanLayout.size.width * 0.6f) continue
+        for ((k, i) in range.withIndex()) {
+            val p = items[i]
+            items[i] = Placed(p.token, p.x + step * k, p.lineTop, p.width, p.hanLayout, p.pinyinLayout)
+        }
+    }
+}
+
 /** One token placed in the paragraph. */
 private class Placed(
     val token: Int,
@@ -69,20 +95,26 @@ private fun layout(
     showPinyin: Boolean,
     hidePinyinFor: Set<String>?,
     gapPx: Float,
-    lineGapPx: Float
+    lineGapPx: Float,
+    justify: Boolean,
+    indent: Boolean
 ): RubyLayout {
     // The pinyin row is kept even above known words, so lines keep one rhythm.
     val pinH = if (showPinyin) metrics.pinyinHeight.toFloat() else 0f
     val hanH = metrics.han("汉", heading).size.height.toFloat()
     val lineH = pinH + hanH + lineGapPx
     val items = ArrayList<Placed>(tokens.size)
-    var x = if (heading) 0f else metrics.emWidth * 2f
+    var x = if (heading || !indent) 0f else metrics.emWidth * 2f
+    // Index in items where the current line starts, and which lines may be stretched.
+    var lineStart = 0
+    val stretch = ArrayList<IntRange>()
     var y = 0f
     var lineHasContent = false
     for ((i, t) in tokens.withIndex()) {
         if (t.kind == TokenKind.SPACE) {
             if (t.text.contains('\n')) {
                 x = 0f; y += lineH; lineHasContent = false
+                lineStart = items.size
             } else if (lineHasContent) {
                 x += metrics.emWidth * 0.3f
             }
@@ -96,12 +128,16 @@ private fun layout(
         // Closing punctuation never starts a line: let it hang past the margin.
         val hangs = t.kind == TokenKind.PUNCT && t.text[0] in CLOSING
         if (lineHasContent && x + w > widthPx && !hangs) {
+            // A full line ends here: it may be justified (the last line of the paragraph is not).
+            if (items.size - lineStart >= 2) stretch += lineStart until items.size
             x = 0f; y += lineH
+            lineStart = items.size
         }
         items += Placed(i, x, y, w, hanLayout, pinLayout)
         x += w
         lineHasContent = true
     }
+    if (justify && !heading) justifyLines(items, stretch, widthPx)
     return RubyLayout(items, if (items.isEmpty()) 0f else y + lineH, pinH, hanH)
 }
 
@@ -127,8 +163,8 @@ fun RubyParagraph(
         val widthPx = constraints.maxWidth.toFloat()
         val gapPx = with(density) { colors.wordGap.toPx() }
         val lineGapPx = with(density) { colors.lineGap.toPx() }
-        val laid = remember(block, widthPx, metrics, showPinyin, hidePinyinFor) {
-            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx)
+        val laid = remember(block, widthPx, metrics, showPinyin, hidePinyinFor, colors) {
+            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx, colors.justify, colors.indent)
         }
         val heightDp = with(density) { laid.height.toDp() }
         Canvas(
@@ -189,5 +225,38 @@ data class RubyColors(
     val saved: Color,
     val selection: Color,
     val wordGap: androidx.compose.ui.unit.Dp,
-    val lineGap: androidx.compose.ui.unit.Dp
+    val lineGap: androidx.compose.ui.unit.Dp,
+    val justify: Boolean = false,
+    val indent: Boolean = true
+)
+
+/** Text styles of the reader from the appearance settings and the theme. */
+@Composable
+fun rememberRubyMetrics(measurer: TextMeasurer, a: Appearance, spec: ThemeSpec, han: FontFamily): RubyMetrics =
+    remember(measurer, a.fontSize, a.pinyinScale, spec, han) {
+        val size = a.fontSize.sp
+        val base = TextStyle(fontSize = size, fontFamily = han, color = spec.text)
+        RubyMetrics(
+            measurer,
+            hanStyle = base,
+            pinyinStyle = TextStyle(
+                fontSize = size * a.pinyinScale * spec.pinyinBoost,
+                fontFamily = spec.pinyinFont,
+                fontStyle = if (spec.pinyinItalic) FontStyle.Italic else FontStyle.Normal,
+                fontWeight = if (spec.pinyinItalic) FontWeight.Medium else FontWeight.Normal,
+                color = spec.pinyin
+            ),
+            headingStyle = base.copy(fontSize = size * 1.25f, fontWeight = FontWeight.SemiBold)
+        )
+    }
+
+fun rubyColors(a: Appearance, spec: ThemeSpec) = RubyColors(
+    text = spec.text,
+    pinyin = spec.pinyin,
+    saved = spec.saved,
+    selection = spec.selection,
+    wordGap = 3.dp,
+    lineGap = (a.fontSize * a.lineSpacing).dp,
+    justify = a.align == TextAlignMode.JUSTIFY,
+    indent = a.indent
 )

@@ -8,6 +8,12 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -82,20 +88,27 @@ private val DarkLexicon = darkColorScheme(
 val HeroReviewColor = Color(0xFF7FD1C4)
 val HeroNewColor = Color(0xFFF2B66B)
 
-/** Studied words and examples use the system serif (Noto Serif / Noto Serif CJK). */
-val WordFont: FontFamily = FontFamily.Serif
+/** The theme in use and the reader's chosen Chinese font, for every screen. */
+val LocalThemeSpec = staticCompositionLocalOf { ReaderTheme.PAPER.spec }
+val LocalHanFont = staticCompositionLocalOf<FontFamily> { FontFamily.Serif }
 
-private val Base = Typography()
-private val LexiconTypography = Typography(
-    displayLarge = Base.displayLarge.copy(fontFamily = WordFont, fontWeight = FontWeight.SemiBold),
-    displayMedium = Base.displayMedium.copy(fontFamily = WordFont, fontWeight = FontWeight.SemiBold),
-    displaySmall = Base.displaySmall.copy(fontFamily = WordFont, fontWeight = FontWeight.SemiBold),
-    headlineLarge = Base.headlineLarge.copy(fontFamily = WordFont, fontWeight = FontWeight.SemiBold),
-    headlineMedium = Base.headlineMedium.copy(fontFamily = WordFont, fontWeight = FontWeight.SemiBold),
-    headlineSmall = Base.headlineSmall.copy(fontFamily = WordFont, fontWeight = FontWeight.SemiBold),
-    titleLarge = Base.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-    titleMedium = Base.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-)
+/** Studied words and examples use the Chinese font chosen in «Оформление». */
+val WordFont: FontFamily
+    @Composable @ReadOnlyComposable get() = LocalHanFont.current
+
+private fun typography(spec: ThemeSpec, han: FontFamily): Typography {
+    val base = Typography()
+    fun body(t: TextStyle) = t.copy(fontFamily = spec.body)
+    fun display(t: TextStyle) = t.copy(fontFamily = han, fontWeight = FontWeight.SemiBold)
+    fun title(t: TextStyle) = t.copy(fontFamily = spec.display, fontWeight = if (spec.display == spec.body) FontWeight.SemiBold else FontWeight.Medium)
+    return Typography(
+        displayLarge = display(base.displayLarge), displayMedium = display(base.displayMedium), displaySmall = display(base.displaySmall),
+        headlineLarge = display(base.headlineLarge), headlineMedium = display(base.headlineMedium), headlineSmall = display(base.headlineSmall),
+        titleLarge = title(base.titleLarge), titleMedium = title(base.titleMedium), titleSmall = title(base.titleSmall),
+        bodyLarge = body(base.bodyLarge), bodyMedium = body(base.bodyMedium), bodySmall = body(base.bodySmall),
+        labelLarge = body(base.labelLarge), labelMedium = body(base.labelMedium), labelSmall = body(base.labelSmall)
+    )
+}
 
 private val LexiconShapes = Shapes(
     small = RoundedCornerShape(12.dp),
@@ -106,10 +119,23 @@ private val LexiconShapes = Shapes(
 
 @Composable
 fun LexiconTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkLexicon else LightLexicon,
-        typography = LexiconTypography,
-        shapes = LexiconShapes,
-        content = content
-    )
+    val appearance by AppearanceStore.appearance.collectAsState()
+    val spec = appearance.theme.resolve(isSystemInDarkTheme()).spec
+    val han = appearance.hanFontFor(spec).family
+    CompositionLocalProvider(LocalThemeSpec provides spec, LocalHanFont provides han) {
+        MaterialTheme(
+            colorScheme = spec.colorScheme(),
+            typography = typography(spec, han),
+            shapes = if (spec.corner == 0.dp) SharpShapes else LexiconShapes,
+            content = content
+        )
+    }
 }
+
+private val SharpShapes = Shapes(
+    extraSmall = RoundedCornerShape(0.dp),
+    small = RoundedCornerShape(2.dp),
+    medium = RoundedCornerShape(2.dp),
+    large = RoundedCornerShape(4.dp),
+    extraLarge = RoundedCornerShape(6.dp)
+)

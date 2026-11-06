@@ -65,6 +65,8 @@ import com.hanreader.app.LexiconIcons
 import com.hanreader.app.Panel
 import com.hanreader.app.ReaderSave
 import com.hanreader.app.Speaker
+import com.hanreader.app.AppearanceStore
+import com.hanreader.app.LocalThemeSpec
 import com.hanreader.app.WordFont
 import com.hanreader.app.zh.TokenKind
 import kotlinx.coroutines.FlowPreview
@@ -75,7 +77,6 @@ import kotlinx.coroutines.launch
 /** Tapped word: paragraph index and token range, which the user can widen or narrow. */
 private data class Selection(val block: Int, val first: Int, val last: Int)
 
-private val FONT_SIZES = listOf(18, 20, 22, 24, 27, 30)
 
 @OptIn(ExperimentalMaterial3Api::class, FlowPreview::class)
 @Composable
@@ -94,32 +95,19 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val speaker = remember(context) { Speaker(context) }
     DisposableEffect(speaker) { onDispose { speaker.close() } }
 
-    var fontStep by rememberSaveable { mutableStateOf(2) }
+    val appearance by AppearanceStore.appearance.collectAsState()
+    var showAppearance by remember { mutableStateOf(false) }
     var showToc by remember { mutableStateOf(false) }
     var showPrepare by remember { mutableStateOf(false) }
     var selection by remember { mutableStateOf<Selection?>(null) }
     BackHandler { onClose() }
 
-    val fontSize = FONT_SIZES[fontStep].sp
-    val measurer = rememberTextMeasurer(cacheSize = 0)
+    val spec = LocalThemeSpec.current
     val scheme = MaterialTheme.colorScheme
-    val metrics = remember(fontSize, scheme) {
-        val base = androidx.compose.ui.text.TextStyle(fontSize = fontSize, fontFamily = WordFont, color = scheme.onBackground)
-        RubyMetrics(
-            measurer,
-            hanStyle = base,
-            pinyinStyle = base.copy(fontSize = fontSize * 0.5f, fontFamily = null, color = scheme.onSurfaceVariant),
-            headingStyle = base.copy(fontSize = fontSize * 1.25f, fontWeight = FontWeight.SemiBold)
-        )
-    }
-    val colors = RubyColors(
-        text = scheme.onBackground,
-        pinyin = scheme.onSurfaceVariant,
-        saved = scheme.primary,
-        selection = scheme.secondaryContainer,
-        wordGap = 3.dp,
-        lineGap = 8.dp
-    )
+    val hanFamily = WordFont
+    val measurer = rememberTextMeasurer(cacheSize = 0)
+    val metrics = rememberRubyMetrics(measurer, appearance, spec, hanFamily)
+    val colors = rubyColors(appearance, spec)
 
     val chapter = book.chapter
     val matcher = remember(known, engine) { KnownMatcher(known, engine) }
@@ -147,8 +135,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onBack = onClose,
             onToc = { showToc = true },
             onPinyin = vm::setPinyinMode,
-            onSmaller = { if (fontStep > 0) fontStep-- },
-            onBigger = { if (fontStep < FONT_SIZES.lastIndex) fontStep++ }
+            appearanceOpen = showAppearance,
+            onAppearance = { showAppearance = true }
         )
         HorizontalDivider(color = scheme.outlineVariant)
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -169,8 +157,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    contentPadding = PaddingValues(horizontal = appearance.margin.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(appearance.paragraphSpacing.dp)
                 ) {
                     item(key = "prepare:${chapter.index}") {
                         val coverage = remember(chapter, matcher, names) { KnownCoverage.of(chapter, matcher, names, engine) }
@@ -213,6 +201,10 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val prepEngine = engine
     if (showPrepare && chapter != null && prepEngine != null) {
         PrepareChapterSheet(vm, book, chapter, prepEngine, onDismiss = { showPrepare = false })
+    }
+
+    if (showAppearance) {
+        AppearanceSheet(onDismiss = { showAppearance = false })
     }
 
     if (showToc) {
@@ -265,8 +257,8 @@ private fun ReaderTopBar(
     onBack: () -> Unit,
     onToc: () -> Unit,
     onPinyin: (PinyinMode) -> Unit,
-    onSmaller: () -> Unit,
-    onBigger: () -> Unit
+    appearanceOpen: Boolean,
+    onAppearance: () -> Unit
 ) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
@@ -285,8 +277,9 @@ private fun ReaderTopBar(
         }
         IconButton(onClick = onToc) { Icon(LexiconIcons.ListBullets, contentDescription = "Оглавление") }
         PinyinMenu(pinyinMode, onPinyin)
-        TextButton(onClick = onSmaller) { Text("A−") }
-        TextButton(onClick = onBigger) { Text("A+") }
+        TextButton(onClick = onAppearance) {
+            Text("Aa", fontFamily = WordFont, color = if (appearanceOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+        }
     }
 }
 
