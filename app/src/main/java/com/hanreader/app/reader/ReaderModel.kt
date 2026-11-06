@@ -8,6 +8,7 @@ import com.hanreader.app.zh.ZhDictionary
 import com.hanreader.app.zh.ZhEntry
 import com.hanreader.app.zh.ZhSegmenter
 import com.hanreader.app.zh.ZhToken
+import com.hanreader.app.zh.isHan
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -185,5 +186,31 @@ data class KnownCoverage(val total: Int, val known: Int, val unknownDistinct: In
             }
             return KnownCoverage(total, k, unknown.size)
         }
+    }
+}
+
+/**
+ * Words that HSK lists leave out because they follow from words on the list: 他 → 他们,
+ * 那 + 些 → 那些, 一 + 个 → 一个, 没 + 有 → 没有. A derived word counts only when every part is
+ * known and the combination is a real lexicon word. Deliberately narrow: 不 + X and other
+ * combinations whose meaning can shift (不过, 东西) are not derived.
+ */
+object KnownExpansion {
+    private const val PREFIXES = "这那哪一每几"
+    private const val SUFFIXES = "个些里边儿样么种次天年位件本张家点下会"
+
+    fun expand(base: Collection<String>, dict: ZhDictionary): Set<String> {
+        val known = base as? Set<String> ?: base.toHashSet()
+        val out = HashSet<String>()
+        fun add(w: String) { if (w !in known && dict.contains(w)) out += w }
+        for (w in known) {
+            if (w.all { it.isHan() } && w.length <= 3) add(w + "们")
+        }
+        for (p in PREFIXES) {
+            if (p.toString() !in known) continue
+            for (x in SUFFIXES) if (x.toString() in known) add("$p$x")
+        }
+        if ("没" in known && "有" in known) add("没有")
+        return out
     }
 }

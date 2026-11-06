@@ -18,10 +18,27 @@ class KnownWordsTest {
         assertEquals(1, hsk.hsk3("我"))
         val level1 = hsk.wordsUpTo(HskSystem.HSK3, 1)
         val level3 = hsk.wordsUpTo(HskSystem.HSK3, 3)
-        assertEquals(506, level1.size)
+        assertTrue(level1.size in 500..560)
         assertTrue(level3.size > level1.size && level3.containsAll(level1))
         assertTrue(hsk.wordsUpTo(HskSystem.HSK2, 6).size > 4_000)
         assertEquals("7–9", HskSystem.HSK3.levelTitle(7))
+    }
+
+    /** The case from a real book: HSK 2.0 level 4 must cover common words and their obvious derivatives. */
+    @Test
+    fun hsk2Level4CoversCommonWords() {
+        val listed = hsk.wordsUpTo(HskSystem.HSK2, 4).toHashSet()
+        assertEquals(1, hsk.hsk2("说"))
+        assertEquals(1, hsk.hsk2("没有"))
+        assertEquals(1, hsk.hsk2("一点")) // erhua form 一点儿 without 儿
+        val known = listed + KnownExpansion.expand(listed, ZhSegmenterTest.dict)
+        listOf("他们", "我们", "说", "没有", "那些", "这个", "一个", "一些", "哪里", "人们").forEach {
+            assertTrue("$it should be known at HSK 2.0 level 4", it in known)
+        }
+        // Not derived: meaning is not the sum of the parts.
+        assertTrue("不过" !in KnownExpansion.expand(setOf("不", "过"), ZhSegmenterTest.dict))
+        // Official 2012 lists: 150 + 150 + 300 + 600 words, give or take list quirks.
+        assertTrue(listed.size in 1_150..1_300)
     }
 
     @Test

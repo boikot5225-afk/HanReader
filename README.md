@@ -54,4 +54,4 @@ JDK 17, Gradle 8.13+, Android SDK 36.
 - Частотный список HSK — MIT, `assets/licenses/HSK_FREQUENCY_NOTICE.txt`
 - Словарь Jieba 0.42.1 — MIT
 - Чтения pypinyin 0.53.0 — MIT
-- Уровни HSK (Complete HSK Vocabulary) — MIT
+- Уровни HSK 3.0 (Complete HSK Vocabulary) — MIT; HSK 2.0 — официальные списки 2012 г. из hskhsk.com — MIT

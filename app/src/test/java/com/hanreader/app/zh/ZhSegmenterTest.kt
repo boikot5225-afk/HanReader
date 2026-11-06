@@ -46,7 +46,9 @@ class ZhSegmenterTest {
     fun commonReadings() {
         val expected = mapOf(
             "离" to "lí", "还" to "hái", "都" to "dōu", "只" to "zhǐ", "要" to "yào",
-            "银行" to "yín háng", "长大" to "zhǎng dà", "觉得" to "jué de", "便宜" to "pián yi", "中国" to "Zhōng guó"
+            "银行" to "yín háng", "长大" to "zhǎng dà", "觉得" to "jué de", "便宜" to "pián yi", "中国" to "Zhōng guó",
+            // Single characters: ordinary reading, not the surname one.
+            "章" to "zhāng", "德" to "dé"
         )
         expected.forEach { (word, reading) -> assertEquals(word, reading, dict.lookup(word)!!.pinyin) }
     }

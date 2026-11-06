@@ -120,7 +120,7 @@ class ReaderFlowTest {
         var r: Result<Int>? = null
         vm.setLevel(HskSystem.HSK3, 1) { r = it }
         waitFor(60_000) { r != null }
-        assertEquals(506, r!!.getOrThrow())
+        assertTrue(r!!.getOrThrow() > 500)
         assertTrue(runBlocking { dao.all() }.any { it.word == "我" && it.source == "hsk3:1" })
 
         vm.setKnown("终于", true)

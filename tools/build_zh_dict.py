@@ -49,7 +49,9 @@ def better_reading(word: str, cedict: str, chars: dict, phrases: dict) -> str:
         candidate = phrases.get(word)
     if not candidate:
         return cedict
-    if cedict and cedict.replace(" ", "").lower() == candidate.replace(" ", "").lower():
+    # A single character keeps its ordinary lower-case reading: CEDICT's capitalised one is a surname
+    # (章 Zhāng, 德 Dé), wrong when the character is part of a word or a transliterated name.
+    if len(word) > 1 and cedict and cedict.replace(" ", "").lower() == candidate.replace(" ", "").lower():
         return cedict
     return candidate
 

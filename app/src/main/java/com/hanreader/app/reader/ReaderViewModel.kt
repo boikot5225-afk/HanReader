@@ -115,12 +115,16 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             onDone(runCatching {
                 val engine = engineDeferred.await()
                 val words = withContext(Dispatchers.Default) {
-                    if (level == 0) emptyList() else engine.hsk.wordsUpTo(system, level)
+                    if (level == 0) emptyList() else {
+                        val listed = engine.hsk.wordsUpTo(system, level).toHashSet()
+                        listed + KnownExpansion.expand(listed, engine.dictionary)
+                    }
                 }
                 val tag = (if (system == HskSystem.HSK3) "hsk3:" else "hsk2:") + level
                 val added = knownDao.setLevelMarks(words.map { KnownWord(it, tag) })
                 _levelMark.value = LevelMark(system, level)
-                prefs.edit().putString("hskSystem", system.name).putInt("hskLevel", level).apply()
+                prefs.edit().putString("hskSystem", system.name).putInt("hskLevel", level)
+                    .putInt("hskData", HSK_DATA_VERSION).apply()
                 added
             })
         }
@@ -137,6 +141,14 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch { _engine.value = runCatching { engineDeferred.await() }.getOrNull() }
+        // HSK lists were corrected after the level was chosen: mark the same level again with the new data.
+        val mark = _levelMark.value
+        if (mark.level > 0 && prefs.getInt("hskData", 1) < HSK_DATA_VERSION) setLevel(mark.system, mark.level) {}
+    }
+
+    companion object {
+        /** 2: official HSK 2.0 lists, erhua forms, derived words (他们, 那些, 没有). */
+        const val HSK_DATA_VERSION = 2
     }
 
     fun clearMessage() { _message.value = null }

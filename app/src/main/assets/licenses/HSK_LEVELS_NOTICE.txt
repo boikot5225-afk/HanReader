@@ -1,3 +1,7 @@
-HSK levels (zh/hsk.tsv): Complete HSK Vocabulary, commit 7ac65bf1a6387d35f1ade478906172a19311c7f9
+HSK 3.0 levels: Complete HSK Vocabulary, commit 7ac65bf1a6387d35f1ade478906172a19311c7f9
 https://github.com/drkameleon/complete-hsk-vocabulary
 License: MIT, Copyright (c) 2026 Yanis Zafirópulos
+
+HSK 2.0 levels: official 2012 word lists as published in hskhsk.com (cidian/data)
+https://github.com/glxxyz/hskhsk.com
+License: MIT, Copyright (c) 2020 Alan Davies
