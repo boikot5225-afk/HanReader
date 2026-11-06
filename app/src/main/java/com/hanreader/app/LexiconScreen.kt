@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.hanreader.app.reader.BookStatsScreen
 import com.hanreader.app.reader.LibraryScreen
 import com.hanreader.app.reader.ReaderScreen
 import com.hanreader.app.reader.ReaderViewModel
@@ -85,6 +86,7 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = 
     var tab by rememberSaveable { mutableStateOf(Tab.READ) }
     // An open book takes the whole screen, like a review session.
     var reading by rememberSaveable { mutableStateOf<Long?>(null) }
+    var bookStats by rememberSaveable { mutableStateOf<Long?>(null) }
     LaunchedEffect(reading) { reading?.let { if (reader.open.value?.entity?.id != it) reader.openBook(it) } }
     // A running review session hides the navigation and takes the whole screen.
     var session by rememberSaveable { mutableStateOf<ReviewMode?>(null) }
@@ -122,7 +124,10 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = 
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
             val active = session
             val book = reading
-            if (book != null) {
+            val statsId = bookStats
+            if (statsId != null && book == null) {
+                BookStatsScreen(reader, statsId, onClose = { bookStats = null })
+            } else if (book != null) {
                 ReaderScreen(reader, onClose = {
                     reading = null
                     reader.closeBook()
@@ -158,7 +163,7 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = 
                     bottomBar = { BottomNav(tab) { tab = it } }
                 ) { padding ->
                     when (tab) {
-                        Tab.READ -> LibraryScreen(reader, padding, onOpen = { reading = it })
+                        Tab.READ -> LibraryScreen(reader, padding, onOpen = { reading = it }, onStats = { bookStats = it })
                         Tab.TODAY -> TodayScreen(
                             cards = visibleCards,
                             settings = settings,

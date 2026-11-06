@@ -136,4 +136,31 @@ class ReaderFlowTest {
         vm.setKnown("终于", false)
         waitFor { runBlocking { dao.all() }.isEmpty() }
     }
+
+    @Test
+    fun analyzeBookAndAddChapterWords() {
+        val vm = ReaderViewModel(app)
+        var imported: Result<Long>? = null
+        vm.importBook(Uri.fromFile(sampleBook())) { imported = it }
+        waitFor { imported != null }
+        val bookId = imported!!.getOrThrow()
+        val dao = LexiconDatabase.get(app).bookDao()
+
+        vm.analyzeBook(bookId)
+        waitFor(60_000) { runBlocking { dao.get(bookId)!!.analyzedTokens } > 0 }
+        val words = runBlocking { dao.observeWords(bookId).first() }
+        assertTrue(words.any { it.word == "图书馆" && it.count == 3 && it.firstChapter == 0 })
+        assertTrue(words.any { it.word == "打电话" && it.firstChapter == 1 })
+
+        // Add a word met only in chapter 2 from the book-level list: its sentence comes from chapter 2.
+        val book = runBlocking { dao.get(bookId)!! }
+        val candidate = StudyCandidate("打电话", 1, "dǎ diàn huà", "to make a telephone call", 1)
+        var added: Result<Int>? = null
+        vm.addCandidates(book, listOf(candidate), null) { added = it }
+        waitFor(60_000) { added != null }
+        assertEquals(1, added!!.getOrThrow())
+        val cardDao = LexiconDatabase.get(app).cardDao()
+        val card = runBlocking { cardDao.allCards() }.single { it.word == "打电话" }
+        assertEquals("晚上他给妈妈打电话。", card.example)
+    }
 }

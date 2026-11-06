@@ -15,7 +15,8 @@ import java.io.File
 
 /**
  * Upgrades a database created exactly as HanReader 0.1.0 (Room v4, from app/schemas/.../4.json)
- * and checks that cards, examples, sources and books survive and known_words works.
+ * through every later version and checks that cards, examples, sources and books survive and
+ * known_words / book_words work.
  * Room validates the migrated schema against the v5 entities when the database opens.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -77,8 +78,17 @@ class MigrationTest {
             assertEquals(33, book.blockIndex)
             db.knownWordDao().put(KnownWord("我", "manual"))
             assertEquals(listOf("我"), db.knownWordDao().all().map { it.word })
+            // v6: analysis columns and table
+            assertEquals(0, book.analyzedTokens)
+            db.bookDao().saveAnalysis(7, listOf(BookWord(7, "终于", 3, 5)), 10)
+            assertEquals(10, db.bookDao().get(7)!!.analyzedTokens)
+            db.bookDao().setIgnored(7, "终于", true)
+            db.bookDao().saveAnalysis(7, listOf(BookWord(7, "终于", 4, 5)), 11)
+            assertEquals(listOf("终于"), db.bookDao().ignoredWords(7)) // ignore marks survive re-analysis
+            db.bookDao().delete(7)
+            assertEquals(emptyList<String>(), db.bookDao().ignoredWords(7)) // cascade
         }
-        assertEquals(5, db.openHelper.readableDatabase.version)
+        assertEquals(6, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

@@ -46,8 +46,9 @@ import com.hanreader.app.ProgressBar
 import com.hanreader.app.WordFont
 
 @Composable
-fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) -> Unit) {
+fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) -> Unit, onStats: (Long) -> Unit) {
     val books by vm.library.collectAsState()
+    val analysis by vm.analysis.collectAsState()
     val known by vm.knownWords.collectAsState()
     val levelMark by vm.levelMark.collectAsState()
     var showLevel by remember { mutableStateOf(false) }
@@ -95,7 +96,13 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
             }
         }
         items(books, key = { it.id }) { book ->
-            BookRow(book, onOpen = { onOpen(book.id) }, onDelete = { confirmDelete = book })
+            BookRow(
+                book,
+                progress = analysis[book.id],
+                onOpen = { onOpen(book.id) },
+                onStats = { onStats(book.id) },
+                onDelete = { confirmDelete = book }
+            )
         }
         item {
             Spacer(Modifier.height(4.dp))
@@ -133,7 +140,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
 }
 
 @Composable
-private fun BookRow(book: BookEntity, onOpen: () -> Unit, onDelete: () -> Unit) {
+private fun BookRow(book: BookEntity, progress: Float?, onOpen: () -> Unit, onStats: () -> Unit, onDelete: () -> Unit) {
     Surface(onClick = onOpen, shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Row(Modifier.fillMaxWidth().padding(start = 18.dp, top = 14.dp, bottom = 14.dp, end = 4.dp),
@@ -153,6 +160,7 @@ private fun BookRow(book: BookEntity, onOpen: () -> Unit, onDelete: () -> Unit) 
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                BookVocabularyAction(book, progress, onStats)
             }
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = onDelete) {

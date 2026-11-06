@@ -157,7 +157,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun importBook(uri: Uri, onDone: (Result<Long>) -> Unit) {
         val app = getApplication<Application>()
         viewModelScope.launch {
-            onDone(runCatching {
+            onDone(runCatching<Long> {
                 withContext(Dispatchers.IO) {
                     val name = "book-${System.currentTimeMillis()}.epub"
                     val target = File(booksDir, name)
@@ -209,6 +209,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 _open.value = OpenBook(entity, epub)
                 loadChapterLocked(entity.chapterIndex.coerceIn(0, epub.chapters.lastIndex))
+                if (entity.analyzedTokens == 0) analyzeBook(entity.id)
             }
         }
     }
@@ -265,6 +266,77 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             while (bounds.outWidth / (sample * 2) >= maxWidth) sample *= 2
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
         }?.also { images.put(key, it) }
+    }
+
+    // ---- Book vocabulary ----
+
+    private val _analysis = MutableStateFlow<Map<Long, Float>>(emptyMap())
+    /** Books being analysed, with progress 0..1. */
+    val analysis: StateFlow<Map<Long, Float>> = _analysis.asStateFlow()
+
+    fun bookWords(bookId: Long) = books.observeWords(bookId)
+
+    /** Counts every word of the book once, in the background. Safe to call repeatedly. */
+    fun analyzeBook(bookId: Long) {
+        if (bookId in _analysis.value) return
+        _analysis.value = _analysis.value + (bookId to 0f)
+        viewModelScope.launch {
+            runCatching {
+                val entity = books.get(bookId) ?: return@runCatching
+                val engine = engineDeferred.await()
+                val result = withContext(Dispatchers.Default) {
+                    EpubBook(File(booksDir, entity.fileName)).use { epub ->
+                        BookAnalyzer.analyze(bookId, epub, engine.segmenter, engine.dictionary) { done, total ->
+                            _analysis.value = _analysis.value + (bookId to done.toFloat() / total)
+                        }
+                    }
+                }
+                books.saveAnalysis(bookId, result.words, result.tokens)
+                _open.value?.let { o -> if (o.entity.id == bookId) _open.value = o.copy(entity = o.entity.copy(analyzedTokens = result.tokens)) }
+            }.onFailure { _message.value = "Не удалось разобрать словарь книги: ${it.message}" }
+            _analysis.value = _analysis.value - bookId
+        }
+    }
+
+    fun setIgnored(bookId: Long, word: String, ignored: Boolean) {
+        viewModelScope.launch { books.setIgnored(bookId, word, ignored) }
+    }
+
+    /**
+     * Adds chosen words to the cards, each with its first sentence in [chapter] or, if absent,
+     * in the chapter where it first occurs in the book. onDone gets the number of new cards.
+     */
+    fun addCandidates(book: BookEntity, words: List<StudyCandidate>, chapter: ChapterContent?, onDone: (Result<Int>) -> Unit) {
+        viewModelScope.launch {
+            onDone(runCatching {
+                val engine = engineDeferred.await()
+                val loaded = HashMap<Int, ChapterContent>()
+                chapter?.let { loaded[it.index] = it }
+                val epub = _open.value?.epub?.takeIf { _open.value?.entity?.id == book.id }
+                var created = 0
+                val own = if (epub == null) withContext(Dispatchers.IO) { EpubBook(File(booksDir, book.fileName)) } else null
+                try {
+                    for (w in words) {
+                        val source = epub ?: own!!
+                        val c = chapter?.takeIf { ch -> VocabularyStats.firstSentence(ch, w.word) != null }
+                            ?: loaded.getOrPut(w.firstChapter) {
+                                withContext(Dispatchers.Default) { ChapterBuilder.build(source, w.firstChapter, engine) }
+                            }
+                        val sentence = VocabularyStats.firstSentence(c, w.word) ?: w.word
+                        val reading = engine.lookup(w.word)?.pinyin ?: w.pinyin
+                        val translation = engine.lookup(w.word)?.shortGloss() ?: w.gloss
+                        val isNew = cards.saveFromReader(
+                            STUDY_LANGUAGE,
+                            ReaderSave(w.word, reading, translation, sentence, book.id, book.title, c.index, c.title)
+                        )
+                        if (isNew) created++
+                    }
+                } finally {
+                    own?.close()
+                }
+                created
+            })
+        }
     }
 
     fun saveWord(save: ReaderSave, onDone: (Result<Boolean>) -> Unit) {

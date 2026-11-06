@@ -112,6 +112,13 @@ class EpubBookTest {
             println("All chapters parsed+segmented: ${allMs} ms, blocks=$blocks, chars=$chars, tokens=$tokens")
             println("Slowest chapter: ${worstMs} ms for $worstChars chars (JVM, desktop CPU)")
             println("Han tokens without an English definition: $unknown")
+            val hsk = File("src/main/assets/zh/hsk.tsv").bufferedReader().useLines { com.hanreader.app.reader.HskLevels.parse(it) }
+            val engine = com.hanreader.app.reader.ZhEngine(ZhSegmenterTest.dict, 0, hsk)
+            val ta = System.nanoTime()
+            val analysis = com.hanreader.app.reader.BookAnalyzer.analyze(1, book, seg, ZhSegmenterTest.dict)
+            println("Book analysis: ${(System.nanoTime() - ta) / 1_000_000} ms, distinct words=${analysis.words.size}, han tokens=${analysis.tokens}")
+            val stats = com.hanreader.app.reader.VocabularyStats.book(analysis.words, analysis.tokens, emptySet(), emptySet(), engine)
+            println("HSK 3.0 coverage: " + stats.levels.joinToString { "L${it.level}=${it.percent}%" })
             assertTrue(book.chapters.isNotEmpty())
         }
     }

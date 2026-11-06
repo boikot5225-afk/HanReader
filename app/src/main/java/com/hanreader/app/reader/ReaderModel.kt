@@ -172,16 +172,26 @@ data class KnownCoverage(val total: Int, val known: Int, val unknownDistinct: In
     val percent: Int get() = if (total == 0) 0 else (known * 100 / total)
 
     companion object {
-        fun of(chapter: ChapterContent, known: Set<String>): KnownCoverage {
+        fun of(chapter: ChapterContent, known: Set<String>): KnownCoverage = of(chapter, KnownMatcher(known, null))
+
+        /** [names]: the book's names and «Не учить» words, left out of the count. */
+        fun of(
+            chapter: ChapterContent,
+            matcher: KnownMatcher,
+            names: Set<String> = emptySet(),
+            engine: ZhEngine? = null
+        ): KnownCoverage {
             var total = 0
             var k = 0
             val unknown = HashSet<String>()
             for (b in chapter.blocks) {
                 if (b !is ReaderBlock.Text) continue
-                for (t in b.tokens) {
-                    if (t.kind != TokenKind.HAN) continue
+                val inNames = if (engine != null) VocabularyStats.nameTokens(b, names, engine) else emptySet()
+                for ((i, t) in b.tokens.withIndex()) {
+                    if (t.kind != TokenKind.HAN || i in inNames || t.text in names) continue
+                    if (engine != null && VocabularyStats.isName(t.text, engine)) continue
                     total++
-                    if (t.text in known) k++ else unknown += t.text
+                    if (matcher.isKnown(t.text)) k++ else unknown += t.text
                 }
             }
             return KnownCoverage(total, k, unknown.size)
@@ -212,5 +222,71 @@ object KnownExpansion {
         }
         if ("没" in known && "有" in known) add("没有")
         return out
+    }
+}
+
+/**
+ * Decides whether a token counts as known. Jieba's lexicon has many transparent compounds that
+ * HSK lists never include (一个人, 看着, 走进, 打电话); a token outside the HSK lists is known
+ * when it splits into known words and either has no dictionary meaning of its own (a Jieba-only
+ * phrase) or is a known word plus a particle or direction/result complement (看 + 着, 走 + 进).
+ * Idioms and other CC-CEDICT words whose meaning is not the sum of parts are never split.
+ */
+class KnownMatcher(private val known: Set<String>, private val engine: ZhEngine?) {
+    private val cache = HashMap<String, Boolean>()
+
+    fun isKnown(word: String): Boolean {
+        if (word in known) return true
+        val e = engine ?: return false
+        if (word.length < 2) return false
+        return cache.getOrPut(word) { composable(word, e) }
+    }
+
+    private fun composable(word: String, e: ZhEngine): Boolean {
+        if (e.hsk.hsk3(word) > 0 || e.hsk.hsk2(word) > 0) return false // a listed word must be learned as such
+        val defined = e.dictionary.lookup(word)?.hasDefinition == true
+        if (!defined) return splits(word)
+        if (word.length > 4) return false
+        // known head + one or two complement characters (看着, 走进, 拿出来)
+        for (tail in 1..2) {
+            if (word.length - tail < 1) continue
+            val head = word.substring(0, word.length - tail)
+            val rest = word.substring(word.length - tail)
+            if (head in known && rest.all { it in COMPLEMENTS } && rest.all { it.toString() in known }) return true
+        }
+        return false
+    }
+
+    /** True if [word] is a sequence of at least two known words. */
+    private fun splits(word: String): Boolean {
+        val n = word.length
+        val ok = BooleanArray(n + 1).also { it[0] = true }
+        val parts = IntArray(n + 1)
+        for (i in 0 until n) {
+            if (!ok[i]) continue
+            for (j in i + 1..n) {
+                if (j - i == n) continue // the whole word is not a split
+                if (word.substring(i, j) in known) {
+                    ok[j] = true
+                    parts[j] = maxOf(parts[j], parts[i] + 1)
+                }
+            }
+        }
+        return ok[n] && parts[n] >= 2
+    }
+
+    /** Words of a chapter treated as known: the set the renderer hides pinyin for. */
+    fun knownIn(chapter: ChapterContent): Set<String> {
+        val out = HashSet<String>()
+        for (b in chapter.blocks) {
+            if (b !is ReaderBlock.Text) continue
+            for (t in b.tokens) if (t.kind == TokenKind.HAN && isKnown(t.text)) out += t.text
+        }
+        return out
+    }
+
+    companion object {
+        /** Aspect/structural particles and the common direction and result complements. */
+        private const val COMPLEMENTS = "了着过的地得们来去上下进出回起开到完好见住走掉成"
     }
 }

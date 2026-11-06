@@ -83,7 +83,34 @@ data class BookEntity(
     val lastOpenedAt: Long = 0,
     /** Reading position: spine item and first visible block. */
     val chapterIndex: Int = 0,
-    val blockIndex: Int = 0
+    val blockIndex: Int = 0,
+    /** Han word occurrences counted by the book analysis; 0 = not analysed yet. */
+    @ColumnInfo(defaultValue = "0")
+    val analyzedTokens: Int = 0
+)
+
+/** How often a word occurs in a book, from the one-time book analysis. */
+@Entity(
+    tableName = "book_words",
+    primaryKeys = ["bookId", "word"],
+    foreignKeys = [
+        ForeignKey(
+            entity = BookEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["bookId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ]
+)
+data class BookWord(
+    val bookId: Long,
+    val word: String,
+    val count: Int,
+    /** First spine item where the word occurs: the source of its example sentence. */
+    val firstChapter: Int,
+    /** «Не учить» for this book (names, words the reader does not want to study). */
+    @ColumnInfo(defaultValue = "0")
+    val ignored: Boolean = false
 )
 
 /**
@@ -193,6 +220,35 @@ interface BookDao {
 
     @Query("DELETE FROM books WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("SELECT * FROM book_words WHERE bookId = :bookId")
+    fun observeWords(bookId: Long): Flow<List<BookWord>>
+
+    @Query("DELETE FROM book_words WHERE bookId = :bookId")
+    suspend fun deleteWords(bookId: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWords(words: List<BookWord>)
+
+    @Query("UPDATE books SET analyzedTokens = :tokens WHERE id = :id")
+    suspend fun setAnalyzed(id: Long, tokens: Int)
+
+    @Query("UPDATE book_words SET ignored = :ignored WHERE bookId = :bookId AND word = :word")
+    suspend fun setIgnored(bookId: Long, word: String, ignored: Boolean)
+
+    /** Replace the word counts of a book in one go; ignore marks survive a re-analysis. */
+    @Transaction
+    suspend fun saveAnalysis(bookId: Long, words: List<BookWord>, tokens: Int) {
+        val ignored = ignoredWords(bookId).toHashSet()
+        deleteWords(bookId)
+        words.chunked(2_000).forEach { chunk ->
+            insertWords(chunk.map { if (it.word in ignored) it.copy(ignored = true) else it })
+        }
+        setAnalyzed(bookId, tokens)
+    }
+
+    @Query("SELECT word FROM book_words WHERE bookId = :bookId AND ignored = 1")
+    suspend fun ignoredWords(bookId: Long): List<String>
 }
 
 data class ImportStats(
@@ -398,9 +454,12 @@ interface CardDao {
 // Version 4 (HanReader 0.1.0): books and word_sources. HanReader uses its own database file,
 // so no database of version 3 exists under this name; Lexicon data arrives through backups.
 // Version 5 (0.2.0): known_words. Schemas are exported to app/schemas for migration checks.
+// Version 6 (0.3.0): book_words and books.analyzedTokens (book vocabulary analysis).
 @Database(
-    entities = [WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class],
-    version = 5,
+    entities = [
+        WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class
+    ],
+    version = 6,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
@@ -459,7 +518,20 @@ abstract class LexiconDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5)
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE books ADD COLUMN analyzedTokens INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(BOOK_WORDS_SQL)
+            }
+        }
+
+        // Copied from app/schemas/.../6.json; MigrationTest checks it against the entity.
+        private const val BOOK_WORDS_SQL = "CREATE TABLE IF NOT EXISTS `book_words` (`bookId` INTEGER NOT NULL, " +
+            "`word` TEXT NOT NULL, `count` INTEGER NOT NULL, `firstChapter` INTEGER NOT NULL, " +
+            "`ignored` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`bookId`, `word`), " +
+            "FOREIGN KEY(`bookId`) REFERENCES `books`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {

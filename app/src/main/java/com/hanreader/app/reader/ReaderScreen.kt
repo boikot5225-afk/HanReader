@@ -96,6 +96,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
 
     var fontStep by rememberSaveable { mutableStateOf(2) }
     var showToc by remember { mutableStateOf(false) }
+    var showPrepare by remember { mutableStateOf(false) }
     var selection by remember { mutableStateOf<Selection?>(null) }
     BackHandler { onClose() }
 
@@ -121,6 +122,11 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     )
 
     val chapter = book.chapter
+    val matcher = remember(known, engine) { KnownMatcher(known, engine) }
+    // Words of this chapter treated as known (marked, learned or transparent compounds of them).
+    val knownHere = remember(chapter, matcher) { chapter?.let { matcher.knownIn(it) } ?: emptySet() }
+    val bookWords by vm.bookWords(book.entity.id).collectAsState(initial = emptyList())
+    val names = remember(bookWords) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word } }
     val listState = rememberLazyListState()
     // Restore the saved position once per chapter, then keep saving it while scrolling.
     LaunchedEffect(chapter?.index) {
@@ -166,13 +172,19 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    item(key = "prepare:${chapter.index}") {
+                        val coverage = remember(chapter, matcher, names) { KnownCoverage.of(chapter, matcher, names, engine) }
+                        if (engine != null && coverage.total > 0 && coverage.unknownDistinct > 0) {
+                            ChapterPrepareBanner(coverage.unknownDistinct, coverage.percent) { showPrepare = true }
+                        }
+                    }
                     itemsIndexed(chapter.blocks, key = { i, _ -> "${chapter.index}:$i" }) { i, block ->
                         when (block) {
                             is ReaderBlock.Text -> RubyParagraph(
                                 block = block,
                                 metrics = metrics,
                                 showPinyin = pinyinMode != PinyinMode.OFF,
-                                hidePinyinFor = if (pinyinMode == PinyinMode.UNKNOWN) known else null,
+                                hidePinyinFor = if (pinyinMode == PinyinMode.UNKNOWN) knownHere else null,
                                 saved = saved,
                                 selection = selection?.takeIf { it.block == i }?.let { it.first..it.last },
                                 colors = colors,
@@ -184,7 +196,9 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                     item(key = "footer:${chapter.index}") {
                         ChapterFooter(
                             chapter = chapter,
-                            known = known,
+                            matcher = matcher,
+                            names = names,
+                            engine = engine,
                             count = book.epub.chapters.size,
                             engineMs = engine?.loadMs,
                             onPrev = { vm.goToChapter(chapter.index - 1) },
@@ -194,6 +208,11 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 }
             }
         }
+    }
+
+    val prepEngine = engine
+    if (showPrepare && chapter != null && prepEngine != null) {
+        PrepareChapterSheet(vm, book, chapter, prepEngine, onDismiss = { showPrepare = false })
     }
 
     if (showToc) {
@@ -309,13 +328,15 @@ private fun PinyinMenu(mode: PinyinMode, onPick: (PinyinMode) -> Unit) {
 @Composable
 private fun ChapterFooter(
     chapter: ChapterContent,
-    known: Set<String>,
+    matcher: KnownMatcher,
+    names: Set<String>,
+    engine: ZhEngine?,
     count: Int,
     engineMs: Long?,
     onPrev: () -> Unit,
     onNext: () -> Unit
 ) {
-    val coverage = remember(chapter, known) { KnownCoverage.of(chapter, known) }
+    val coverage = remember(chapter, matcher, names) { KnownCoverage.of(chapter, matcher, names, engine) }
     Column(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = onPrev, enabled = chapter.index > 0) { Text("← Назад") }
