@@ -164,7 +164,8 @@ private fun CandidateRow(
 fun PrepareChapterSheet(vm: ReaderViewModel, book: OpenBook, chapter: ChapterContent, engine: ZhEngine, onDismiss: () -> Unit) {
     val known by vm.knownWords.collectAsState()
     val saved by vm.savedWords.collectAsState()
-    val bookWords by vm.bookWords(book.entity.id).collectAsState(initial = emptyList())
+    val bookWordsFlow = remember(book.entity.id) { vm.bookWords(book.entity.id) }
+    val bookWords by bookWordsFlow.collectAsState(initial = emptyList())
     val ignored = remember(bookWords) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word } }
     val candidates by produceState(emptyList<StudyCandidate>(), chapter, known, saved, ignored) {
         value = withContext(Dispatchers.Default) { VocabularyStats.chapter(chapter, known, saved, ignored, engine) }
@@ -213,7 +214,8 @@ fun BookStatsScreen(vm: ReaderViewModel, bookId: Long, onClose: () -> Unit) {
     val known by vm.knownWords.collectAsState()
     val saved by vm.savedWords.collectAsState()
     val progress by vm.analysis.collectAsState()
-    val words by vm.bookWords(bookId).collectAsState(initial = emptyList())
+    val wordsFlow = remember(bookId) { vm.bookWords(bookId) }
+    val words by wordsFlow.collectAsState(initial = emptyList())
     LaunchedEffect(book?.analyzedTokens) { if (book != null && book.analyzedTokens == 0) vm.analyzeBook(bookId) }
     val eng = engine
     val stats by produceState<BookStats?>(null, words, known, saved, eng) {

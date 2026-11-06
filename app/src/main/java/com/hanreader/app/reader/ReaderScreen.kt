@@ -143,7 +143,9 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     var highlight by remember { mutableStateOf<SearchHit?>(null) }
     var returnTo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var blockJump by remember { mutableStateOf<((Int) -> Unit)?>(null) }
-    val bookmarks by vm.bookmarks(book.entity.id).collectAsState(initial = emptyList())
+    // One subscription per book: calling vm.bookmarks() in every recomposition re-queried the database each time.
+    val bookmarksFlow = remember(book.entity.id) { vm.bookmarks(book.entity.id) }
+    val bookmarks by bookmarksFlow.collectAsState(initial = emptyList())
 
     val sheetOpen = showAppearance || showToc || showPrepare || selection != null
     ImmersiveEffects(hideBars = !chrome && !sheetOpen, keepOn = appearance.keepScreenOn, brightness = appearance.brightness)
@@ -159,7 +161,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val matcher = remember(known, engine) { KnownMatcher(known, engine) }
     // Words of this chapter treated as known (marked, learned or transparent compounds of them).
     val knownHere = remember(chapter, matcher) { chapter?.let { matcher.knownIn(it) } ?: emptySet() }
-    val bookWords by vm.bookWords(book.entity.id).collectAsState(initial = emptyList())
+    val bookWordsFlow = remember(book.entity.id) { vm.bookWords(book.entity.id) }
+    val bookWords by bookWordsFlow.collectAsState(initial = emptyList())
     val userNames by vm.userNames.collectAsState()
     // Names of this book (found or «Не учить») and the reader's own «Это имя».
     val names = remember(bookWords, userNames) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word }.apply { addAll(userNames) } }
@@ -253,7 +256,15 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             ) {
                 CircularProgressIndicator()
                 Spacer(Modifier.height(12.dp))
-                Text(if (engine == null) "Загружаю словарь…" else "Открываю главу…", color = scheme.onSurfaceVariant)
+                Text(if (engine == null) "Готовлю словарь…" else "Открываю главу…", color = scheme.onSurfaceVariant)
+                if (engine == null) {
+                    Text(
+                        "После установки или обновления — несколько секунд, один раз",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
             appearance.mode == ReadingMode.PAGES -> PagedChapter(
                 vm = vm,

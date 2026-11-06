@@ -11,8 +11,8 @@ android {
         applicationId = "com.hanreader.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 17
-        versionName = "0.9.6"
+        versionCode = 18
+        versionName = "0.9.7"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
