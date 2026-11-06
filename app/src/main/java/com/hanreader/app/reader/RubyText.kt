@@ -17,6 +17,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -158,6 +160,15 @@ internal class RubyLayout(
     val glosses: List<GlossPlaced> = emptyList()
 ) {
     fun lineOf(p: Placed): Int = if (lineHeight <= 0f) 0 else (p.lineTop / lineHeight + 0.5f).toInt()
+
+    /** The token under [pos] or nearest to it on that line (lines limited to [shown]). */
+    fun tokenNear(pos: Offset, shown: IntRange): Int? {
+        if (items.isEmpty() || lineHeight <= 0f) return null
+        val line = (pos.y / lineHeight).toInt().coerceIn(shown.first, shown.last)
+        val onLine = items.filter { lineOf(it) == line }.ifEmpty { return null }
+        return (onLine.firstOrNull { pos.x >= it.x && pos.x < it.x + it.width }
+            ?: if (pos.x < onLine.first().x) onLine.first() else onLine.last()).token
+    }
 }
 
 private const val CLOSING = "，。、；：？！”’）》」』〉】…—·,.;:?!)"
@@ -281,7 +292,12 @@ fun RubyParagraph(
     /** The reader's highlights: token index -> colour. */
     marked: Map<Int, Color> = emptyMap(),
     /** Tokens that end a highlight with a note (a small dot is drawn after them). */
-    noted: Set<Int> = emptySet()
+    noted: Set<Int> = emptySet(),
+    /**
+     * Long press and drag selects text: (anchor token, token under the finger, finger lifted).
+     * Null: long press does nothing.
+     */
+    onRange: ((Int, Int, Boolean) -> Unit)? = null
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val density = LocalDensity.current
@@ -295,6 +311,7 @@ fun RubyParagraph(
         val offsetY = shown.first * laid.lineHeight
         val heightPx = if (lines == null) laid.height else (shown.last - shown.first + 1) * laid.lineHeight
         val heightDp = with(density) { heightPx.toDp() }
+        val haptics = LocalHapticFeedback.current
         Canvas(
             Modifier.fillMaxWidth().height(heightDp).pointerInput(laid, shown) {
                 // Consume only taps on a word: other taps reach the page (turn, menu).
@@ -305,12 +322,36 @@ fun RubyParagraph(
                         laid.lineOf(it) in shown &&
                             pos.x >= it.x && pos.x < it.x + it.width &&
                             pos.y >= it.lineTop && pos.y < it.lineTop + laid.hanTop + laid.hanHeight + lineGapPx
-                    }?.takeIf { block.tokens[it.token].kind == TokenKind.HAN } ?: return@awaitEachGesture
-                    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
-                    if ((up.position - down.position).getDistance() < viewConfiguration.touchSlop) {
-                        up.consume()
-                        onTap(hit.token)
+                    }?.takeIf { block.tokens[it.token].kind == TokenKind.HAN }
+                    if (hit == null && onRange == null) return@awaitEachGesture
+                    // A tap, a swipe (left to the page) or, held still, a long press that starts a selection.
+                    var tapped = false
+                    val held = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        while (true) {
+                            val c = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: return@withTimeoutOrNull false
+                            if (!c.pressed) {
+                                // Only a tap on a word is ours; any other tap turns the page or opens the menu.
+                                if (hit != null && (c.position - down.position).getDistance() < viewConfiguration.touchSlop) { tapped = true; c.consume() }
+                                return@withTimeoutOrNull false
+                            }
+                            if ((c.position - down.position).getDistance() > viewConfiguration.touchSlop) return@withTimeoutOrNull false
+                        }
+                        @Suppress("UNREACHABLE_CODE") false
+                    } == null
+                    if (tapped && hit != null) { onTap(hit.token); return@awaitEachGesture }
+                    if (!held || onRange == null) return@awaitEachGesture
+                    val anchor = laid.tokenNear(pos, shown) ?: return@awaitEachGesture
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    var to = anchor
+                    onRange(anchor, to, false)
+                    while (true) {
+                        val c = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                        c.consume()
+                        if (!c.pressed) break
+                        val t = laid.tokenNear(c.position + Offset(0f, offsetY), shown) ?: continue
+                        if (t != to) { to = t; onRange(anchor, to, false) }
                     }
+                    onRange(anchor, to, true)
                 }
             }
         ) {

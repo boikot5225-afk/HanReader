@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
@@ -110,7 +111,11 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /** Tapped word: paragraph index and token range, which the user can widen or narrow. */
-private data class Selection(val block: Int, val first: Int, val last: Int)
+/**
+ * Selected tokens [first..last] of paragraph [block]. [phrase]: selected by long press and drag
+ * (or «всё предложение»): the phrase sheet opens once [done], when the finger is lifted.
+ */
+private data class Selection(val block: Int, val first: Int, val last: Int, val phrase: Boolean = false, val done: Boolean = true)
 
 
 @OptIn(ExperimentalMaterial3Api::class, FlowPreview::class, ExperimentalLayoutApi::class)
@@ -230,6 +235,10 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             selection = selection?.takeIf { it.block == i }?.let { it.first..it.last },
             colors = colors,
             onTap = { t -> selection = Selection(i, t, t); chrome = false; highlight = null },
+            onRange = { a, b, done ->
+                chrome = false; highlight = null
+                selection = Selection(i, minOf(a, b), maxOf(a, b), phrase = true, done = done)
+            },
             lines = lines,
             glossFor = glossFor,
             unknownMarks = if (appearance.markUnknown) unknownSet else null,
@@ -439,7 +448,27 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val sel = selection
     val block = sel?.let { chapter?.blocks?.getOrNull(it.block) as? ReaderBlock.Text }
     val eng = engine
-    if (sel != null && block != null && eng != null && chapter != null) {
+    // A long press on one word is the same as a tap on it.
+    val asWord = sel != null && block != null && sel.phrase && sel.done && sel.first == sel.last && block.tokens[sel.first].kind == TokenKind.HAN
+    if (sel != null && block != null && chapter != null && sel.phrase && sel.done && !asWord) {
+        val start = block.tokens[sel.first].start
+        val end = block.tokens[sel.last].end
+        PhraseSheet(
+            text = block.shown.substring(start, end),
+            reading = block.tokens.subList(sel.first, sel.last + 1).filter { it.kind == TokenKind.HAN }.joinToString(" ") { it.pinyin },
+            highlight = Highlights.at(highlights, chapter.index, sel.block, start, end),
+            canWiden = Highlights.sentence(block, sel.first, sel.last) != sel.first..sel.last,
+            onSentence = { val r = Highlights.sentence(block, sel.first, sel.last); selection = sel.copy(first = r.first, last = r.last) },
+            onColor = { color, existing ->
+                if (existing != null) vm.updateHighlight(existing.copy(color = color))
+                else vm.addHighlight(chapter, sel.block, start, end, color)
+            },
+            onNote = { h, note -> vm.updateHighlight(h.copy(note = note)) },
+            onRemove = { vm.removeHighlight(it.id); selection = null },
+            onDismiss = { selection = null }
+        )
+    }
+    if (sel != null && block != null && eng != null && chapter != null && (!sel.phrase || asWord)) {
         WordSheet(
             selection = sel,
             block = block,
@@ -1025,7 +1054,7 @@ private fun BookImage(vm: ReaderViewModel, path: String) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun WordSheet(
     selection: Selection,
@@ -1078,17 +1107,17 @@ private fun WordSheet(
             Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(verticalAlignment = Alignment.Bottom) {
+            // Wraps: a long combination must not squeeze the reading into a column.
+            FlowRow(verticalArrangement = Arrangement.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val shownWord = block.shown.substring(first.start, last.end)
-                Text(shownWord, fontFamily = WordFont, fontSize = if (word.length > 6) 28.sp else 40.sp, fontWeight = FontWeight.SemiBold)
+                Text(shownWord, fontFamily = WordFont, fontSize = if (word.length > 6) 28.sp else 40.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.alignByBaseline())
                 if (shownWord != word) {
-                    Spacer(Modifier.width(8.dp))
                     Text(word, fontFamily = WordFont, style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.alignByBaseline())
                 }
-                Spacer(Modifier.width(12.dp))
                 Text(reading, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 6.dp))
+                    modifier = Modifier.alignByBaseline())
             }
             if (russian.isNotEmpty()) {
                 russian.forEachIndexed { i, sense ->
@@ -1202,7 +1231,7 @@ private fun WordSheet(
                 current = highlight,
                 canWiden = sentenceRange != selection.first..selection.last,
                 onColor = { onHighlight(it, highlight) },
-                onSentence = { onChange(selection.copy(first = sentenceRange.first, last = sentenceRange.last)) },
+                onSentence = { onChange(selection.copy(first = sentenceRange.first, last = sentenceRange.last, phrase = true, done = true)) },
                 onNote = { n -> highlight?.let { onNote(it, n) } },
                 onRemove = { highlight?.let(onRemoveHighlight) }
             )

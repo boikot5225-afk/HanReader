@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -200,6 +201,53 @@ internal fun HighlightList(
                     }
                 }
             }
+        }
+    }
+}
+
+/** A passage selected by long press and drag: its text and reading, highlight colours, note, copy. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+internal fun PhraseSheet(
+    text: String,
+    reading: String,
+    highlight: Highlight?,
+    canWiden: Boolean,
+    onSentence: () -> Unit,
+    onColor: (Int, Highlight?) -> Unit,
+    onNote: (Highlight, String) -> Unit,
+    onRemove: (Highlight) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp)
+                .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(text, fontFamily = WordFont, style = MaterialTheme.typography.headlineSmall)
+            if (reading.isNotBlank()) {
+                Text(reading, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+            }
+            HighlightPanel(
+                current = highlight,
+                canWiden = canWiden,
+                onColor = { onColor(it, highlight) },
+                onSentence = onSentence,
+                onNote = { n -> highlight?.let { onNote(it, n) } },
+                onRemove = { highlight?.let(onRemove) }
+            )
+            if (highlight == null) {
+                Text("Выбери цвет — потом можно добавить заметку.", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            androidx.compose.material3.OutlinedButton(
+                onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(text)); copied = true },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp)
+            ) { Text(if (copied) "Скопировано" else "Копировать") }
         }
     }
 }
