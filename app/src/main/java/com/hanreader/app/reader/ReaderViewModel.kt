@@ -191,7 +191,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     val format = BookFiles.sniff(temp)
                     if (format == null) {
                         temp.delete()
-                        throw EpubException("Это не книга: поддерживаются EPUB, FB2 и TXT")
+                        throw EpubException("Это не книга: поддерживаются EPUB, FB2, TXT, DOCX и DOC")
                     }
                     val name = "book-$stamp.${format.extension}"
                     val target = File(booksDir, name)
@@ -199,7 +199,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     try {
                         BookFiles.open(target, format).use { book ->
                             val shown = displayName(uri)
-                            val title = if (format == BookFormat.TXT || book.title.startsWith("book-")) shown ?: book.title else book.title
+                            val plain = format == BookFormat.TXT || format == BookFormat.DOC
+                            val title = if (plain || book.title.startsWith("book-") || book.title.startsWith("import-")) shown ?: book.title else book.title
                             val id = books.insert(
                                 BookEntity(
                                     title = title.ifBlank { shown ?: "Без названия" },
@@ -223,7 +224,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private fun displayName(uri: Uri): String? = runCatching {
         getApplication<Application>().contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
             ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
-    }.getOrNull()?.let { n -> n.replace(Regex("\\.(fb2\\.zip|epub|fb2|txt|zip)$", RegexOption.IGNORE_CASE), "") }
+    }.getOrNull()?.let { n -> n.replace(Regex("\\.(fb2\\.zip|epub|fb2|txt|docx|doc|zip)$", RegexOption.IGNORE_CASE), "") }
         ?: uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.')
 
     // ---- Covers ----

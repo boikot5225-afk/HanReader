@@ -33,7 +33,8 @@ data class PageSpec(
     val showPinyin: Boolean,
     val hidePinyinFor: Set<String>?,
     val justify: Boolean,
-    val indent: Boolean
+    val indent: Boolean,
+    val glossFor: Map<String, String>? = null
 )
 
 object Paginator {
@@ -76,7 +77,7 @@ object Paginator {
                 is ReaderBlock.Text -> {
                     val laid = layout(
                         block.tokens, spec.widthPx, metrics, block.heading, spec.showPinyin, spec.hidePinyinFor,
-                        spec.gapPx, spec.lineGapPx, spec.justify, spec.indent
+                        spec.gapPx, spec.lineGapPx, spec.justify, spec.indent, spec.glossFor
                     )
                     if (laid.lineCount == 0) continue
                     val lineChars = IntArray(laid.lineCount)

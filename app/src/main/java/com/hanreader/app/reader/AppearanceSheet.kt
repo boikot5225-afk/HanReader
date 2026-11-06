@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hanreader.app.Appearance
 import com.hanreader.app.AppearanceStore
+import com.hanreader.app.GlossMode
 import com.hanreader.app.HanFont
 import com.hanreader.app.LexiconIcons
 import com.hanreader.app.LocalThemeSpec
@@ -129,6 +130,19 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
                 levelText?.let {
                     Text("Уровень: $it", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                 }
+            }
+
+            Text("Перевод над словами", style = MaterialTheme.typography.bodyLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GlossMode.entries.forEach { m ->
+                    FilterChip(selected = a.gloss == m, onClick = { AppearanceStore.update { it.copy(gloss = m) } }, label = { Text(m.title) })
+                }
+            }
+            if (a.gloss != GlossMode.OFF) {
+                Text(
+                    "Первое значение из словаря, мелко над пиньинем. В контексте значение может быть другим — полный перевод по нажатию на слово.",
+                    style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
+                )
             }
 
             Section("Тема")

@@ -30,6 +30,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.hanreader.app.Appearance
+import com.hanreader.app.GlossMode
 import com.hanreader.app.ReaderKeys
 import com.hanreader.app.ReadingMode
 import androidx.activity.compose.BackHandler
@@ -168,7 +169,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val levelMark by vm.levelMark.collectAsState()
     val readerLevel = remember(matcher, levelMark, engine) { engine?.let { Recommendations.level(levelMark, matcher, it.hsk) } }
     val bookWordMap = remember(bookWords) { bookWords.associateBy { it.word } }
-    val wantRecommended = appearance.markRecommended || pinyinMode == PinyinMode.RECOMMENDED
+    val wantRecommended = appearance.markRecommended || pinyinMode == PinyinMode.RECOMMENDED || appearance.gloss == GlossMode.RECOMMENDED
     val recommended = remember(chapter, matcher, saved, names, bookWordMap, readerLevel, appearance.recommendedPerChapter, wantRecommended) {
         val eng = engine
         if (!wantRecommended || chapter == null || eng == null || readerLevel == null) emptyList()
@@ -178,10 +179,22 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val chapterWords = remember(chapter) {
         chapter?.blocks?.flatMap { b -> (b as? ReaderBlock.Text)?.tokens?.filter { it.kind == TokenKind.HAN }?.map { it.text }.orEmpty() }?.toHashSet() ?: hashSetOf()
     }
-    val unknownSet = remember(chapterWords, knownHere, saved, names, appearance.markUnknown) {
+    val wantUnknown = appearance.markUnknown || appearance.gloss == GlossMode.UNKNOWN
+    val unknownSet = remember(chapterWords, knownHere, saved, names, wantUnknown) {
         val eng = engine
-        if (!appearance.markUnknown) emptySet()
+        if (!wantUnknown) emptySet()
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
+    }
+    // Short translations above the pinyin: over unknown words or over recommended ones.
+    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine) {
+        val eng = engine
+        val words = when (appearance.gloss) {
+            GlossMode.OFF -> null
+            GlossMode.UNKNOWN -> unknownSet
+            GlossMode.RECOMMENDED -> recommendedSet
+        }
+        if (words == null || eng == null) null
+        else HashMap<String, String>().apply { for (w in words) eng.glossShort(w)?.let { put(w, it) } }
     }
     val hidePinyinFor = when (pinyinMode) {
         PinyinMode.UNKNOWN -> knownHere
@@ -208,6 +221,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             colors = colors,
             onTap = { t -> selection = Selection(i, t, t); chrome = false; highlight = null },
             lines = lines,
+            glossFor = glossFor,
             unknownMarks = if (appearance.markUnknown) unknownSet else null,
             noMarks = remember(block, names, engine) { engine?.let { VocabularyStats.nameTokens(block, names, it) } ?: emptySet() },
             recommendedMarks = if (appearance.markRecommended) recommendedSet else null,
@@ -251,6 +265,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 showPinyin = showPinyin,
                 hidePinyinFor = hidePinyinFor,
                 showBanner = false,
+                glossFor = glossFor,
                 banner = {
                     if (engine != null && coverage != null && coverage.total > 0) {
                         KnownIndicator(coverage.percent, coverage.unknownDistinct, if (appearance.markRecommended) recommended.size else 0) { showPrepare = true }
@@ -528,6 +543,7 @@ private fun PagedChapter(
     showPinyin: Boolean,
     hidePinyinFor: Set<String>?,
     showBanner: Boolean,
+    glossFor: Map<String, String>?,
     banner: @Composable () -> Unit,
     paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit,
     bars: PaddingValues,
@@ -557,7 +573,8 @@ private fun PagedChapter(
             showPinyin = showPinyin,
             hidePinyinFor = hidePinyinFor,
             justify = colors.justify,
-            indent = colors.indent
+            indent = colors.indent,
+            glossFor = glossFor
         )
         val pages by produceState<List<Page>?>(null, chapter, pageSpec, metrics) {
             value = Paginator.paginate(chapter, metrics, pageSpec) { vm.imageAspect(it) }

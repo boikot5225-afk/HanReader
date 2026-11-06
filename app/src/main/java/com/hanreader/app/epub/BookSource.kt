@@ -25,7 +25,7 @@ interface BookSource : Closeable {
     fun cover(): ByteArray?
 }
 
-enum class BookFormat(val extension: String) { EPUB("epub"), FB2("fb2"), FB2_ZIP("fb2.zip"), TXT("txt") }
+enum class BookFormat(val extension: String) { EPUB("epub"), FB2("fb2"), FB2_ZIP("fb2.zip"), TXT("txt"), DOCX("docx"), DOC("doc") }
 
 object BookFiles {
     /** Recognises the format from the file's content: a name from Telegram or a file manager may lie. */
@@ -36,12 +36,14 @@ object BookFiles {
                 ZipFile(file).use { z ->
                     when {
                         z.getEntry("META-INF/container.xml") != null -> BookFormat.EPUB
+                        z.getEntry("word/document.xml") != null -> BookFormat.DOCX
                         z.entries().asSequence().any { it.name.endsWith(".fb2", ignoreCase = true) } -> BookFormat.FB2_ZIP
                         else -> null
                     }
                 }
             }.getOrNull()
         }
+        if (DocBook.isCompoundFile(head)) return BookFormat.DOC
         val start = String(head, Charsets.ISO_8859_1)
         if (start.contains("<FictionBook")) return BookFormat.FB2
         if (head.isEmpty()) return null
@@ -59,6 +61,8 @@ object BookFiles {
             Fb2Book(z.getInputStream(e).use { it.readBytes() }, file.name.substringBefore('.'))
         }
         BookFormat.TXT -> TxtBook(file.readBytes(), file.nameWithoutExtension)
+        BookFormat.DOCX -> DocxBook.open(file, file.nameWithoutExtension)
+        BookFormat.DOC -> DocBook.open(file, file.nameWithoutExtension)
     }
 
     /** Opens a stored book; the format is in its file name (book-123.fb2.zip). */

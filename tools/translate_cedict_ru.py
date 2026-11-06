@@ -136,7 +136,7 @@ def main():
                 try:
                     items, u = call(batch, key, args.model, args.thinking)
                     break
-                except (urllib.error.URLError, json.JSONDecodeError, KeyError, TimeoutError) as e:
+                except (urllib.error.URLError, json.JSONDecodeError, KeyError, OSError) as e:
                     if attempt == 3:
                         print(f"batch {i // args.batch}: giving up: {e}", file=sys.stderr)
                         items, u = [], {}

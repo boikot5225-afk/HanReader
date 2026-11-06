@@ -27,6 +27,8 @@
                 <data android:mimeType="application/x-fictionbook"/>
                 <data android:mimeType="application/x-zip-compressed-fb2"/>
                 <data android:mimeType="text/plain"/>
+                <data android:mimeType="application/msword"/>
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
                 <data android:mimeType="application/octet-stream"/>
             </intent-filter>
             <!-- «Поделиться» a book file. -->
@@ -37,6 +39,8 @@
                 <data android:mimeType="application/x-fictionbook+xml"/>
                 <data android:mimeType="application/x-fictionbook"/>
                 <data android:mimeType="application/x-zip-compressed-fb2"/>
+                <data android:mimeType="application/msword"/>
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
                 <data android:mimeType="application/octet-stream"/>
             </intent-filter>
         </activity>

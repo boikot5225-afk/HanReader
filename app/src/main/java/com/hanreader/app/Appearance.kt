@@ -192,6 +192,9 @@ enum class TextAlignMode(val title: String) { LEFT("По левому краю")
 
 enum class ReadingMode(val title: String) { PAGES("Страницы"), SCROLL("Прокрутка") }
 
+/** A short translation above the pinyin: none, over unknown words, or only over recommended ones. */
+enum class GlossMode(val title: String) { OFF("Выкл"), UNKNOWN("Над незнакомыми"), RECOMMENDED("Над рекомендуемыми") }
+
 /** Reader appearance, saved per device. Ranges are enforced on load. */
 data class Appearance(
     val theme: ReaderTheme = ReaderTheme.AUTO,
@@ -217,7 +220,8 @@ data class Appearance(
     /** Underline words recommended for the reader's level (blue line). */
     val markRecommended: Boolean = false,
     /** How many recommended words a chapter shows at most. */
-    val recommendedPerChapter: Int = 12
+    val recommendedPerChapter: Int = 12,
+    val gloss: GlossMode = GlossMode.OFF
 ) {
     fun hanFontFor(spec: ThemeSpec): HanFont = hanFont ?: spec.defaultHanFont
 
@@ -259,7 +263,8 @@ object AppearanceStore {
             brightness = p.getFloat("brightness", d.brightness).coerceAtMost(1f),
             markUnknown = p.getBoolean("markUnknown", d.markUnknown),
             markRecommended = p.getBoolean("markRecommended", d.markRecommended),
-            recommendedPerChapter = p.getInt("recommendedPerChapter", d.recommendedPerChapter).coerceIn(Appearance.RECOMMENDED)
+            recommendedPerChapter = p.getInt("recommendedPerChapter", d.recommendedPerChapter).coerceIn(Appearance.RECOMMENDED),
+            gloss = GlossMode.entries.firstOrNull { it.name == p.getString("gloss", null) } ?: d.gloss
         )
         appContext = context.applicationContext
     }
@@ -286,6 +291,7 @@ object AppearanceStore {
             putBoolean("markUnknown", next.markUnknown)
             putBoolean("markRecommended", next.markRecommended)
             putInt("recommendedPerChapter", next.recommendedPerChapter)
+            putString("gloss", next.gloss.name)
             apply()
         }
     }

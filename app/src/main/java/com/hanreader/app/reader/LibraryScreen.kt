@@ -63,7 +63,8 @@ import androidx.compose.ui.text.style.TextAlign
 /** File types the picker offers: EPUB, FB2 (also zipped) and plain text. */
 val BOOK_MIME_TYPES = arrayOf(
     "application/epub+zip", "application/x-fictionbook+xml", "application/x-fictionbook", "text/xml",
-    "text/plain", "application/zip", "application/x-zip-compressed", "application/octet-stream"
+    "text/plain", "application/zip", "application/x-zip-compressed", "application/octet-stream",
+    "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 )
 
 @Composable
@@ -120,7 +121,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
             item {
                 Panel(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Добавь китайскую книгу: EPUB, FB2 или TXT", style = MaterialTheme.typography.titleMedium)
+                        Text("Добавь китайскую книгу: EPUB, FB2, TXT или документ Word", style = MaterialTheme.typography.titleMedium)
                         Text(
                             "Над словами появится пиньинь. Нажми на слово — увидишь перевод и сохранишь его в карточки вместе с предложением из книги. Книгу можно открыть и прямо из файлового менеджера или Telegram: «Открыть с помощью» → HanReader.",
                             style = MaterialTheme.typography.bodyMedium,
@@ -161,7 +162,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
             } else {
                 BigButton("Добавить книгу", onClick = { picker.launch(BOOK_MIME_TYPES) })
                 Text(
-                    "EPUB, FB2, FB2.ZIP, TXT",
+                    "EPUB, FB2, FB2.ZIP, TXT, DOCX, DOC",
                     Modifier.fillMaxWidth().padding(top = 6.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -99,6 +99,21 @@ class ZhEngine(
     }
 
     /**
+     * A few words to write above an unknown word: the first Russian sense (first part, without
+     * remarks in brackets or subject labels), else the first English sense; null if none.
+     */
+    fun glossShort(word: String): String? {
+        fun clean(x: String) = x.replace(Regex("\\([^)]*\\)|\\[[^]]*]|（[^）]*）"), " ")
+            .replace(Regex("^(перен|разг|книжн|лит|мед|юр|хим|физ|бот|зоол|воен|ист|диал|офиц|вежл|груб|арх|устар|сокр)\\.\\s*"), "")
+            .split(',', ';', '；', '，').map { it.trim() }.firstOrNull { it.isNotEmpty() }
+        russianSenses(word).firstNotNullOfOrNull { clean(it) }?.let { return it }
+        val e = dictionary.lookup(word)?.takeIf { it.hasDefinition } ?: return null
+        return e.gloss.split("; ", "/").firstNotNullOfOrNull { s ->
+            clean(s.removePrefix("lit. ").removePrefix("to "))?.takeIf { !it.startsWith("variant of") && !it.startsWith("see ") }
+        }
+    }
+
+    /**
      * The meaning stored on a flash card: Russian when available (first two senses), otherwise
      * the short English CC-CEDICT gloss, otherwise null.
      */
