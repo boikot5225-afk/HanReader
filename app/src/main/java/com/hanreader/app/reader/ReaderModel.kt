@@ -54,11 +54,27 @@ class ZhEngine(
     val loadMs: Long,
     val hsk: HskLevels = HskLevels(emptyMap()),
     /** Russian meanings from the Russian Wiktionary (about 11.7k words), senses joined by " ; ". */
-    private val russian: Map<String, String> = emptyMap()
+    private val russian: Map<String, String> = emptyMap(),
+    /** Machine translation of CC-CEDICT meanings into Russian, senses joined by "; ". */
+    private val russianAi: Map<String, String> = emptyMap()
 ) {
-    /** Russian senses of a word, or empty when the Russian Wiktionary has none. */
-    fun russianSenses(word: String): List<String> =
-        russian[word]?.split(" ; ")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+    enum class RussianSource(val label: String) {
+        WIKTIONARY("Викисловарь"),
+        AI("машинный перевод CC-CEDICT")
+    }
+
+    /** Where the Russian meaning of a word comes from, or null when there is none. */
+    fun russianSource(word: String): RussianSource? = when {
+        word in russian -> RussianSource.WIKTIONARY
+        word in russianAi -> RussianSource.AI
+        else -> null
+    }
+
+    /** Russian senses of a word: the Russian Wiktionary first, then the CC-CEDICT translation. */
+    fun russianSenses(word: String): List<String> {
+        russian[word]?.let { v -> return v.split(" ; ").map { it.trim() }.filter { it.isNotEmpty() } }
+        return russianAi[word]?.split(";")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+    }
 
     /**
      * The meaning stored on a flash card: Russian when available (first two senses), otherwise
@@ -119,7 +135,8 @@ class ZhEngine(
                         val dict = app.assets.open("zh/lexicon.dat").use { ZhDictionary.load(it) }
                         val hsk = app.assets.open("zh/hsk.tsv").bufferedReader().useLines { HskLevels.parse(it) }
                         val ru = app.assets.open("zh/ru.tsv").bufferedReader().useLines { parseRussian(it) }
-                        ZhEngine(dict, (System.nanoTime() - t) / 1_000_000, hsk, ru)
+                        val ruAi = app.assets.open("zh/ru_ai.tsv").bufferedReader().useLines { parseRussian(it) }
+                        ZhEngine(dict, (System.nanoTime() - t) / 1_000_000, hsk, ru, ruAi)
                     }.onSuccess { d.complete(it) }.onFailure { d.completeExceptionally(it) }
                 }
                 return d

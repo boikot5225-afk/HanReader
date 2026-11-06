@@ -16,3 +16,4 @@ signing-secrets.txt
 
 # Shared debug key: test builds from any machine install over each other. Not a release key.
 !app/debug.keystore
+/.work/

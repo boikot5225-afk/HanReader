@@ -462,6 +462,13 @@ private fun WordSheet(
                 russian.forEachIndexed { i, sense ->
                     Text("${i + 1}. $sense", style = MaterialTheme.typography.bodyLarge)
                 }
+                engine.russianSource(word)?.let { src ->
+                    Text(
+                        "Русский · ${src.label}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             if (entry != null) {
                 if (russian.isNotEmpty()) {

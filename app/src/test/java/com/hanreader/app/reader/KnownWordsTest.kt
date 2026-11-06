@@ -78,4 +78,19 @@ class KnownWordsTest {
         assertTrue(engine.russianSenses("终于").isEmpty())
         assertTrue(engine.cardTranslation("终于")!!.contains("finally"))
     }
+
+    @Test
+    fun aiTranslationFillsGapsAndWiktionaryWins() {
+        val engine = ZhEngine(
+            ZhSegmenterTest.dict, 0, hsk,
+            russian = mapOf("他们" to "они"),
+            russianAi = mapOf("终于" to "наконец; в конце концов", "他们" to "они (ИИ)")
+        )
+        assertEquals(listOf("наконец", "в конце концов"), engine.russianSenses("终于"))
+        assertEquals(ZhEngine.RussianSource.AI, engine.russianSource("终于"))
+        assertEquals(listOf("они"), engine.russianSenses("他们"))
+        assertEquals(ZhEngine.RussianSource.WIKTIONARY, engine.russianSource("他们"))
+        assertEquals("наконец; в конце концов", engine.cardTranslation("终于"))
+        assertEquals(null, engine.russianSource("图书馆"))
+    }
 }
