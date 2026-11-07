@@ -297,7 +297,9 @@ fun RubyParagraph(
      * Long press and drag selects text: (anchor token, token under the finger, finger lifted).
      * Null: long press does nothing.
      */
-    onRange: ((Int, Int, Boolean) -> Unit)? = null
+    onRange: ((Int, Int, Boolean) -> Unit)? = null,
+    /** Tokens being read aloud right now: underlined boldly. */
+    spoken: IntRange? = null
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val density = LocalDensity.current
@@ -403,6 +405,10 @@ fun RubyParagraph(
                     color = if (metrics.tonedHan(t)) Color.Unspecified else colors.text,
                     topLeft = Offset(p.x + (inner - hanW) / 2f, p.lineTop + laid.hanTop)
                 )
+                if (spoken != null && p.token in spoken) {
+                    val yLine = p.lineTop + laid.hanTop + laid.hanHeight + 1f
+                    drawLine(colors.saved, Offset(p.x, yLine), Offset(p.x + p.width - gapPx, yLine), strokeWidth = 6f)
+                }
                 if (p.token in noted) {
                     val c = marked[p.token] ?: colors.saved
                     drawCircle(c, radius = 5f, center = Offset(p.x + p.width - 1f, p.lineTop + laid.hanTop + 3f))

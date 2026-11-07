@@ -75,6 +75,10 @@ object LexiconIcons {
     val Volume by lazy {
         line("speak", "M11 5L6 9H2V15H6L11 19Z", "M15.5 8.5A5 5 0 0 1 15.5 15.5", "M19 5A10 10 0 0 1 19 19")
     }
+    val Headphones by lazy { line("headphones", "M4 15V12A8 8 0 0 1 20 12V15", "M4 15H7V20H4Z", "M17 15H20V20H17Z") }
+    val Pause by lazy { line("pause", "M8 5V19M16 5V19") }
+    val SkipBack by lazy { line("skip_back", "M6 5V19", "M18 5L9 12L18 19Z") }
+    val SkipForward by lazy { line("skip_forward", "M18 5V19", "M6 5L15 12L6 19Z") }
     val Search by lazy { line("search", "M11 4A7 7 0 1 0 11 18A7 7 0 1 0 11 4Z", "M20 20L16.5 16.5") }
     val Trash by lazy { line("delete", "M3 6H21", "M8 6V4H16V6", "M19 6L18 20H6L5 6") }
     val Copy by lazy { line("copy", "M9 9H20V20H9Z", "M5 15H4V4H15V5") }

@@ -148,7 +148,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // A search match to mark in the text, and the place to return to after a jump.
     var highlight by remember { mutableStateOf<SearchHit?>(null) }
     var returnTo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    var blockJump by remember { mutableStateOf<((Int) -> Unit)?>(null) }
+    // Shows paragraph [block] at character [char] (the page holding it); set by the page or scroll view.
+    var blockJump by remember { mutableStateOf<((Int, Int) -> Unit)?>(null) }
     // One subscription per book: calling vm.bookmarks() in every recomposition re-queried the database each time.
     val bookmarksFlow = remember(book.entity.id) { vm.bookmarks(book.entity.id) }
     val bookmarks by bookmarksFlow.collectAsState(initial = emptyList())
@@ -156,7 +157,10 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val highlights by highlightsFlow.collectAsState(initial = emptyList())
 
     val sheetOpen = showAppearance || showToc || showPrepare || selection != null
-    ImmersiveEffects(hideBars = !chrome && !sheetOpen, keepOn = appearance.keepScreenOn, brightness = appearance.brightness)
+    // Reading aloud: one sentence at a time, the page follows the voice.
+    val readAloud = remember(context) { ReadAloud(context) }
+    DisposableEffect(readAloud) { onDispose { readAloud.close() } }
+    ImmersiveEffects(hideBars = !chrome && !sheetOpen, keepOn = appearance.keepScreenOn || readAloud.playing, brightness = appearance.brightness)
 
     val spec = LocalThemeSpec.current
     val scheme = MaterialTheme.colorScheme
@@ -248,8 +252,40 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 val first = block.tokens.indexOfFirst { it.end > h.start }
                 val last = block.tokens.indexOfLast { it.start < h.end }
                 if (first in 0..last) first..last else null
-            }
+            } ?: readAloud.current?.takeIf { it.chapter == chapter?.index && it.block == i }?.let { s ->
+                Highlights.range(block, s.start, s.end)
+            },
+            spoken = readAloud.current?.takeIf { it.chapter == chapter?.index && it.block == i }?.let { tokensOf(block, readAloud.word) }
         )
+    }
+
+    // ---- reading aloud: next chapter, following the voice, stopping in the background ----
+    readAloud.onChapterEnd = {
+        val c = chapter
+        if (c != null && c.index < chapterCount - 1) vm.goToChapter(c.index + 1) else readAloud.stop()
+    }
+    // A new chapter on screen while reading (the previous one ended, or the reader went there): read it from its position.
+    LaunchedEffect(chapter?.index) {
+        val c = chapter ?: return@LaunchedEffect
+        if (readAloud.active && readAloud.chapterIndex != c.index) {
+            val here = book.entity.chapterIndex == c.index
+            if (readAloud.playing) readAloud.start(c, if (here) book.entity.blockIndex else 0, if (here) book.entity.charOffset else 0)
+            else readAloud.stop()
+        }
+    }
+    // The page turns to the sentence being read.
+    LaunchedEffect(readAloud.current) {
+        val s = readAloud.current ?: return@LaunchedEffect
+        if (s.chapter == chapter?.index) blockJump?.invoke(s.block, s.start)
+    }
+    // Leaving the app pauses: without a background service Android may stop the voice at any moment.
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle, readAloud) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && readAloud.playing) readAloud.pause()
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
     }
 
     /** Jump to a paragraph, remembering where the reader was. */
@@ -257,7 +293,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         val cur = chapter ?: return
         returnTo = cur.index to book.entity.blockIndex
         chrome = false
-        if (toChapter == cur.index) blockJump?.invoke(toBlock) else vm.goToChapter(toChapter, block = toBlock)
+        if (toChapter == cur.index) blockJump?.invoke(toBlock, 0) else vm.goToChapter(toChapter, block = toBlock)
     }
     val chapterBookmarks = bookmarks.filter { it.chapterIndex == chapter?.index }
     val pageBookmark = chapterBookmarks.firstOrNull { it.blockIndex in progress.firstBlock..progress.lastBlock }
@@ -354,6 +390,16 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                     onPinyin = vm::setPinyinMode,
                     appearanceOpen = showAppearance,
                     onAppearance = { showAppearance = true },
+                    reading = readAloud.active,
+                    onReadAloud = {
+                        val c = chapter
+                        if (readAloud.active) readAloud.stop()
+                        else if (c != null) {
+                            val here = book.entity.chapterIndex == c.index
+                            readAloud.start(c, if (here) book.entity.blockIndex else 0, if (here) book.entity.charOffset else 0)
+                            chrome = false
+                        }
+                    },
                     bookmarked = pageBookmark != null,
                     onBookmark = {
                         val c = chapter ?: return@ReaderTopBar
@@ -386,7 +432,13 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             ReturnPill(
                 onReturn = { returnTo = null; jump(back.first, back.second); returnTo = null },
                 onDismiss = { returnTo = null },
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bars).padding(bottom = 36.dp)
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bars).padding(bottom = if (readAloud.active) 110.dp else 36.dp)
+            )
+        }
+        if (readAloud.active && !chrome) {
+            ReadAloudBar(
+                readAloud,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bars).padding(bottom = 36.dp, start = 16.dp, end = 16.dp)
             )
         }
     }
@@ -625,7 +677,7 @@ internal fun PagedChapter(
     onAnyTap: () -> Boolean,
     onProgress: (ReadingProgress) -> Unit,
     registerJump: (((Int) -> Unit)?) -> Unit,
-    registerBlockJump: (((Int) -> Unit)?) -> Unit,
+    registerBlockJump: (((Int, Int) -> Unit)?) -> Unit,
     bookmarkedBlocks: Set<Int>
 ) {
     val density = LocalDensity.current
@@ -678,7 +730,10 @@ internal fun PagedChapter(
             }
             DisposableEffect(pager) {
                 registerJump { page -> scope.launch { pager.scrollToPage(lead + page.coerceIn(0, list.size - 1)) } }
-                registerBlockJump { block -> scope.launch { pager.scrollToPage(lead + Paginator.pageFor(list, block)) } }
+                registerBlockJump { block, char ->
+                    val target = lead + Paginator.pageFor(list, block, char)
+                    if (pager.currentPage != target) scope.launch { pager.scrollToPage(target) }
+                }
                 onDispose { registerJump(null); registerBlockJump(null) }
             }
             DisposableEffect(keysEnabled) {
@@ -790,7 +845,7 @@ private fun ScrollChapter(
     onTap: () -> Unit,
     onProgress: (ReadingProgress) -> Unit,
     registerJump: (((Int) -> Unit)?) -> Unit,
-    registerBlockJump: (((Int) -> Unit)?) -> Unit
+    registerBlockJump: (((Int, Int) -> Unit)?) -> Unit
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -799,7 +854,12 @@ private fun ScrollChapter(
     }
     DisposableEffect(listState) {
         registerJump { block -> scope.launch { listState.scrollToItem(block.coerceIn(0, chapter.blocks.size) + 1) } }
-        registerBlockJump { block -> scope.launch { listState.scrollToItem(block.coerceIn(0, chapter.blocks.size) + 1) } }
+        registerBlockJump { block, char ->
+            val item = block.coerceIn(0, chapter.blocks.size) + 1
+            // Already on screen (reading aloud moved within it): stay; a jump from elsewhere scrolls.
+            val visible = listState.layoutInfo.visibleItemsInfo.any { it.index == item }
+            if (char == 0 || !visible) scope.launch { listState.scrollToItem(item) }
+        }
         onDispose { registerJump(null); registerBlockJump(null) }
     }
     // Restore the saved position once per chapter, then keep saving it while scrolling.
@@ -929,7 +989,9 @@ private fun ReaderTopBar(
     appearanceOpen: Boolean,
     onAppearance: () -> Unit,
     bookmarked: Boolean = false,
-    onBookmark: () -> Unit = {}
+    onBookmark: () -> Unit = {},
+    reading: Boolean = false,
+    onReadAloud: () -> Unit = {}
 ) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
@@ -944,6 +1006,13 @@ private fun ReaderTopBar(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+        }
+        IconButton(onClick = onReadAloud) {
+            Icon(
+                LexiconIcons.Headphones,
+                contentDescription = if (reading) "Остановить чтение вслух" else "Читать вслух",
+                tint = if (reading) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
             )
         }
         IconButton(onClick = onBookmark) {
@@ -1292,6 +1361,39 @@ private fun KnownChoice(
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
             } ?: Spacer(Modifier.weight(1f))
             if (canReset) TextButton(onClick = onReset) { Text("Сбросить") }
+        }
+    }
+}
+
+/** The read-aloud player over the text: previous / pause-play / next sentence, speed, stop. */
+@Composable
+private fun ReadAloudBar(r: ReadAloud, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp
+    ) {
+        Column(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = r::previous) { Icon(LexiconIcons.SkipBack, contentDescription = "Предыдущее предложение") }
+                IconButton(onClick = { if (r.playing) r.pause() else r.resume() }) {
+                    Icon(if (r.playing) LexiconIcons.Pause else LexiconIcons.Play,
+                        contentDescription = if (r.playing) "Пауза" else "Продолжить", tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = r::next) { Icon(LexiconIcons.SkipForward, contentDescription = "Следующее предложение") }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = {
+                    val i = ReadAloud.RATES.indexOfFirst { it >= r.rate - 0.01f }.let { if (it < 0) 0 else it }
+                    r.changeRate(ReadAloud.RATES[(i + 1) % ReadAloud.RATES.size])
+                }) { Text(String.format(java.util.Locale.ROOT, "%.1f×", r.rate)) }
+                IconButton(onClick = r::stop) { Icon(LexiconIcons.Close, contentDescription = "Остановить чтение") }
+            }
+            if (r.message.isNotEmpty()) {
+                Text(r.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 12.dp, bottom = 6.dp))
+            }
         }
     }
 }
