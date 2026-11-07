@@ -32,6 +32,9 @@ android {
             providers.environmentVariable("HANREADER_TEST_EPUB").orNull?.let {
                 test.environment("HANREADER_TEST_EPUB", it)
             }
+            providers.environmentVariable("HANREADER_STORE_SHOTS").orNull?.let {
+                test.environment("HANREADER_STORE_SHOTS", it)
+            }
             providers.environmentVariable("HANREADER_COUNTS_OUT").orNull?.let {
                 test.environment("HANREADER_COUNTS_OUT", it)
             }
