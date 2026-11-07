@@ -1,5 +1,16 @@
 # 汉读 HanReader
 
+**Читалка китайских книг с пиньинем, переводом по нажатию и карточками для запоминания слов.**
+Работает без интернета, без рекламы и регистрации.
+
+- **Скачать тестовую версию:** [HanReader-beta.apk](https://github.com/boikot5225-afk/HanReader/releases/download/beta/HanReader-beta.apk) · [что нового и как установить](https://github.com/boikot5225-afk/HanReader/releases/tag/beta)
+- **Связь:** boikot5225@gmail.com · Telegram [@SainJust](https://t.me/SainJust)
+- **Конфиденциальность:** [PRIVACY.md](PRIVACY.md) — приложение не собирает личные данные
+
+---
+
+## Для разработчика
+
 Android-приложение для чтения китайских книг и изучения слов: читаешь EPUB → нажимаешь на слово →
 слово вместе с предложением из книги попадает в интервальное повторение.
 

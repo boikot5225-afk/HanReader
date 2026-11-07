@@ -45,4 +45,6 @@ HanReader → Очистить данные». Отчёты о сбоях мож
 
 ## Контакты
 
-Вопросы о приложении: [контактный e-mail].
+Вопросы о приложении и конфиденциальности:
+- e-mail: boikot5225@gmail.com
+- Telegram: @SainJust (https://t.me/SainJust)

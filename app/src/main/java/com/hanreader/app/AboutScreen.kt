@@ -97,6 +97,10 @@ fun AboutDialog(onClose: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
+                    "Связь с разработчиком: boikot5225@gmail.com · Telegram @SainJust",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
                     "Исходный код и данные: github.com/boikot5225-afk/HanReader",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

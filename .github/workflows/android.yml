@@ -47,12 +47,15 @@ jobs:
         run: |
           VERSION=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts | head -n 1)
           cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/HanReader-beta.apk"
-          NOTES="HanReader $VERSION (тестовая сборка) · ветка ${GITHUB_REF_NAME} · коммит ${GITHUB_SHA::7} · $(date -u '+%Y-%m-%d %H:%M') UTC"
+          BUILD="HanReader $VERSION (тестовая сборка) · ветка ${GITHUB_REF_NAME} · коммит ${GITHUB_SHA::7} · $(date -u '+%Y-%m-%d %H:%M') UTC"
+          # The public page of the release: what the app is, how to install it, contacts.
+          { cat store/RELEASE_NOTES_ru.md; printf '\n---\n_%s_\n' "$BUILD"; } > "$RUNNER_TEMP/notes.md"
+          NOTES="$BUILD"
           if ! gh release view beta >/dev/null 2>&1; then
             gh release create beta --prerelease --target "$GITHUB_SHA" --title "HanReader beta" --notes "$NOTES"
           fi
           gh release upload beta "$RUNNER_TEMP/HanReader-beta.apk" --clobber
-          gh release edit beta --title "HanReader beta $VERSION" --notes "$NOTES"
+          gh release edit beta --title "HanReader beta $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
           echo "Beta: https://github.com/${GITHUB_REPOSITORY}/releases/download/beta/HanReader-beta.apk" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:

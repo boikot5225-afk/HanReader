@@ -24,11 +24,16 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+const val DEVELOPER_EMAIL = "boikot5225@gmail.com"
+const val DEVELOPER_TELEGRAM = "@SainJust"
+
 /** Opens the system share sheet with the reports as text (Telegram, mail...). */
 fun shareCrashReports(context: Context) {
     val send = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_SUBJECT, "HanReader: отчёт о сбое")
+        // Mail apps fill in the developer's address; Telegram and others ignore it (@SainJust).
+        putExtra(Intent.EXTRA_EMAIL, arrayOf(DEVELOPER_EMAIL))
         putExtra(Intent.EXTRA_TEXT, CrashLog.text(context).take(200_000))
     }
     runCatching { context.startActivity(Intent.createChooser(send, "Отправить отчёт").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
@@ -89,7 +94,7 @@ fun CrashPrompt() {
         onDismissRequest = { done(clear = false) },
         title = { Text("Приложение закрылось с ошибкой") },
         text = {
-            Text("Отправь отчёт разработчику — это поможет найти и исправить ошибку. В отчёте только версия, модель телефона и техническое описание ошибки, без текста книг. Посмотреть его можно в настройках.")
+            Text("Отправь отчёт разработчику — на почту $DEVELOPER_EMAIL или в Telegram $DEVELOPER_TELEGRAM. Это поможет найти и исправить ошибку. В отчёте только версия, модель телефона и техническое описание ошибки, без текста книг. Посмотреть его можно в настройках.")
         },
         confirmButton = {
             TextButton(onClick = { shareCrashReports(context); done(clear = false) }) { Text("Отправить") }
