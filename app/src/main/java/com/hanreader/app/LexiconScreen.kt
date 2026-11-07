@@ -133,6 +133,7 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = 
         settings = settings, vm = vm, onClose = { showSettings = false }
     )
 
+    CrashPrompt()
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         // The reader handles the system bars itself (full-screen reading); other screens stay inside them.
         Box(Modifier.fillMaxSize().then(if (reading != null) Modifier else Modifier.safeDrawingPadding())) {
@@ -423,6 +424,8 @@ private fun LearningSettingsDialog(
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 BackupSection(vm)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                CrashReportsSection()
             }
         },
         confirmButton = {

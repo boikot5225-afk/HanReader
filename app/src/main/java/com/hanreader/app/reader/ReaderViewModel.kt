@@ -340,6 +340,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 val epub = runCatching {
                     withContext(Dispatchers.IO) { BookFiles.open(File(booksDir, entity.fileName)) }
                 }.getOrElse {
+                    com.hanreader.app.CrashLog.record("Открытие книги", it)
                     _message.value = "Не удалось открыть книгу: ${it.message}"
                     return@withLock
                 }
@@ -377,7 +378,10 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         val now = _open.value ?: return
         _open.value = result.fold(
             onSuccess = { now.copy(chapter = it, loading = false) },
-            onFailure = { now.copy(loading = false, error = "Глава не открылась: ${it.message}") }
+            onFailure = {
+                com.hanreader.app.CrashLog.record("Открытие главы $index", it)
+                now.copy(loading = false, error = "Глава не открылась: ${it.message}")
+            }
         )
         if (result.isSuccess && (index != now.entity.chapterIndex || atEnd || block != null)) {
             savePosition(index, block ?: if (atEnd) END_OF_CHAPTER else 0, if (block != null) char else 0)
@@ -613,7 +617,10 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 _open.value?.let { o -> if (o.entity.id == bookId) rebuildOpenChapter(o) }
                 _open.value?.let { o -> if (o.entity.id == bookId) _open.value = o.copy(entity = o.entity.copy(analyzedTokens = result.tokens)) }
                 snapshotProgress(bookId)
-            }.onFailure { _message.value = "Не удалось разобрать словарь книги: ${it.message}" }
+            }.onFailure {
+                com.hanreader.app.CrashLog.record("Анализ словаря книги", it)
+                _message.value = "Не удалось разобрать словарь книги: ${it.message}"
+            }
             _analysis.value = _analysis.value - bookId
         }
     }
