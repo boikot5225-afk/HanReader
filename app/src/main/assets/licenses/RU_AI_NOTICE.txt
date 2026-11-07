@@ -3,3 +3,7 @@ made once with the DeepSeek API (November 2026) by tools/translate_cedict_ru.py;
 Source: CC-CEDICT, MDBG, https://www.mdbg.net/chinese/dictionary?page=cc-cedict
 Licence of the derived file: Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0),
 https://creativecommons.org/licenses/by-sa/4.0/
+
+Russian meanings of single characters by reading (zh/ru_chars.tsv): machine translation of the
+CC-CEDICT English meanings of each reading, made with the DeepSeek API (November 2026) by
+tools/translate_chars_ru.py and tools/build_ru_chars.py; same source and licence (CC BY-SA 4.0).

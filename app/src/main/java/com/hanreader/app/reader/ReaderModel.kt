@@ -74,7 +74,9 @@ class ZhEngine(
     /** Proper names (assets/zh/names.tsv): p = person, l = place, o = organisation. */
     private val names: Map<String, Char> = emptyMap(),
     /** Simplified <-> traditional tables. */
-    val script: ZhScript = ZhScript.NONE
+    val script: ZhScript = ZhScript.NONE,
+    /** Single characters by reading (assets/zh/ru_chars.tsv): 得 -> [dé: получить…, de: частица…], most frequent first. */
+    private val russianChars: Map<String, List<Pair<String, String>>> = emptyMap()
 ) {
     enum class NameKind(val title: String) { PERSON("человек"), PLACE("место"), ORGANISATION("организация") }
 
@@ -88,21 +90,50 @@ class ZhEngine(
 
     enum class RussianSource(val label: String) {
         WIKTIONARY("Викисловарь"),
-        AI("машинный перевод CC-CEDICT")
+        AI("машинный перевод CC-CEDICT"),
+        READING("машинный перевод CC-CEDICT, по чтению")
     }
 
     /** Where the Russian meaning of a word comes from, or null when there is none. */
     fun russianSource(word: String): RussianSource? = when {
+        word in russianChars -> RussianSource.READING
         word in russian -> RussianSource.WIKTIONARY
         word in russianAi -> RussianSource.AI
         else -> null
     }
 
-    /** Russian senses of a word: the Russian Wiktionary first, then the CC-CEDICT translation. */
-    fun russianSenses(word: String): List<String> {
+    /**
+     * The entry of character [word] for [reading] (tone marks compared first, then without them),
+     * else for the dictionary's reading, else the most frequent one. Null for words and unknown characters.
+     */
+    private fun charEntry(word: String, reading: String?): Pair<String, String>? {
+        val list = russianChars[word] ?: return null
+        fun pick(r: String?) = r?.lowercase()?.let { x ->
+            list.firstOrNull { it.first.lowercase() == x } ?: list.firstOrNull { toneless(it.first) == toneless(x) }
+        }
+        return pick(reading) ?: pick(dictionary.lookup(word)?.pinyin?.substringBefore(' ')) ?: list.first()
+    }
+
+    /** The other readings of character [word] with their meanings ([reading] left out): "zhǎng — расти; глава". */
+    fun otherReadings(word: String, reading: String?): List<Pair<String, String>> {
+        val list = russianChars[word] ?: return emptyList()
+        val here = charEntry(word, reading)
+        return list.filter { it !== here }
+    }
+
+    /**
+     * Russian senses of a word. A single character takes the meanings of the reading on the page
+     * ([reading], e.g. 得 de after a verb), since a character's Wiktionary page mixes all its
+     * readings. Words: the Russian Wiktionary first, then the CC-CEDICT translation.
+     */
+    fun russianSenses(word: String, reading: String? = null): List<String> {
+        charEntry(word, reading)?.let { e -> return e.second.split(";").map { it.trim() }.filter { it.isNotEmpty() } }
         russian[word]?.let { v -> return v.split(" ; ").map { it.trim() }.filter { it.isNotEmpty() } }
         return russianAi[word]?.split(";")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
     }
+
+    private fun toneless(p: String): String = java.text.Normalizer.normalize(p.lowercase(), java.text.Normalizer.Form.NFD)
+        .filter { it in 'a'..'z' }.replace("v", "u")
 
     /**
      * A word the dictionary does not define (a Jieba combination like 革命党 or 一件), split into
@@ -132,11 +163,11 @@ class ZhEngine(
     }
 
     /** The first short sense of a defined word, Russian if possible. */
-    private fun firstSense(word: String): String? {
+    private fun firstSense(word: String, reading: String? = null): String? {
         fun clean(x: String) = x.replace(Regex("\\([^)]*\\)|\\[[^]]*]|（[^）]*）"), " ")
             .replace(Regex("^(перен|разг|книжн|лит|мед|юр|хим|физ|бот|зоол|воен|ист|диал|офиц|вежл|груб|арх|устар|сокр)\\.\\s*"), "")
             .split(',', ';', '；', '，').map { it.trim() }.firstOrNull { it.isNotEmpty() }
-        russianSenses(word).firstNotNullOfOrNull { clean(it) }?.let { return it }
+        russianSenses(word, reading).firstNotNullOfOrNull { clean(it) }?.let { return it }
         val e = dictionary.lookup(word)?.takeIf { it.hasDefinition } ?: return null
         return e.gloss.split("; ", "/").firstNotNullOfOrNull { s ->
             clean(s.removePrefix("lit. ").removePrefix("to "))?.takeIf { !it.startsWith("variant of") && !it.startsWith("see ") }
@@ -151,14 +182,14 @@ class ZhEngine(
      * A few words to write above an unknown word: the first Russian sense (first part, without
      * remarks in brackets or subject labels), else the first English sense; null if none.
      */
-    fun glossShort(word: String): String? = firstSense(word) ?: composedGloss(word)
+    fun glossShort(word: String, reading: String? = null): String? = firstSense(word, reading) ?: composedGloss(word)
 
     /**
      * The meaning stored on a flash card: Russian when available (first two senses), otherwise
      * the short English CC-CEDICT gloss, otherwise null.
      */
-    fun cardTranslation(word: String): String? {
-        val ru = russianSenses(word)
+    fun cardTranslation(word: String, reading: String? = null): String? {
+        val ru = russianSenses(word, reading)
         if (ru.isNotEmpty()) return ru.take(2).joinToString("; ")
         return dictionary.lookup(word)?.takeIf { it.hasDefinition }?.shortGloss() ?: composedGloss(word)
     }
@@ -208,7 +239,23 @@ class ZhEngine(
             val map = HashMap<String, String>(16_000)
             for (line in lines) {
                 val tab = line.indexOf('\t')
-                if (tab > 0) map[line.substring(0, tab)] = line.substring(tab + 1)
+                if (tab <= 0) continue
+                // Character pages of the Wiktionary sometimes give reference data instead of a meaning
+                // ("ключ 109 目+7 черт, метод ввода cangjie…"): those senses are left out.
+                val senses = line.substring(tab + 1).split(" ; ").filter { !REFERENCE.containsMatchIn(it) }
+                if (senses.isNotEmpty()) map[line.substring(0, tab)] = senses.joinToString(" ; ")
+            }
+            return map
+        }
+
+        private val REFERENCE = Regex("ключ \\d+|\\d+ черт|cangjie|метод ввода|четырёхугольник", RegexOption.IGNORE_CASE)
+
+        /** assets/zh/ru_chars.tsv: character \t reading \t senses, readings in order of frequency. */
+        fun parseRussianChars(lines: Sequence<String>): Map<String, List<Pair<String, String>>> {
+            val map = HashMap<String, MutableList<Pair<String, String>>>(8_000)
+            for (line in lines) {
+                val p = line.split('\t')
+                if (p.size == 3 && p[0].isNotEmpty() && p[1].isNotEmpty() && p[2].isNotEmpty()) map.getOrPut(p[0]) { ArrayList(2) } += p[1] to p[2]
             }
             return map
         }
@@ -245,7 +292,8 @@ class ZhEngine(
                         val ru = app.assets.open("zh/ru.tsv").bufferedReader().useLines { parseRussian(it) }
                         val ruAi = app.assets.open("zh/ru_ai.tsv").bufferedReader().useLines { parseRussian(it) }
                         val names = app.assets.open("zh/names.tsv").bufferedReader().useLines { parseNames(it) }
-                        f.complete(ZhEngine(dict, ms, hsk, ru, ruAi, names, script))
+                        val ruChars = runCatching { app.assets.open("zh/ru_chars.tsv").bufferedReader().useLines { parseRussianChars(it) } }.getOrDefault(emptyMap())
+                        f.complete(ZhEngine(dict, ms, hsk, ru, ruAi, names, script, ruChars))
                     } catch (e: Throwable) {
                         c.completeExceptionally(e)
                         f.completeExceptionally(e)

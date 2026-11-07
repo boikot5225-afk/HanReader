@@ -201,7 +201,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
     // Short translations above the pinyin: over unknown words or over recommended ones.
-    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine) {
+    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter) {
         val eng = engine
         val words = when (appearance.gloss) {
             GlossMode.OFF -> null
@@ -209,7 +209,18 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             GlossMode.RECOMMENDED -> recommendedSet
         }
         if (words == null || eng == null) null
-        else HashMap<String, String>().apply { for (w in words) eng.glossShort(w)?.let { put(w, it) } }
+        else HashMap<String, String>().apply {
+            for (w in words) eng.glossShort(w)?.let { put(w, it) }
+            // A single character gets the meaning of each reading it has on these pages (慢慢地 de, 土地 dì).
+            chapter?.blocks?.forEach { b ->
+                (b as? ReaderBlock.Text)?.tokens?.forEach { t ->
+                    if (t.text.length == 1 && t.text in words && t.pinyin.isNotEmpty()) {
+                        val key = t.text + "|" + t.pinyin
+                        if (key !in this) eng.glossShort(t.text, t.pinyin)?.let { put(key, it) }
+                    }
+                }
+            }
+        }
     }
     val hidePinyinFor = when (pinyinMode) {
         PinyinMode.UNKNOWN -> knownHere
@@ -1167,8 +1178,11 @@ private fun WordSheet(
     // One token: its reading in context (慢慢地 de, not the dictionary's dì).
     val reading = if (selection.first == selection.last && first.pinyin.isNotEmpty() && first.text.length == 1) first.pinyin
         else entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
-    val russian = remember(word) { engine.russianSenses(word) }
-    val translation = engine.cardTranslation(word)
+    // A single character: the meanings of the reading on the page (得 de after a verb, not dé «получить»).
+    val pageReading = if (selection.first == selection.last && first.text.length == 1) first.pinyin.takeIf { it.isNotEmpty() } else null
+    val russian = remember(word, pageReading) { engine.russianSenses(word, pageReading) }
+    val otherReadings = remember(word, pageReading) { engine.otherReadings(word, pageReading) }
+    val translation = engine.cardTranslation(word, pageReading)
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
     var status by remember(word) { mutableStateOf<String?>(null) }
@@ -1207,6 +1221,12 @@ private fun WordSheet(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+            if (otherReadings.isNotEmpty()) {
+                Text("Другие чтения", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                otherReadings.take(3).forEach { (p, ru) ->
+                    Text("$p — $ru", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (entry != null) {

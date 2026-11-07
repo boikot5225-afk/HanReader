@@ -237,6 +237,10 @@ internal fun layout(
  * line, the space is split half-way between the centres of translated words; what does not fit is
  * cut with an ellipsis. Word widths never change, so lines break exactly as without translations.
  */
+/** The translation of a token: "text|reading" first (a character read as on the page), then the word. */
+internal fun glossOf(glossFor: Map<String, String>, t: RToken): String? =
+    (if (t.text.length == 1) glossFor[t.text + "|" + t.pinyin] else null) ?: glossFor[t.text]
+
 private fun placeGlosses(
     items: List<Placed>,
     tokens: List<RToken>,
@@ -245,7 +249,7 @@ private fun placeGlosses(
     widthPx: Float
 ): List<GlossPlaced> {
     val out = ArrayList<GlossPlaced>()
-    val byLine = items.filter { tokens[it.token].kind == TokenKind.HAN && glossFor.containsKey(tokens[it.token].text) }
+    val byLine = items.filter { tokens[it.token].kind == TokenKind.HAN && glossOf(glossFor, tokens[it.token]) != null }
         .groupBy { it.lineTop }
     val pad = metrics.emWidth * 0.15f
     for ((top, line) in byLine) {
@@ -254,7 +258,7 @@ private fun placeGlosses(
             val left = if (k == 0) 0f else (centres[k - 1] + centres[k]) / 2f + pad
             val right = if (k == line.lastIndex) widthPx else (centres[k] + centres[k + 1]) / 2f - pad
             val room = (right - left).coerceAtLeast(metrics.emWidth.toFloat())
-            val g = metrics.gloss(glossFor.getValue(tokens[p.token].text), room.toInt())
+            val g = metrics.gloss(glossOf(glossFor, tokens[p.token])!!, room.toInt())
             val gx = (centres[k] - g.size.width / 2f).coerceIn(left, (right - g.size.width).coerceAtLeast(left))
             out += GlossPlaced(p.token, gx, top, g)
         }
