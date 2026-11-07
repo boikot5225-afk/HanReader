@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.WindowInsets
@@ -632,6 +633,8 @@ private fun ImmersiveEffects(hideBars: Boolean, keepOn: Boolean, brightness: Flo
 }
 
 private val HEADER_H = 44.dp
+/** How far a vertical swipe on a page must go to open the menu. */
+private val MENU_SWIPE = 56.dp
 private val FOOTER_H = 30.dp
 private val BANNER_H = 64.dp
 
@@ -787,12 +790,24 @@ internal fun PagedChapter(
                         .pointerInput(Unit) {
                             detectTapGestures { pos ->
                                 if (onAnyTap()) return@detectTapGestures
+                                // The running header and footer have no words: a tap anywhere on them is the menu.
+                                val edge = pos.y < HEADER_H.toPx() || pos.y > size.height - FOOTER_H.toPx()
                                 when {
+                                    edge -> onTapCenter()
                                     pos.x < size.width * 0.3f -> turn(-1)
                                     pos.x > size.width * 0.7f -> turn(1)
                                     else -> onTapCenter()
                                 }
                             }
+                        }
+                        // Pages turn sideways, so a swipe up or down is free: it shows or hides the menu.
+                        .pointerInput(Unit) {
+                            var moved = 0f
+                            detectVerticalDragGestures(
+                                onDragStart = { moved = 0f },
+                                onDragEnd = { if (kotlin.math.abs(moved) > MENU_SWIPE.toPx()) onTapCenter() },
+                                onVerticalDrag = { change, dy -> moved += dy; change.consume() }
+                            )
                         }
                 ) {
                     val pageIndex = index - lead

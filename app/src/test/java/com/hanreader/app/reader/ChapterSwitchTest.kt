@@ -11,6 +11,10 @@ import com.hanreader.app.ReadingMode
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import org.junit.Assert.assertEquals
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.swipeUp
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -82,6 +86,51 @@ class ChapterSwitchTest {
             shown = chapters[target]
             compose.waitForIdle()
         }
+        epub.close()
+    }
+
+    /** The menu opens from the running header or footer (any x) and by a vertical swipe; the page does not turn. */
+    @Test
+    fun menuFromEdgesAndSwipe() {
+        val engine = ZhEngine(com.hanreader.app.zh.ZhSegmenterTest.dict, 0)
+        val epub = com.hanreader.app.epub.EpubBook(book())
+        val chapter = ChapterBuilder.build(epub, 1, engine)
+        val entity = com.hanreader.app.BookEntity(id = 1, title = "换章", author = "", fileName = "x", chapterCount = 3, chapterIndex = 1)
+        val vm = ReaderViewModel(app)
+        var menu = 0
+        var page = -1
+        compose.setContent {
+            LexiconTheme {
+                val a = com.hanreader.app.Appearance(mode = ReadingMode.PAGES)
+                val spec = com.hanreader.app.LocalThemeSpec.current
+                val metrics = rememberRubyMetrics(androidx.compose.ui.text.rememberTextMeasurer(cacheSize = 0), a, spec, spec.defaultHanFont.family)
+                val colors = rubyColors(a, spec)
+                PagedChapter(
+                    vm = vm, book = OpenBook(entity, epub, chapter, loading = false),
+                    chapter = chapter, metrics = metrics, colors = colors, appearance = a, showPinyin = true,
+                    hidePinyinFor = null, showBanner = false, glossFor = null, banner = {},
+                    paragraph = { b, i, lines -> RubyParagraph(b, metrics, true, null, emptySet(), null, colors, {}, lines = lines) },
+                    bars = androidx.compose.foundation.layout.PaddingValues(), speed = 200f, keysEnabled = false,
+                    onTapCenter = { menu++ }, onAnyTap = { false }, onProgress = { page = it.position }, registerJump = {}, registerBlockJump = {},
+                    bookmarkedBlocks = emptySet()
+                )
+            }
+        }
+        compose.waitForIdle()
+        val root = compose.onRoot()
+        // Left end of the running header: used to turn back a page, now the menu.
+        root.performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.1f, 20f)) }
+        compose.waitForIdle()
+        assertEquals(1, menu)
+        // Right end of the footer.
+        root.performTouchInput { click(androidx.compose.ui.geometry.Offset(width * 0.9f, height - 15f)) }
+        compose.waitForIdle()
+        assertEquals(2, menu)
+        // A swipe up across the text.
+        root.performTouchInput { swipeUp(startY = height * 0.7f, endY = height * 0.3f) }
+        compose.waitForIdle()
+        assertEquals(3, menu)
+        assertEquals("no page turned", 0, page)
         epub.close()
     }
 }
