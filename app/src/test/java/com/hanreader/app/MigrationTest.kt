@@ -93,18 +93,23 @@ class MigrationTest {
             // v10: highlights, removed with their book
             db.highlightDao().insert(Highlight(bookId = 7, chapterIndex = 5, blockIndex = 12, startChar = 0, endChar = 4, color = 1, text = "他终于回", chapterTitle = "第五章"))
             assertEquals("他终于回", db.highlightDao().observe(7).first().single().text)
+            // v11: reading by day, book progress removed with its book
+            db.statsDao().addReading(20261106, 60_000, 250)
+            assertEquals(250, db.statsDao().allDays().single().readChars)
+            db.statsDao().putProgress(BookProgress(7, 20261106, 42))
             // v7: bookmarks, removed with their book
             db.bookmarkDao().insert(Bookmark(bookId = 7, chapterIndex = 5, blockIndex = 12, chapterTitle = "第五章", snippet = "他终于回来了"))
             assertEquals(1, db.bookmarkDao().observe(7).first().size)
             db.bookDao().delete(7)
             assertEquals(0, db.bookmarkDao().observe(7).first().size)
             assertEquals(0, db.highlightDao().observe(7).first().size)
+            assertEquals(0, db.statsDao().allProgress().size)
             // v8: names marked by the reader
             db.userNameDao().put(UserName("雷蒙德"))
             assertEquals(listOf("雷蒙德"), db.userNameDao().all().map { it.word })
             assertEquals(emptyList<String>(), db.bookDao().ignoredWords(7)) // cascade
         }
-        assertEquals(10, db.openHelper.readableDatabase.version)
+        assertEquals(11, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

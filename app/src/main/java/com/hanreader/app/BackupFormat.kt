@@ -18,6 +18,8 @@ data class Backup(
     val sources: List<WordSource>? = null,
     /** HanReader: the library. Null in older files and word-only copies: restoring keeps the current books. */
     val library: LibraryBackup? = null,
+    /** HanReader: reading time and reviews by day. Null in older files: restoring keeps the current ones. */
+    val activity: List<DailyActivity>? = null,
     /** Book files unpacked from the archive (file name -> temporary file); not part of the JSON. */
     val bookFiles: Map<String, java.io.File> = emptyMap()
 )
@@ -27,7 +29,9 @@ data class LibraryBackup(
     val books: List<BookEntity>,
     val bookmarks: List<Bookmark>,
     val highlights: List<Highlight>,
-    val ignored: List<BookWord>
+    val ignored: List<BookWord>,
+    /** Known-word share of each book by day. */
+    val progress: List<BookProgress> = emptyList()
 )
 
 class BackupFormatException(message: String) : Exception(message)
@@ -142,6 +146,19 @@ object BackupFormat {
                 put("ignored", JSONArray().apply {
                     lib.ignored.forEach { w -> put(JSONObject().apply { put("bookId", w.bookId); put("word", w.word) }) }
                 })
+                put("progress", JSONArray().apply {
+                    lib.progress.forEach { r -> put(JSONObject().apply { put("bookId", r.bookId); put("day", r.day); put("percent", r.percent) }) }
+                })
+            })
+        }
+        backup.activity?.let { list ->
+            root.put("activity", JSONArray().apply {
+                list.forEach { d ->
+                    put(JSONObject().apply {
+                        put("day", d.day); put("readMillis", d.readMillis); put("readChars", d.readChars)
+                        put("pages", d.pages); put("reviews", d.reviews)
+                    })
+                }
             })
         }
         return root.toString(2)
@@ -227,8 +244,14 @@ object BackupFormat {
                 }.filter { it.cardId in ids }
             }
             val library = root.optJSONObject("library")?.let { decodeLibrary(it) }
+            val activity = root.optJSONArray("activity")?.let { arr ->
+                (0 until arr.length()).map { i ->
+                    val d = arr.getJSONObject(i)
+                    DailyActivity(d.getInt("day"), d.optLong("readMillis", 0L), d.optInt("readChars", 0), d.optInt("pages", 0), d.optInt("reviews", 0))
+                }.filter { it.day in 19_000_101..29_991_231 }.distinctBy { it.day }
+            }
             validate(cards, examples)
-            return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known, names, sources, library)
+            return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known, names, sources, library, activity)
         } catch (e: JSONException) {
             throw BackupFormatException("Файл копии повреждён: " + (e.message ?: "неверная структура"))
         }
@@ -276,7 +299,12 @@ object BackupFormat {
             val w = igJson.getJSONObject(i)
             BookWord(w.getLong("bookId"), w.getString("word"), 0, 0, ignored = true)
         }.filter { it.bookId in ids && it.word.isNotBlank() }.distinctBy { it.bookId to it.word }
-        return LibraryBackup(books, bookmarks, highlights, ignored)
+        val prJson = arr("progress")
+        val progress = (0 until prJson.length()).map { i ->
+            val r = prJson.getJSONObject(i)
+            BookProgress(r.getLong("bookId"), r.getInt("day"), r.optInt("percent", 0).coerceIn(0, 100))
+        }.filter { it.bookId in ids }.distinctBy { it.bookId to it.day }
+        return LibraryBackup(books, bookmarks, highlights, ignored, progress)
     }
 
     /** A plain file name: no folders, nothing that could leave the books folder. */

@@ -37,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.graphicsLayer
 import com.hanreader.app.BigButton
 import com.hanreader.app.BookEntity
 import com.hanreader.app.LexiconIcons
@@ -68,7 +70,7 @@ val BOOK_MIME_TYPES = arrayOf(
 )
 
 @Composable
-fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) -> Unit, onStats: (Long) -> Unit) {
+fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) -> Unit, onStats: (Long) -> Unit, onReadingStats: () -> Unit = {}) {
     val all by vm.library.collectAsState()
     val sort by vm.sort.collectAsState()
     val grid by vm.grid.collectAsState()
@@ -103,6 +105,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
         item {
             KnownWordsPanel(known.size, levelMark, onChoose = { showLevel = true })
         }
+        item { ActivityPanel(vm, onReadingStats) }
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Overline("Моя библиотека", Modifier.weight(1f))
@@ -355,4 +358,26 @@ private fun LevelDialog(vm: ReaderViewModel, current: LevelMark, onClose: () -> 
         },
         dismissButton = { TextButton(enabled = !busy, onClick = onClose) { Text("Отмена") } }
     )
+}
+
+/** Today's reading and the streak; opens the statistics. */
+@Composable
+private fun ActivityPanel(vm: ReaderViewModel, onOpen: () -> Unit) {
+    val days by vm.activity.collectAsState(initial = emptyList())
+    val today = ReadingStats.today()
+    val row = days.firstOrNull { it.day == today }
+    val streak = remember(days, today) { ReadingStats.streak(days, today) }
+    Panel(Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+        Row(Modifier.padding(start = 20.dp, end = 12.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Overline("Статистика")
+                Text(
+                    "Сегодня ${(row?.readMillis ?: 0L) / 60_000} мин · серия ${streak.current} " +
+                        com.hanreader.app.RussianText.plural(streak.current, "день", "дня", "дней"),
+                    style = MaterialTheme.typography.titleSmall
+                )
+            }
+            Icon(LexiconIcons.ChevronDown, contentDescription = null, modifier = Modifier.graphicsLayer(rotationZ = -90f))
+        }
+    }
 }

@@ -868,6 +868,9 @@ private fun ScrollChapter(
         // Item 0 is the chapter banner, paragraph i is item i + 1.
         if (target > 0) listState.scrollToItem(target.coerceIn(0, chapter.blocks.size) + 1)
         var saved = target
+        // Reading time in scroll mode: paragraphs passed forward since the last stop, and the time it took.
+        var readFrom = target
+        var readAt = System.currentTimeMillis()
         snapshotFlow { listState.firstVisibleItemIndex }
             .distinctUntilChanged()
             .debounce(400)
@@ -875,6 +878,10 @@ private fun ScrollChapter(
                 val block = (first - 1).coerceIn(0, (chapter.blocks.size - 1).coerceAtLeast(0))
                 // Still the restored paragraph: keep the exact spot saved in page mode.
                 if (block != saved) { saved = block; vm.savePosition(chapter.index, block) }
+                val now = System.currentTimeMillis()
+                if (block > readFrom) vm.recordPage(blockChars.subList(readFrom, block).sum(), now - readAt)
+                readFrom = block
+                readAt = now
                 val left = blockChars.drop(block).sum()
                 onProgress(
                     ReadingProgress(

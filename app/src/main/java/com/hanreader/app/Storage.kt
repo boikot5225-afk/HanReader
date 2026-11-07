@@ -203,6 +203,71 @@ interface HighlightDao {
     suspend fun delete(id: Long)
 }
 
+/**
+ * What the reader did on a day ([day] = yyyymmdd, local time): reading time and characters,
+ * pages turned, card reviews. One row per day.
+ */
+@Entity(tableName = "daily_activity")
+data class DailyActivity(
+    @PrimaryKey val day: Int,
+    val readMillis: Long = 0,
+    val readChars: Int = 0,
+    val pages: Int = 0,
+    val reviews: Int = 0
+)
+
+/** A book's share of known word occurrences (percent) on a day: how understanding grows. */
+@Entity(
+    tableName = "book_progress",
+    primaryKeys = ["bookId", "day"],
+    foreignKeys = [
+        ForeignKey(entity = BookEntity::class, parentColumns = ["id"], childColumns = ["bookId"], onDelete = ForeignKey.CASCADE)
+    ]
+)
+data class BookProgress(val bookId: Long, val day: Int, val percent: Int)
+
+@Dao
+interface StatsDao {
+    @Query("INSERT OR IGNORE INTO daily_activity (day, readMillis, readChars, pages, reviews) VALUES (:day, 0, 0, 0, 0)")
+    suspend fun ensureDay(day: Int)
+
+    @Query("UPDATE daily_activity SET readMillis = readMillis + :millis, readChars = readChars + :chars, pages = pages + 1 WHERE day = :day")
+    suspend fun addReadingRow(day: Int, millis: Long, chars: Int)
+
+    @Query("UPDATE daily_activity SET reviews = reviews + 1 WHERE day = :day")
+    suspend fun addReviewRow(day: Int)
+
+    @Transaction
+    suspend fun addReading(day: Int, millis: Long, chars: Int) { ensureDay(day); addReadingRow(day, millis, chars) }
+
+    @Transaction
+    suspend fun addReview(day: Int) { ensureDay(day); addReviewRow(day) }
+
+    @Query("SELECT * FROM daily_activity ORDER BY day")
+    fun observeDays(): Flow<List<DailyActivity>>
+
+    @Query("SELECT * FROM daily_activity ORDER BY day")
+    suspend fun allDays(): List<DailyActivity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putDays(rows: List<DailyActivity>)
+
+    @Query("DELETE FROM daily_activity")
+    suspend fun clearDays()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putProgress(row: BookProgress)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putProgressAll(rows: List<BookProgress>)
+
+    @Query("SELECT * FROM book_progress ORDER BY bookId, day")
+    fun observeProgress(): Flow<List<BookProgress>>
+
+    @Query("SELECT * FROM book_progress ORDER BY bookId, day")
+    suspend fun allProgress(): List<BookProgress>
+}
+
 /** How often a word occurs in a book, from the one-time book analysis. */
 @Entity(
     tableName = "book_words",
@@ -595,13 +660,13 @@ interface CardDao {
 // so no database of version 3 exists under this name; Lexicon data arrives through backups.
 // Version 5 (0.2.0): known_words. Schemas are exported to app/schemas for migration checks.
 // Version 6 (0.3.0): book_words and books.analyzedTokens (book vocabulary analysis).
-// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names. Version 9 (0.9.9): books.charOffset. Version 10 (0.10.0): highlights.
+// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names. Version 9 (0.9.9): books.charOffset. Version 10 (0.10.0): highlights. Version 11 (0.13.0): daily_activity, book_progress.
 @Database(
     entities = [
         WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
-        Bookmark::class, UserName::class, Highlight::class
+        Bookmark::class, UserName::class, Highlight::class, DailyActivity::class, BookProgress::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
@@ -611,6 +676,7 @@ abstract class LexiconDatabase : RoomDatabase() {
     abstract fun bookmarkDao(): BookmarkDao
     abstract fun userNameDao(): UserNameDao
     abstract fun highlightDao(): HighlightDao
+    abstract fun statsDao(): StatsDao
 
     companion object {
         @Volatile private var instance: LexiconDatabase? = null
@@ -717,7 +783,20 @@ abstract class LexiconDatabase : RoomDatabase() {
             "`text` TEXT NOT NULL, `chapterTitle` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, " +
             "FOREIGN KEY(`bookId`) REFERENCES `books`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `daily_activity` (`day` INTEGER NOT NULL, `readMillis` INTEGER NOT NULL, " +
+                        "`readChars` INTEGER NOT NULL, `pages` INTEGER NOT NULL, `reviews` INTEGER NOT NULL, PRIMARY KEY(`day`))"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `book_progress` (`bookId` INTEGER NOT NULL, `day` INTEGER NOT NULL, `percent` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`bookId`, `day`), FOREIGN KEY(`bookId`) REFERENCES `books`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
+                )
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {

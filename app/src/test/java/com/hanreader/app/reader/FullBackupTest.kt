@@ -59,6 +59,7 @@ class FullBackupTest {
         db.knownWordDao().removeAll()
         db.bookDao().deleteAll()
         db.cardDao().replaceAll(emptyList(), emptyList())
+        db.statsDao().clearDays()
     }
 
     @Test
@@ -82,6 +83,10 @@ class FullBackupTest {
         runBlocking { db.bookDao().insertWords(listOf(BookWord(bookId, "老板", 1, 0, ignored = true))) }
         waitFor { runBlocking { db.bookDao().get(bookId)!!.charOffset == 5 } }
         val highlight = runBlocking { db.highlightDao().all().single() }
+        runBlocking {
+            db.statsDao().addReading(20261105, 600_000, 2_000)
+            db.statsDao().putProgress(com.hanreader.app.BookProgress(bookId, 20261105, 61))
+        }
 
         // Export.
         val lexicon = LexiconViewModel(app)
@@ -94,7 +99,7 @@ class FullBackupTest {
 
         // Lose everything: the book (with its bookmarks and highlights), the marks.
         val fileName = runBlocking { db.bookDao().get(bookId)!!.fileName }
-        runBlocking { db.bookDao().delete(bookId); db.knownWordDao().removeAll() }
+        runBlocking { db.bookDao().delete(bookId); db.knownWordDao().removeAll(); db.statsDao().clearDays() }
         File(app.filesDir, "books/$fileName").delete()
 
         // Restore.
@@ -118,6 +123,8 @@ class FullBackupTest {
         assertEquals(KnownWord("下雨", ReaderViewModel.UNKNOWN).source, runBlocking { db.knownWordDao().all() }.single().source)
         val source = runBlocking { db.cardDao().allSources() }.single { it.sentence.contains("老板") }
         assertEquals("门开了，老板看了他一眼。", source.sentence)
+        assertEquals(2_000, runBlocking { db.statsDao().allDays() }.single { it.day == 20261105 }.readChars)
+        assertEquals(61, runBlocking { db.statsDao().allProgress() }.single { it.bookId == bookId }.percent)
         // The restored book opens.
         val again = ReaderViewModel(app)
         again.openBook(bookId)

@@ -189,6 +189,14 @@ object VocabularyStats {
         return StudyCandidate(word, count, e?.pinyin.orEmpty(), engine.cardTranslation(word).orEmpty(), firstChapter)
     }
 
+    /** Share of the book's word occurrences known now (names and «Не учить» left out), percent. */
+    fun knownPercent(words: List<BookWord>, tokens: Int, known: Set<String>, engine: ZhEngine): Int {
+        val matcher = KnownMatcher(known, engine)
+        val counted = words.filter { !it.ignored && !isName(it.word, engine) }
+        val base = counted.sumOf { it.count }.coerceAtMost(tokens).coerceAtLeast(1)
+        return percent(counted.sumOf { if (matcher.isKnown(it.word)) it.count else 0 }, base)
+    }
+
     fun book(
         words: List<BookWord>,
         tokens: Int,

@@ -138,8 +138,10 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         books = db.bookDao().all(),
                         bookmarks = db.bookmarkDao().all(),
                         highlights = db.highlightDao().all(),
-                        ignored = db.bookDao().allIgnored()
-                    )
+                        ignored = db.bookDao().allIgnored(),
+                        progress = db.statsDao().allProgress()
+                    ),
+                    activity = db.statsDao().allDays()
                 )
                 withContext(Dispatchers.IO) {
                     val stream = app.contentResolver.openOutputStream(uri, "wt")
@@ -191,6 +193,11 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         db.bookmarkDao().insertAllStrict(lib.bookmarks)
                         db.highlightDao().insertAllStrict(lib.highlights)
                         lib.ignored.chunked(2_000).forEach { books.insertWords(it) }
+                        db.statsDao().putProgressAll(lib.progress)
+                    }
+                    backup.activity?.let { days ->
+                        db.statsDao().clearDays()
+                        db.statsDao().putDays(days)
                     }
                     backup.knownWords?.let { knownDao.replaceAll(it) }
                     backup.userNames?.let { names ->
@@ -216,15 +223,19 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private val statsDao = LexiconDatabase.get(app).statsDao()
+
     fun markAlreadyKnown(card: WordCard, mode: ReviewMode) {
         viewModelScope.launch {
             dao.update(ReviewSchedule.markAlreadyKnown(card, mode, System.currentTimeMillis()))
+            statsDao.addReview(com.hanreader.app.reader.ReadingStats.today())
         }
     }
 
     fun rate(card: WordCard, remembered: Boolean, mode: ReviewMode) {
         viewModelScope.launch {
             dao.update(ReviewSchedule.rate(card, remembered, System.currentTimeMillis(), mode))
+            statsDao.addReview(com.hanreader.app.reader.ReadingStats.today())
         }
     }
 

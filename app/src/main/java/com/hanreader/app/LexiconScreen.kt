@@ -87,6 +87,7 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = 
     // An open book takes the whole screen, like a review session.
     var reading by rememberSaveable { mutableStateOf<Long?>(null) }
     var bookStats by rememberSaveable { mutableStateOf<Long?>(null) }
+    var readingStats by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(reading) { reading?.let { if (reader.open.value?.entity?.id != it) reader.openBook(it) } }
     // A running review session hides the navigation and takes the whole screen.
     var session by rememberSaveable { mutableStateOf<ReviewMode?>(null) }
@@ -138,7 +139,9 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = 
             val active = session
             val book = reading
             val statsId = bookStats
-            if (statsId != null && book == null) {
+            if (readingStats && book == null) {
+                com.hanreader.app.reader.StatsScreen(reader, onClose = { readingStats = false })
+            } else if (statsId != null && book == null) {
                 BookStatsScreen(reader, statsId, onClose = { bookStats = null })
             } else if (book != null) {
                 ReaderScreen(reader, onClose = {
@@ -176,7 +179,7 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = 
                     bottomBar = { BottomNav(tab) { tab = it } }
                 ) { padding ->
                     when (tab) {
-                        Tab.READ -> LibraryScreen(reader, padding, onOpen = { reading = it }, onStats = { bookStats = it })
+                        Tab.READ -> LibraryScreen(reader, padding, onOpen = { reading = it }, onStats = { bookStats = it }, onReadingStats = { readingStats = true })
                         Tab.TODAY -> TodayScreen(
                             cards = visibleCards,
                             settings = settings,

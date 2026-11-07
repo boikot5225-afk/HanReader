@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -345,6 +346,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 _open.value = OpenBook(entity, epub)
                 loadChapterLocked(entity.chapterIndex.coerceIn(0, epub.chapters.lastIndex))
                 if (entity.analyzedTokens == 0 || prefs.getInt("analysis_v_${entity.id}", 1) < BookAnalyzer.VERSION) analyzeBook(entity.id)
+                else snapshotProgress(entity.id)
             }
         }
     }
@@ -391,7 +393,23 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun closeBook() {
+        _open.value?.entity?.id?.let { snapshotProgress(it) }
         viewModelScope.launch { openMutex.withLock { closeBookInternal() } }
+    }
+
+    /** Today's share of known words in the book: the statistics show how it grows. */
+    fun snapshotProgress(bookId: Long) {
+        viewModelScope.launch {
+            runCatching {
+                val book = books.get(bookId)?.takeIf { it.analyzedTokens > 0 } ?: return@launch
+                val engine = engineDeferred.await()
+                val words = books.observeWords(bookId).first()
+                if (words.isEmpty()) return@launch
+                val known = knownWords.first { it is KnownWords || it.isNotEmpty() }
+                val percent = withContext(Dispatchers.Default) { VocabularyStats.knownPercent(words, book.analyzedTokens, known, engine) }
+                statsDao.putProgress(com.hanreader.app.BookProgress(bookId, ReadingStats.today(), percent))
+            }
+        }
     }
 
     private fun closeBookInternal() {
@@ -528,7 +546,22 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     val speed: StateFlow<Float> = _speed.asStateFlow()
 
     /** A page of [chars] characters was read in [millis]; implausible times are ignored. */
+    private val statsDao = db.statsDao()
+
+    /** Days of reading and reviews, for the statistics screen. */
+    val activity = statsDao.observeDays()
+    val bookProgress = statsDao.observeProgress()
+    /** All cards (new words per day, learned). */
+    val allCards: StateFlow<List<com.hanreader.app.WordCard>> = studyCards
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** A page was on screen [millis] ms and had [chars] characters: today's reading and the speed estimate. */
     fun recordPage(chars: Int, millis: Long) {
+        if (millis >= 2_000 && chars > 0) {
+            viewModelScope.launch {
+                statsDao.addReading(ReadingStats.today(), millis.coerceAtMost(ReadingStats.MAX_PAGE_MILLIS), chars)
+            }
+        }
         if (chars < 20 || millis < 3_000 || millis > 5 * 60_000) return
         val sample = (chars / (millis / 60_000f)).coerceIn(30f, 1_500f)
         val next = _speed.value * 0.8f + sample * 0.2f
@@ -579,6 +612,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 // Names found now are kept whole: rebuild the open chapter in place.
                 _open.value?.let { o -> if (o.entity.id == bookId) rebuildOpenChapter(o) }
                 _open.value?.let { o -> if (o.entity.id == bookId) _open.value = o.copy(entity = o.entity.copy(analyzedTokens = result.tokens)) }
+                snapshotProgress(bookId)
             }.onFailure { _message.value = "Не удалось разобрать словарь книги: ${it.message}" }
             _analysis.value = _analysis.value - bookId
         }
