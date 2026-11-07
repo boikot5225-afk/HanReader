@@ -1,4 +1,4 @@
-Reader AI uses a generated, slim word-frequency index derived at build time from:
+HanReader uses a generated, slim word-frequency index derived at build time from:
 
 Complete HSK Vocabulary
 https://github.com/drkameleon/complete-hsk-vocabulary

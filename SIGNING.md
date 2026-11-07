@@ -2,6 +2,24 @@
 
 The private signing key is NEVER committed to this public repository.
 
+## Creating the release key (once, on your own computer)
+
+Needs a JDK (Java 17+; `keytool` comes with it). Run, choosing your own passwords:
+
+    keytool -genkeypair -v -storetype PKCS12 -keystore hanreader-release-keystore.p12 \
+      -alias hanreader -keyalg RSA -keysize 4096 -validity 10000 \
+      -dname "CN=HanReader"
+
+Then make the base64 text GitHub needs:
+
+- Linux / macOS: `base64 -w0 hanreader-release-keystore.p12 > keystore.base64.txt`
+  (macOS: `base64 -i hanreader-release-keystore.p12 -o keystore.base64.txt`)
+- Windows PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("hanreader-release-keystore.p12")) > keystore.base64.txt`
+
+Keep the .p12 file and both passwords in two safe places (e.g. a password manager and an
+offline copy). Losing them means no more updates for the published app. Never send them in
+a chat, an e-mail or a commit. Delete keystore.base64.txt after adding the secret.
+
 ## One-time setup
 
 Keep the following two private files provided with this release:

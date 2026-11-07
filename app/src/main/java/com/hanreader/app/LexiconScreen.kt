@@ -426,6 +426,8 @@ private fun LearningSettingsDialog(
                 BackupSection(vm)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 CrashReportsSection()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                AboutSection()
             }
         },
         confirmButton = {

@@ -1,0 +1,7 @@
+Simplified / traditional conversion tables (zh/script.tsv): OpenCC dictionaries
+(TSCharacters, STCharacters, STPhrases), https://github.com/BYVoid/OpenCC,
+as packaged in opencc-python-reimplemented 0.1.7. Only one-to-one character conversions
+are kept (tools/build_script.py).
+License: Apache License 2.0 (APACHE-2.0.txt in this folder).
+NOTICE of the package: "This product includes dictionary data and configurations
+developed by OpenCC (https://github.com/BYVoid/OpenCC)."
