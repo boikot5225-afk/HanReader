@@ -85,6 +85,15 @@ jobs:
       - name: Build signed release APK
         if: env.HANREADER_HAS_RELEASE_KEY == 'true'
         run: gradle :app:assembleRelease --stacktrace
+      # The release key's certificate fingerprint, to compare with hanreader-signing-setup.txt.
+      - name: Show release signature
+        if: env.HANREADER_HAS_RELEASE_KEY == 'true'
+        shell: bash
+        run: |
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          DIGEST=$("$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1)
+          echo "Release signing certificate SHA-256: $DIGEST"
+          echo "Подпись релиза (SHA-256): \`$DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload signed release APK
         if: env.HANREADER_HAS_RELEASE_KEY == 'true'
         uses: actions/upload-artifact@v4
