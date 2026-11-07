@@ -18,8 +18,15 @@ Add the four named secrets and copy their values from hanreader-signing-setup.tx
 
 After that, run Android CI on main using "Run workflow".
 It produces both hanreader-debug-apk and hanreader-signed-release-apk artifacts.
-The release APK is signed using the stable release key. Debug APKs are signed by
-ephemeral CI debug keys and do NOT have a stable identity across builds.
+The release APK is signed using the stable release key. Debug APKs are signed with
+the shared test key committed as app/debug.keystore, so every debug build (CI or local)
+installs over the previous one. That key is public: it identifies test builds only.
+
+## Beta link for testers
+
+Every successful CI build on main or a working branch replaces the APK of the
+GitHub release `beta`. The link stays the same:
+https://github.com/boikot5225-afk/HanReader/releases/download/beta/HanReader-beta.apk
 
 ## Switching from the debug build to the signed release
 

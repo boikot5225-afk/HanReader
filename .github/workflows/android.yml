@@ -1,13 +1,19 @@
 name: HanReader Android CI
 on:
   push:
-    branches: [main]
+    # main and the working branches: every change gets a tested APK.
+    branches: [main, 'ccr-*']
   workflow_dispatch:
+# Two pushes in a row: the newer build replaces the older one.
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # write: to publish the beta APK as a release asset.
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -31,6 +37,23 @@ jobs:
           gradle-version: '8.13'
       - name: Tests and debug APK
         run: gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace
+      # A permanent public link for testers: the latest APK, replaced on every successful build.
+      # https://github.com/<owner>/<repo>/releases/download/beta/HanReader-beta.apk
+      - name: Publish beta APK
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts | head -n 1)
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/HanReader-beta.apk"
+          NOTES="HanReader $VERSION (тестовая сборка) · ветка ${GITHUB_REF_NAME} · коммит ${GITHUB_SHA::7} · $(date -u '+%Y-%m-%d %H:%M') UTC"
+          if ! gh release view beta >/dev/null 2>&1; then
+            gh release create beta --prerelease --target "$GITHUB_SHA" --title "HanReader beta" --notes "$NOTES"
+          fi
+          gh release upload beta "$RUNNER_TEMP/HanReader-beta.apk" --clobber
+          gh release edit beta --title "HanReader beta $VERSION" --notes "$NOTES"
+          echo "Beta: https://github.com/${GITHUB_REPOSITORY}/releases/download/beta/HanReader-beta.apk" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: hanreader-debug-apk
