@@ -35,6 +35,11 @@ TENSE = [("present", "наст."), ("preterite", "претерит"), ("imperfec
 MOOD = [("subjunctive", "субх."), ("imperative", "повел."), ("gerund", "герундий"),
         ("participle", "причастие"), ("infinitive", "инфинитив"), ("diminutive", "уменьш."),
         ("augmentative", "увелич."), ("superlative", "превосх.")]
+# Russian meanings the Wiktionary lacks for the most frequent words of real books.
+MANUAL_RU = {
+    "del": ["de + el: из, от, о (перед словом мужского рода)"],
+    "al": ["a + el: к, в, на (перед словом мужского рода)"],
+}
 SKIP_TAGS = {"obsolete", "archaic", "rare", "proscribed", "misspelling", "nonstandard"}
 
 
@@ -78,6 +83,11 @@ def main(ru_path, en_path, out_dir):
     pos = {}      # lemma -> part of speech
     forms = {}    # form -> {lemma: description}
 
+    def set_pos(w, p):
+        # A common word first: «al» is a contraction before it is an initialism (имя).
+        if p in POS and (w not in pos or (pos[w] == "имя" and POS[p] != "имя")):
+            pos[w] = POS[p]
+
     def add_form(form, lemma, desc):
         form, lemma = form.lower().strip(), lemma.lower().strip()
         if not form or form == lemma or " " in form or not re.fullmatch(r"[^\W\d_]+", form):
@@ -96,8 +106,7 @@ def main(ru_path, en_path, out_dir):
                 g = clean(g)
                 if g and "?" not in g and g not in ru.setdefault(w, []):
                     ru[w].append(g)
-        if e.get("pos") in POS:
-            pos.setdefault(w, POS[e["pos"]])
+        set_pos(w, e.get("pos"))
         for f in e.get("forms", []):
             add_form(f.get("form", ""), w, "")
 
@@ -122,8 +131,11 @@ def main(ru_path, en_path, out_dir):
                 g = clean(g)
                 if g and g not in en.setdefault(w, []):
                     en[w].append(g)
-        if lemma_entry and e.get("pos") in POS:
-            pos.setdefault(w, POS[e["pos"]])
+        if lemma_entry:
+            set_pos(w, e.get("pos"))
+
+    for w, senses in MANUAL_RU.items():
+        ru[w] = senses + [x for x in ru.get(w, []) if x not in senses]
 
     lemmas = sorted(set(ru) | set(en), key=lambda x: x.encode("utf-8"))
     with open(f"{out_dir}/dict.tsv", "w", encoding="utf-8") as f:
@@ -142,7 +154,17 @@ def main(ru_path, en_path, out_dir):
         m = 0
         for form in sorted(forms, key=lambda x: x.encode("utf-8")):
             # Lemmas with a Russian meaning first, then the ones in the dictionary at all.
-            items = sorted(forms[form].items(), key=lambda kv: (kv[0] not in ru, kv[0] not in known))
+            # A form of a form (controlada -> controlado -> controlar): to the dictionary word, keeping
+            # the outer description (feminine participle).
+            resolved = {}
+            for l, d in forms[form].items():
+                if l in known:
+                    resolved.setdefault(l, d)
+                elif l in forms:
+                    for l2, d2 in forms[l].items():
+                        if l2 in known:
+                            resolved.setdefault(l2, d or d2)
+            items = sorted(resolved.items(), key=lambda kv: (kv[0] not in ru, kv[0] not in known))
             items = [(l, d) for l, d in items if l in known][:3]
             if not items or form in ru:
                 continue
