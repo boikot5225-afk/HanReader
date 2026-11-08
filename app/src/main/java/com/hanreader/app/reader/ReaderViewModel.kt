@@ -235,6 +235,12 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     if (!temp.renameTo(target)) { temp.copyTo(target, overwrite = true); temp.delete() }
                     try {
                         BookFiles.open(target, format).use { book ->
+                            // A book with no text at all (an empty file, an EPUB without chapters) would have
+                            // nothing to open: refuse it here instead of failing on every opening.
+                            val hasText = book.chapters.asSequence().take(50).any { c ->
+                                book.blocks(c.index).any { it is com.hanreader.app.epub.EpubBlock.Text && it.text.isNotBlank() }
+                            }
+                            if (!hasText) throw EpubException("В книге не нашлось текста")
                             val shown = displayName(uri)
                             val plain = format == BookFormat.TXT || format == BookFormat.DOC
                             val title = if (plain || book.title.startsWith("book-") || book.title.startsWith("import-")) shown ?: book.title else book.title
@@ -342,6 +348,11 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 }.getOrElse {
                     com.hanreader.app.CrashLog.record("Открытие книги", it)
                     _message.value = "Не удалось открыть книгу: ${it.message}"
+                    return@withLock
+                }
+                if (epub.chapters.isEmpty()) {
+                    runCatching { epub.close() }
+                    _message.value = "В книге не нашлось текста"
                     return@withLock
                 }
                 _open.value = OpenBook(entity, epub)

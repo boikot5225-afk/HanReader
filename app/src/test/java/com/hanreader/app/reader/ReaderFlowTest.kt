@@ -275,4 +275,16 @@ class ReaderFlowTest {
         vm.setUserName("小明每", false)
         waitFor(60_000) { (vm.open.value?.chapter?.blocks?.get(1) as? ReaderBlock.Text)?.tokens?.none { it.text == "小明每" } == true }
     }
+
+    /** A file with no text (empty TXT): the import refuses it instead of storing a book that cannot open. */
+    @Test
+    fun emptyBookIsRefused() {
+        val vm = ReaderViewModel(app)
+        val file = File(app.cacheDir, "empty.txt").apply { writeText("  \n\n  ") }
+        var imported: Result<Long>? = null
+        vm.importBook(Uri.fromFile(file)) { imported = it }
+        waitFor { imported != null }
+        assertTrue("refused: $imported", imported!!.isFailure)
+        assertTrue(imported!!.exceptionOrNull()!!.message!!.contains("текст"))
+    }
 }

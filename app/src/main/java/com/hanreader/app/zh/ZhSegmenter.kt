@@ -34,6 +34,20 @@ class ZhSegmenter(private val dict: ZhDictionary) {
         while (i < text.length) {
             val ch = text[i]
             when {
+                // Characters outside the basic plane are two Java chars (a surrogate pair): never cut them.
+                Character.isHighSurrogate(ch) && i + 1 < text.length && Character.isLowSurrogate(text[i + 1]) -> {
+                    val cp = text.codePointAt(i)
+                    if (cp in 0x20000..0x3FFFF) {
+                        // A rare character (CJK extensions B and later): a word of its own, tappable.
+                        out += ZhToken(text.substring(i, i + 2), i, i + 2, TokenKind.HAN)
+                        i += 2
+                    } else {
+                        // An emoji with its modifiers and joined parts (skin tone, 👨‍👩‍👧): one sign.
+                        val j = emojiEnd(text, i)
+                        out += ZhToken(text.substring(i, j), i, j, TokenKind.PUNCT)
+                        i = j
+                    }
+                }
                 ch.isHan() -> {
                     var j = i
                     while (j < text.length && text[j].isHan()) j++
@@ -59,6 +73,19 @@ class ZhSegmenter(private val dict: ZhDictionary) {
             }
         }
         return out
+    }
+
+    /** The end of the emoji sequence starting at [from]: pairs joined by ZWJ, variation selectors, skin tones. */
+    private fun emojiEnd(text: String, from: Int): Int {
+        var j = from + Character.charCount(text.codePointAt(from))
+        while (j < text.length) {
+            val c = text.codePointAt(j)
+            val joins = c == 0x200D || c == 0xFE0F || c in 0x1F3FB..0x1F3FF || c in 0xE0020..0xE007F
+            val afterZwj = text[j - 1] == '\u200D' && Character.isSupplementaryCodePoint(c)
+            if (!joins && !afterZwj) break
+            j += Character.charCount(c)
+        }
+        return j
     }
 
     private fun segmentHan(text: String, from: Int, to: Int, out: MutableList<ZhToken>, extra: Set<String>) {

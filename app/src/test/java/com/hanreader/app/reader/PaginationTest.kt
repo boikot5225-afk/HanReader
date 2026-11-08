@@ -194,6 +194,37 @@ class PaginationTest {
         assertEquals("every line on some page", lines, shown)
     }
 
+    /** A page narrower than one word: every token on its own line, all of them shown. */
+    @Test
+    fun pageNarrowerThanAWord() {
+        val a = Appearance(fontSize = Appearance.FONT_SIZES.last)
+        val spec = ReaderTheme.CLASSIC.spec
+        var result by mutableStateOf<Pair<List<Page>, Int>?>(null)
+        compose.setContent {
+            val metrics = rememberRubyMetrics(rememberTextMeasurer(cacheSize = 0), a, spec, spec.defaultHanFont.family)
+            val colors = rubyColors(a, spec)
+            val d = LocalDensity.current
+            LaunchedEffect(Unit) {
+                val pageSpec = with(d) {
+                    PageSpec(
+                        widthPx = 12.dp.toPx(), heightPx = 300.dp.toPx(), paragraphSpacingPx = a.paragraphSpacing.dp.toPx(),
+                        bannerHeightPx = 64.dp.toPx(), showBanner = false, gapPx = colors.wordGap.toPx(),
+                        lineGapPx = colors.lineGap.toPx(), showPinyin = true, hidePinyinFor = null,
+                        justify = colors.justify, indent = colors.indent
+                    )
+                }
+                val small = ChapterContent(0, "雨夜", chapter.blocks.take(1), 0, 0)
+                val t = small.blocks.first() as ReaderBlock.Text
+                result = Paginator.paginate(small, metrics, pageSpec) { null } to t.tokens.count { it.kind != com.hanreader.app.zh.TokenKind.SPACE }
+            }
+        }
+        compose.waitUntil(20_000) { result != null }
+        val (pages, tokens) = result!!
+        val lines = pages.sumOf { p -> p.items.filterIsInstance<PageItem.Lines>().sumOf { it.lines.count() } }
+        // Closing punctuation hangs on the previous line, so at most one line per token.
+        assertTrue("$lines lines for $tokens tokens", lines in 1..tokens)
+    }
+
     @Test
     fun twoPagesSideBySide() {
         val a = Appearance()
