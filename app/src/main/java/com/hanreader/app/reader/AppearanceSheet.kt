@@ -196,11 +196,12 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
             Section(if (chinese) "Шрифт иероглифов" else "Шрифт")
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val current = a.hanFontFor(spec)
-                HanFont.entries.forEach { f ->
-                    FontRow(f, selected = current == f) { AppearanceStore.update { it.copy(hanFont = f) } }
+                // Chinese faces for Chinese, book faces for Latin letters (Spanish); each language keeps its choice.
+                HanFont.offered(chinese).forEach { f ->
+                    FontRow(f, selected = current == f) { AppearanceStore.update { if (chinese) it.copy(hanFont = f) else it.copy(latinFont = f) } }
                 }
-                if (a.hanFont != null) {
-                    TextButton(onClick = { AppearanceStore.update { it.copy(hanFont = null) } }) { Text("Шрифт по теме") }
+                if ((if (chinese) a.hanFont else a.latinFont) != null) {
+                    TextButton(onClick = { AppearanceStore.update { if (chinese) it.copy(hanFont = null) else it.copy(latinFont = null) } }) { Text("Шрифт по теме") }
                 }
             }
 
@@ -268,8 +269,8 @@ private fun ThemeCard(theme: ReaderTheme, selected: Boolean, onClick: () -> Unit
         modifier = Modifier.width(112.dp).height(118.dp)
     ) {
         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("hàn", color = s.pinyin, fontFamily = s.pinyinFont, fontSize = 11.sp)
-            Text("汉字", color = s.text, fontFamily = s.defaultHanFont.family, fontSize = 24.sp)
+            Text(if (chinese) "hàn" else " ", color = s.pinyin, fontFamily = s.pinyinFont, fontSize = 11.sp)
+            Text(if (chinese) "汉字" else "Aa", color = s.text, fontFamily = (if (chinese) s.defaultHanFont else s.defaultLatinFont).family, fontSize = 24.sp)
             Box(Modifier.width(28.dp).height(3.dp).background(s.accent))
             Spacer(Modifier.weight(1f))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -290,7 +291,7 @@ private fun FontRow(font: HanFont, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(font.sample, fontFamily = font.family, fontSize = 24.sp, modifier = Modifier.widthIn(min = 112.dp))
+        Text(font.sampleFor(chinese), fontFamily = font.family, fontSize = 24.sp, modifier = Modifier.widthIn(min = 112.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(font.title, style = MaterialTheme.typography.bodyLarge)

@@ -41,15 +41,32 @@ object AppFonts {
         Font(R.font.cormorant_italic, FontWeight.Medium, FontStyle.Italic, variationSettings = FontVariation.Settings(FontVariation.weight(500)))
     )
     val Inter: FontFamily = variable(R.font.inter, FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold)
+    /** Book faces for languages written in Latin letters (Spanish). */
+    val Literata: FontFamily = variable(R.font.literata, FontWeight.Normal, FontWeight.SemiBold)
+    val Lora: FontFamily = variable(R.font.lora, FontWeight.Normal, FontWeight.SemiBold)
 }
 
-/** The four classic styles of Chinese type, plus the phone's own font. */
-enum class HanFont(val title: String, val style: String, val sample: String) {
+/**
+ * The text faces: the four classic styles of Chinese type, book faces for Latin letters
+ * ([latin], for Spanish), and the phone's own font (both).
+ */
+enum class HanFont(val title: String, val style: String, val sample: String, val latin: Boolean = false) {
     SERIF("Noto Serif SC", "宋体 · антиква", "雨夜的灯"),
     SANS("Noto Sans SC", "黑体 · гротеск", "雨夜的灯"),
     KAI("LXGW WenKai", "楷体 · кай", "雨夜的灯"),
     FANGSONG("Zhuque Fangsong", "仿宋 · фансун", "雨夜的灯"),
+    LITERATA("Literata", "антиква для чтения", "La lluvia", latin = true),
+    LORA("Lora", "мягкая антиква", "La lluvia", latin = true),
+    INTER("Inter", "гротеск", "La lluvia", latin = true),
     SYSTEM("Системный", "как в телефоне", "雨夜的灯");
+
+    /** The sample in the language being read. */
+    fun sampleFor(chinese: Boolean): String = if (chinese) sample else "La lluvia"
+
+    /** Faces offered for the language being read. */
+    companion object {
+        fun offered(chinese: Boolean): List<HanFont> = entries.filter { it == SYSTEM || it.latin != chinese }
+    }
 
     val family: FontFamily
         get() = when (this) {
@@ -57,6 +74,9 @@ enum class HanFont(val title: String, val style: String, val sample: String) {
             SANS -> AppFonts.NotoSansSc
             KAI -> AppFonts.WenKai
             FANGSONG -> AppFonts.Fangsong
+            LITERATA -> AppFonts.Literata
+            LORA -> AppFonts.Lora
+            INTER -> AppFonts.Inter
             SYSTEM -> FontFamily.Default
         }
 }
@@ -92,7 +112,9 @@ data class ThemeSpec(
     /** Pinyin size correction for fonts with a small x-height (Cormorant). */
     val pinyinBoost: Float = 1f,
     val corner: Dp,
-    val defaultHanFont: HanFont
+    val defaultHanFont: HanFont,
+    /** The theme's face for Latin-letter languages: a serif book face, or the grotesque for a sans theme. */
+    val defaultLatinFont: HanFont = if (defaultHanFont == HanFont.SANS) HanFont.INTER else HanFont.LITERATA
 )
 
 enum class ReaderTheme(val title: String, val note: String) {
@@ -208,6 +230,8 @@ data class Appearance(
     val theme: ReaderTheme = ReaderTheme.AUTO,
     /** null: the theme's own default font. */
     val hanFont: HanFont? = null,
+    /** The face for a Latin-letter language (Spanish), kept apart from the Chinese one; null: the theme's. */
+    val latinFont: HanFont? = null,
     val fontSize: Int = 22,
     /** Extra space between lines, as a share of the character height. */
     val lineSpacing: Float = 0.35f,
@@ -235,7 +259,9 @@ data class Appearance(
     /** The translation over a word fades after its first [GLOSS_REPEATS] appearances in a chapter. */
     val glossFade: Boolean = true
 ) {
-    fun hanFontFor(spec: ThemeSpec): HanFont = hanFont ?: spec.defaultHanFont
+    fun hanFontFor(spec: ThemeSpec): HanFont =
+        if (com.hanreader.app.lang.Languages.current.readingTitle != null) hanFont?.takeIf { !it.latin } ?: spec.defaultHanFont
+        else latinFont ?: spec.defaultLatinFont
 
     companion object {
         val FONT_SIZES = 16..34
@@ -263,6 +289,7 @@ object AppearanceStore {
         state.value = Appearance(
             theme = ReaderTheme.entries.firstOrNull { it.name == p.getString("theme", null) } ?: d.theme,
             hanFont = HanFont.entries.firstOrNull { it.name == p.getString("hanFont", null) },
+            latinFont = HanFont.entries.firstOrNull { it.name == p.getString("latinFont", null) },
             fontSize = p.getInt("fontSize", d.fontSize).coerceIn(Appearance.FONT_SIZES),
             lineSpacing = p.getFloat("lineSpacing", d.lineSpacing).coerceIn(Appearance.LINE_SPACING),
             paragraphSpacing = p.getInt("paragraphSpacing", d.paragraphSpacing).coerceIn(Appearance.PARAGRAPH_SPACING),
@@ -293,6 +320,7 @@ object AppearanceStore {
         appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.edit()?.apply {
             putString("theme", next.theme.name)
             if (next.hanFont == null) remove("hanFont") else putString("hanFont", next.hanFont.name)
+            if (next.latinFont == null) remove("latinFont") else putString("latinFont", next.latinFont.name)
             putInt("fontSize", next.fontSize)
             putFloat("lineSpacing", next.lineSpacing)
             putInt("paragraphSpacing", next.paragraphSpacing)
