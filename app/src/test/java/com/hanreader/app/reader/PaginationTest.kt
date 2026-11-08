@@ -158,6 +158,42 @@ class PaginationTest {
         }
     }
 
+    /**
+     * A page lower than one line (huge font with pinyin and translations in a split-screen window):
+     * every line still gets a page, no endless loop.
+     */
+    @Test
+    fun pageLowerThanALine() {
+        val a = Appearance(fontSize = Appearance.FONT_SIZES.last, lineSpacing = Appearance.LINE_SPACING.endInclusive)
+        val spec = ReaderTheme.CLASSIC.spec
+        var result by mutableStateOf<Pair<List<Page>, Int>?>(null)
+        compose.setContent {
+            val metrics = rememberRubyMetrics(rememberTextMeasurer(cacheSize = 0), a, spec, spec.defaultHanFont.family)
+            val colors = rubyColors(a, spec)
+            val d = LocalDensity.current
+            LaunchedEffect(Unit) {
+                val pageSpec = with(d) {
+                    PageSpec(
+                        widthPx = 300.dp.toPx(), heightPx = 40.dp.toPx(), paragraphSpacingPx = a.paragraphSpacing.dp.toPx(),
+                        bannerHeightPx = 64.dp.toPx(), showBanner = true, gapPx = colors.wordGap.toPx(),
+                        lineGapPx = colors.lineGap.toPx(), showPinyin = true, hidePinyinFor = null,
+                        justify = colors.justify, indent = colors.indent, glossFor = mapOf("雨" to "дождь")
+                    )
+                }
+                val small = ChapterContent(0, "雨夜", chapter.blocks.take(2), 0, 0)
+                val lines = small.blocks.sumOf { b ->
+                    val t = b as ReaderBlock.Text
+                    layout(t.tokens, pageSpec.widthPx, metrics, false, true, null, pageSpec.gapPx, pageSpec.lineGapPx, pageSpec.justify, pageSpec.indent, pageSpec.glossFor).lineCount
+                }
+                result = Paginator.paginate(small, metrics, pageSpec) { null } to lines
+            }
+        }
+        compose.waitUntil(20_000) { result != null }
+        val (pages, lines) = result!!
+        val shown = pages.sumOf { p -> p.items.filterIsInstance<PageItem.Lines>().sumOf { it.lines.count() } }
+        assertEquals("every line on some page", lines, shown)
+    }
+
     @Test
     fun twoPagesSideBySide() {
         val a = Appearance()

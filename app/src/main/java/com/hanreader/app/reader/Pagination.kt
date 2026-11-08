@@ -93,10 +93,15 @@ object Paginator {
                     var line = 0
                     while (line < laid.lineCount) {
                         val gap = if (items.isEmpty() || line > 0) 0f else spec.paragraphSpacingPx
-                        val room = ((spec.heightPx - y - gap) / laid.lineHeight).toInt()
+                        var room = ((spec.heightPx - y - gap) / laid.lineHeight).toInt()
                         if (room <= 0) {
-                            flush()
-                            continue
+                            if (items.isNotEmpty()) {
+                                flush()
+                                continue
+                            }
+                            // A line taller than the whole page (huge font in a small window): it gets a page
+                            // of its own, cut at the bottom. Flushing an empty page again would never end.
+                            room = 1
                         }
                         val take = minOf(room, laid.lineCount - line)
                         if (items.isEmpty()) { first = i; firstChar = if (line == 0) 0 else lineStart[line].takeIf { it != Int.MAX_VALUE } ?: 0 }
