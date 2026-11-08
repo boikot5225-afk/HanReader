@@ -5,6 +5,7 @@ import com.hanreader.app.reader.ChapterBuilder
 import com.hanreader.app.reader.ReaderBlock
 import com.hanreader.app.reader.ZhEngine
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Readings of standalone polyphones in context; sentences written for the test. */
@@ -42,5 +43,26 @@ class PolyphonesTest {
         val block = ChapterBuilder.build(TxtBook("这个地方很好，我得到了一本书。".toByteArray(), "x"), 0, engine).blocks.first() as ReaderBlock.Text
         assertEquals("dìfāng", block.tokens.first { it.text == "地方" }.pinyin.lowercase())
         assertEquals("dédào", block.tokens.first { it.text == "得到" }.pinyin.lowercase())
+    }
+
+    /**
+     * The sentence set in src/test/resources/polyphones.tsv: every listed token reads as expected.
+     * All mismatches are reported together, with the sentence's segmentation.
+     */
+    @Test
+    fun sentenceSet() {
+        val lines = javaClass.classLoader!!.getResourceAsStream("polyphones.tsv")!!.bufferedReader().readLines()
+            .filter { it.isNotBlank() && !it.startsWith("#") }
+        assertTrue(lines.size >= 50)
+        val failures = ArrayList<String>()
+        for (line in lines) {
+            val (sentence, token, expected) = line.split("\t")
+            val block = ChapterBuilder.build(TxtBook(sentence.toByteArray(), "x"), 0, engine).blocks.first() as ReaderBlock.Text
+            val got = block.tokens.filter { it.text == token }.map { it.pinyin.lowercase() }
+            if (got != expected.split(" ")) {
+                failures += "$sentence  $token: expected $expected, got $got  [${block.tokens.joinToString("|") { it.text }}]"
+            }
+        }
+        assertTrue(failures.joinToString("\n", "\n"), failures.isEmpty())
     }
 }

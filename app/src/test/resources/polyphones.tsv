@@ -1,0 +1,84 @@
+# Readings of polyphones in context: sentence \t token \t expected pinyin of every such token, in order (" " between them).
+# Sentences written for the test. A token is a single character standing alone or a whole dictionary word.
+# 地 得
+他慢慢地走过来。	地	de
+她不耐烦地问。	地	de
+他坐在地上。	地上	dìshàng
+魁地奇比赛开始了。	地	dì
+他说得很快。	得	de
+我得走了。	得	děi
+# 长 只 还
+她的头发很长。	长	cháng
+他长得很高。	长	zhǎng
+那只猫在睡觉。	只	zhī
+我只想睡觉。	只	zhǐ
+明天还钱。	还	huán
+他还在家。	还	hái
+# 行
+他写了两行字。	两行	liǎngháng
+这行字看不清。	行	háng
+那行，就这么办。	行	xíng
+我们银行见。	银行	yínháng
+他在山里行走。	行走	xíngzǒu
+# 重
+这个箱子很重。	重	zhòng
+你重写一遍。	重写	chóngxiě
+我们重来吧。	重	chóng
+两重山挡住了路。	两重	liǎngchóng
+这件事很重要。	重要	zhòngyào
+他去重庆了。	重庆	chóngqìng
+# 种
+他在院子里种树。	种树	zhòngshù
+我种了很多花。	种	zhòng
+这种人不多。	这种	zhèzhǒng
+各种颜色都有。	各种	gèzhǒng
+# 数
+你数一数有多少。	数一数	shǔyīshǔ
+他数了三遍。	数	shǔ
+# 教
+妈妈教我写字。	教	jiāo
+老师教他们唱歌。	教	jiāo
+# 觉
+我睡了一觉。	觉	jiào
+他睡个好觉。	觉	jiào
+# 空
+你明天有空吗？	有空	yǒukòng
+我没有空。	空	kòng
+房间是空的。	空	kōng
+# 干
+衣服晒干了。	晒干	shàigān
+他把水喝干了。	干	gān
+你在干什么？	干什么	gànshénme
+# 处
+我们处得很好。	处	chǔ
+到处都是人。	到处	dàochù
+# 倒
+他倒在床上。	倒	dǎo
+你倒是说话啊。	倒	dào
+# 背
+他背起书包就走。	背	bēi
+# 量
+护士给他量体温。	量体温	liángtǐwēn
+你量一量这张桌子。	量	liáng liáng
+# 假
+我们放了三天假。	假	jià
+这是假的。	假	jiǎ
+# 着 了
+他坐着看书。	着	zhe
+火点着了。	点着	diǎnzháo
+我吃不了这么多。	不了	bùliǎo
+我吃了饭。	了	le
+# 削 似 弹 系 盛 扇 担
+他削了一个苹果。	削	xiāo
+他似乎很累。	似乎	sìhū
+好似一场梦。	好似	hǎosì
+她会弹钢琴。	弹	tán
+你把鞋带系好。	系	jì
+妈妈给我盛饭。	盛饭	chéngfàn
+她扇了他一巴掌。	扇	shān
+他挑了两担水。	两担	liǎngdàn
+他猜着了。	着	zháo
+她似笑非笑。	似笑非笑	sìxiàofēixiào
+他在教育局工作。	教育局	jiàoyùjú
+他悄悄地走了。	悄悄地	qiāoqiāode
+羊在青草地上吃草。	青草地	qīngcǎodì

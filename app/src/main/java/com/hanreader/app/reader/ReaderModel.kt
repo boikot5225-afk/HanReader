@@ -410,15 +410,16 @@ object ChapterBuilder {
                     val tokens = segmented.mapIndexed { k, tok ->
                         // A standalone polyphone reads as its neighbours say (慢慢地 de, 很长 cháng).
                         val contextual = com.hanreader.app.zh.Polyphones.reading(segmented, k)
+                            ?: insideReading(engine, segmented, k)
                         RToken(
                             text = tok.text,
-                            pinyin = contextual ?: engine.pinyinOf(tok),
+                            pinyin = contextual?.replace(" ", "") ?: engine.pinyinOf(tok),
                             kind = tok.kind,
                             start = tok.start,
                             end = tok.end,
                             defined = tok.entry?.hasDefinition == true,
                             display = if (shown === simple) tok.text else shown.substring(tok.start, tok.end),
-                            syllables = contextual?.let { listOf(it) } ?: engine.syllablesOf(tok)
+                            syllables = contextual?.split(' ') ?: engine.syllablesOf(tok)
                         )
                     }
                     ReaderBlock.Text(simple, b.heading, tokens, shown)
@@ -432,6 +433,17 @@ object ChapterBuilder {
     private const val MAX_SENTENCE = 140
 
     /** The sentence around [start, end) in a paragraph, trimmed to a readable length. */
+    /**
+     * A combination without its own reading (两行, 数一数) whose characters the polyphone rules
+     * decide: its syllables joined by spaces, the dictionary's where no rule decides; else null.
+     */
+    private fun insideReading(engine: ZhEngine, tokens: List<com.hanreader.app.zh.ZhToken>, k: Int): String? {
+        val inside = com.hanreader.app.zh.Polyphones.readingsInside(tokens, k) ?: return null
+        val base = engine.syllablesOf(tokens[k])
+        if (base.size != inside.size) return null
+        return inside.indices.joinToString(" ") { inside[it] ?: base[it] }
+    }
+
     fun sentence(text: String, start: Int, end: Int): String {
         var s = start
         while (s > 0 && text[s - 1] !in SENTENCE_END) s--
