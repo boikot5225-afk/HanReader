@@ -18,3 +18,7 @@ distributed under CC BY-SA 4.0 as a derivative of Wiktionary.
 Edited meanings (source "r"): for the most frequent words, the Russian meanings (Wiktionary or machine
 translation) reordered by use and given a main meaning by the DeepSeek API (tools/refine_es_ru.py,
 data/es/ru_refined.jsonl); distributed under CC BY-SA 4.0.
+
+Regional and style labels (where a sense is used): from the English Wiktionary sense tags; the Russian
+senses of words with such senses were labelled and reordered by the DeepSeek API
+(tools/refine_es_ru.py --regional, data/es/ru_regional.jsonl); distributed under CC BY-SA 4.0.
