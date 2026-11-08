@@ -20,6 +20,13 @@ object BookLanguages {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(bookId.toString(), tag).apply()
     }
 
+    /** After restoring a backup: exactly these languages (book id -> tag); other books are Chinese. */
+    fun replaceAll(context: Context, languages: Map<Long, String>) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply {
+            languages.forEach { (id, tag) -> putString(id.toString(), tag) }
+        }.apply()
+    }
+
     fun remove(context: Context, bookId: Long) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(bookId.toString()).apply()
     }

@@ -71,6 +71,14 @@ class BackupFormatTest {
         assertThrows(BackupFormatException::class.java) { BackupFormat.decode(json) }
     }
 
+    @Test fun keepsBookLanguages() {
+        val zh = BookEntity(id = 3, title = "雨夜", author = "", fileName = "book-1.txt", chapterCount = 1)
+        val es = BookEntity(id = 4, title = "El narco", author = "", fileName = "book-2.epub", chapterCount = 1)
+        val lib = LibraryBackup(listOf(zh, es), emptyList(), emptyList(), emptyList(), languages = mapOf(4L to "es-ES"))
+        val back = BackupFormat.decode(BackupFormat.encode(Backup(1L, listOf(card), examples, settings, library = lib)))
+        assertEquals(mapOf(4L to "es-ES"), back.library!!.languages)
+    }
+
     @Test fun keepsOwnMeanings() {
         val json = BackupFormat.encode(Backup(1L, listOf(card), examples, settings, userMeanings = listOf(UserMeaning("端", "держать в руках", 7))))
         assertEquals(listOf(UserMeaning("端", "держать в руках", 7)), BackupFormat.decode(json).userMeanings)

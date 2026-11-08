@@ -35,7 +35,9 @@ data class LibraryBackup(
     val highlights: List<Highlight>,
     val ignored: List<BookWord>,
     /** Known-word share of each book by day. */
-    val progress: List<BookProgress> = emptyList()
+    val progress: List<BookProgress> = emptyList(),
+    /** Language of each book (book id -> tag) other than Chinese; a book missing here is Chinese. */
+    val languages: Map<Long, String> = emptyMap()
 )
 
 class BackupFormatException(message: String) : Exception(message)
@@ -127,6 +129,7 @@ object BackupFormat {
                             put("id", b.id); put("title", b.title); put("author", b.author); put("fileName", b.fileName)
                             put("chapterCount", b.chapterCount); put("addedAt", b.addedAt); put("lastOpenedAt", b.lastOpenedAt)
                             put("chapterIndex", b.chapterIndex); put("blockIndex", b.blockIndex); put("charOffset", b.charOffset)
+                            lib.languages[b.id]?.let { put("language", it) }
                         })
                     }
                 })
@@ -289,6 +292,10 @@ object BackupFormat {
                 charOffset = b.optInt("charOffset", 0)
             )
         }
+        val languages = (0 until booksJson.length()).mapNotNull { i ->
+            val b = booksJson.getJSONObject(i)
+            b.optString("language", "").takeIf { it.isNotEmpty() }?.let { b.getLong("id") to it }
+        }.toMap()
         val ids = HashSet<Long>()
         val names = HashSet<String>()
         books.forEach { b ->
@@ -323,7 +330,7 @@ object BackupFormat {
             val r = prJson.getJSONObject(i)
             BookProgress(r.getLong("bookId"), r.getInt("day"), r.optInt("percent", 0).coerceIn(0, 100))
         }.filter { it.bookId in ids }.distinctBy { it.bookId to it.day }
-        return LibraryBackup(books, bookmarks, highlights, ignored, progress)
+        return LibraryBackup(books, bookmarks, highlights, ignored, progress, languages)
     }
 
     /** A plain file name: no folders, nothing that could leave the books folder. */

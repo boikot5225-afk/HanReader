@@ -137,7 +137,9 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         bookmarks = db.bookmarkDao().all(),
                         highlights = db.highlightDao().all(),
                         ignored = db.bookDao().allIgnored(),
-                        progress = db.statsDao().allProgress()
+                        progress = db.statsDao().allProgress(),
+                        languages = db.bookDao().all().associate { it.id to com.hanreader.app.lang.BookLanguages.of(getApplication(), it.id) }
+                            .filterValues { it != com.hanreader.app.lang.Languages.CHINESE.tag }
                     ),
                     userMeanings = db.userMeaningDao().all(),
                     userSplits = db.userSplitDao().all().map { it.word },
@@ -195,6 +197,8 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         lib.ignored.chunked(2_000).forEach { books.insertWords(it) }
                         db.statsDao().putProgressAll(lib.progress)
                     }
+                    // The language of each restored book (Chinese when the copy says nothing).
+                    backup.library?.let { lib -> com.hanreader.app.lang.BookLanguages.replaceAll(getApplication(), lib.languages) }
                     backup.userSplits?.let { list ->
                         db.userSplitDao().removeAll()
                         db.userSplitDao().putAll(list.map { com.hanreader.app.UserSplit(it) })
