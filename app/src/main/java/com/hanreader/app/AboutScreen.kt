@@ -158,7 +158,7 @@ fun AboutDialog(onClose: () -> Unit) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("汉读 HanReader $version", style = MaterialTheme.typography.headlineSmall, fontFamily = WordFont)
                 Text(
-                    "Читалка китайских книг с пиньинем, словарём и карточками. Работает без интернета и не собирает личные данные.",
+                    (if (com.hanreader.app.lang.Languages.current.readingTitle != null) "Читалка китайских книг с пиньинем, словарём и карточками." else "Читалка книг со словарём и карточками: китайский и (на пробу) испанский.") + " Работает без интернета и не собирает личные данные.",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Overline("Связь с разработчиком", Modifier.padding(top = 4.dp))

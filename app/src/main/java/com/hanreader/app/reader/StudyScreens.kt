@@ -272,7 +272,8 @@ fun BookStatsScreen(vm: ReaderViewModel, bookId: Long, onClose: () -> Unit) {
                     }
                 }
             }
-            item {
+            // Difficulty by word levels: only for a language that has them (Chinese, HSK).
+            if (s.levels.isNotEmpty()) item {
                 Panel(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Overline("Сложность относительно HSK 3.0")

@@ -148,7 +148,7 @@ private fun Search(vm: ReaderViewModel, onHit: (SearchHit) -> Unit) {
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Иероглифы или пиньинь без тонов") },
+            label = { Text(if (com.hanreader.app.lang.Languages.current.readingTitle != null) "Иероглифы или пиньинь без тонов" else "Слово или фраза") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { vm.search(query) }),

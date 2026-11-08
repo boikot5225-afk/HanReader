@@ -74,6 +74,19 @@ private val SAMPLE = ReaderBlock.Text(
     )
 )
 
+/** The same evening in Spanish, for a language written with spaces. */
+private val SAMPLE_SPACED: ReaderBlock.Text by lazy {
+    val text = "Aquella noche no dejó de llover. La farola daba poca luz, y él esperaba en la puerta a alguien que no iba a venir."
+    val tokens = Regex("\\p{L}+|\\s+|[^\\p{L}\\s]").findAll(text).map { m ->
+        val kind = when { m.value[0].isLetter() -> TokenKind.HAN; m.value[0].isWhitespace() -> TokenKind.SPACE; else -> TokenKind.PUNCT }
+        RToken(m.value, "", kind, m.range.first, m.range.last + 1, kind == TokenKind.HAN)
+    }.toList()
+    ReaderBlock.Text(text, heading = false, tokens = tokens)
+}
+
+/** Chinese settings (pinyin, tones, characters) are shown only when reading Chinese. */
+private val chinese: Boolean get() = com.hanreader.app.lang.Languages.current.readingTitle != null
+
 private fun t(w: String, at: Int, pinyin: String = "") = RToken(w, pinyin, TokenKind.HAN, at, at + w.length, true)
 private fun p(w: String, at: Int) = RToken(w, "", TokenKind.PUNCT, at, at + w.length, false)
 
@@ -100,7 +113,7 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
                     .padding(horizontal = a.margin.coerceAtMost(28).dp, vertical = 14.dp)
             ) {
                 RubyParagraph(
-                    SAMPLE, metrics, showPinyin = true, hidePinyinFor = null, saved = setOf("门口"),
+                    if (chinese) SAMPLE else SAMPLE_SPACED, metrics, showPinyin = chinese, hidePinyinFor = null, saved = setOf("门口", "puerta"),
                     selection = null, colors = rubyColors(a, spec), onTap = {}
                 )
             }
@@ -144,18 +157,18 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
             if (a.gloss != GlossMode.OFF) {
                 SwitchRow("Убирать перевод после ${Appearance.GLOSS_REPEATS} встреч в главе", a.glossFade) { on -> AppearanceStore.update { it.copy(glossFade = on) } }
                 Text(
-                    "Первое значение из словаря, мелко над пиньинем. В контексте значение может быть другим — полный перевод по нажатию на слово.",
+                    (if (chinese) "Первое значение из словаря, мелко над пиньинем." else "Первое значение из словаря, мелко над словом.") + " В контексте значение может быть другим — полный перевод по нажатию на слово.",
                     style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
                 )
             }
 
-            Text("Цвет тонов", style = MaterialTheme.typography.bodyLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            if (chinese) Text("Цвет тонов", style = MaterialTheme.typography.bodyLarge)
+            if (chinese) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 ToneColors.entries.forEach { m ->
                     FilterChip(selected = a.tones == m, onClick = { AppearanceStore.update { it.copy(tones = m) } }, label = { Text(m.title) })
                 }
             }
-            if (a.tones != ToneColors.OFF) {
+            if (chinese && a.tones != ToneColors.OFF) {
                 val pal = if (spec.dark) Tones.DARK else Tones.LIGHT
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     listOf("1 mā", "2 má", "3 mǎ", "4 mà", "· ma").forEachIndexed { i, t ->
@@ -164,13 +177,13 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
                 }
             }
 
-            Text("Иероглифы", style = MaterialTheme.typography.bodyLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            if (chinese) Text("Иероглифы", style = MaterialTheme.typography.bodyLarge)
+            if (chinese) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 ScriptMode.entries.forEach { m ->
                     FilterChip(selected = a.script == m, onClick = { AppearanceStore.update { it.copy(script = m) } }, label = { Text(m.title) })
                 }
             }
-            Text(
+            if (chinese) Text(
                 "Книгу в традиционных иероглифах словарь понимает всегда; здесь — как их показывать.",
                 style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
             )
@@ -180,7 +193,7 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
                 items(ReaderTheme.entries) { theme -> ThemeCard(theme, selected = a.theme == theme) { AppearanceStore.update { it.copy(theme = theme) } } }
             }
 
-            Section("Шрифт иероглифов")
+            Section(if (chinese) "Шрифт иероглифов" else "Шрифт")
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val current = a.hanFontFor(spec)
                 HanFont.entries.forEach { f ->
@@ -205,7 +218,7 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
                 a.margin.toFloat(), Appearance.MARGINS.first.toFloat()..Appearance.MARGINS.last.toFloat()) { v ->
                 AppearanceStore.update { it.copy(margin = v.roundToInt()) }
             }
-            LabeledSlider("Размер пиньиня", String.format(Locale.ROOT, "%.0f%%", a.pinyinScale * 100),
+            if (chinese) LabeledSlider("Размер пиньиня", String.format(Locale.ROOT, "%.0f%%", a.pinyinScale * 100),
                 a.pinyinScale, Appearance.PINYIN_SCALE) { v -> AppearanceStore.update { it.copy(pinyinScale = (v * 50).roundToInt() / 50f) } }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

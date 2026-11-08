@@ -79,7 +79,7 @@ fun PasteTextDialog(initial: String, busy: Boolean, error: String?, onDismiss: (
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(18.dp)
                 ) { Text(if (busy) "Сохраняю…" else "Читать") }
                 Text(
-                    "Текст сохранится в библиотеке как книга: пиньинь, перевод по нажатию, карточки и место чтения — всё как в книгах.",
+                    "Текст сохранится в библиотеке как книга: " + (if (com.hanreader.app.lang.Languages.current.readingTitle != null) "пиньинь, " else "") + "перевод по нажатию, карточки и место чтения — всё как в книгах.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
