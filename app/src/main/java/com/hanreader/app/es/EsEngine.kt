@@ -355,10 +355,31 @@ class EsEngine(
             return EsEngine(d, f, g, (System.nanoTime() - t) / 1_000_000)
         }
 
+        /**
+         * A dictionary file copied once from the APK (compressed there) into app storage, with its
+         * line index, then mapped into memory: later starts read nothing. A new install or update
+         * makes a fresh copy.
+         */
+        private fun mapped(app: Context, name: String): SortedTsv {
+            val stamp = runCatching { app.packageManager.getPackageInfo(app.packageName, 0).lastUpdateTime }.getOrDefault(0L)
+            val dir = java.io.File(app.filesDir, "es-$stamp")
+            if (!dir.isDirectory) {
+                app.filesDir.listFiles()?.filter { it.name.startsWith("es-") }?.forEach { it.deleteRecursively() }
+                dir.mkdirs()
+            }
+            val file = java.io.File(dir, name)
+            if (!file.isFile || file.length() == 0L) {
+                val tmp = java.io.File(dir, "$name.tmp")
+                app.assets.open("es/$name").use { src -> tmp.outputStream().use { src.copyTo(it, 1 shl 16) } }
+                tmp.renameTo(file)
+            }
+            return SortedTsv.map(file, java.io.File(dir, "$name.idx"))
+        }
+
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         @Volatile private var loading: CompletableDeferred<EsEngine>? = null
 
-        /** Loads the dictionary once per process in the background (about 18 MB of text). */
+        /** Loads the dictionary once per process in the background (mapped from app storage). */
         fun warmUp(context: Context): CompletableDeferred<EsEngine> {
             loading?.let { return it }
             synchronized(this) {
@@ -368,7 +389,11 @@ class EsEngine(
                 val app = context.applicationContext
                 scope.launch {
                     runCatching {
-                        load(app.assets.open("es/dict.tsv"), app.assets.open("es/forms.tsv"), app.assets.open("es/grammar.tsv"))
+                        val t = System.nanoTime()
+                        val dict = mapped(app, "dict.tsv")
+                        val forms = mapped(app, "forms.tsv")
+                        val grammar = app.assets.open("es/grammar.tsv").bufferedReader().use { it.readLines() }
+                        EsEngine(dict, forms, grammar, (System.nanoTime() - t) / 1_000_000)
                     }.fold({ d.complete(it) }, { d.completeExceptionally(it) })
                 }
                 return d
