@@ -35,7 +35,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
-const val STUDY_LANGUAGE = "zh-CN"
+/** The language this build reads (cards, speech): see [com.hanreader.app.lang.Languages]. */
+val STUDY_LANGUAGE: String get() = com.hanreader.app.lang.Languages.current.tag
 
 /** Which words get pinyin: all, only words not yet known, or none. */
 enum class PinyinMode(val title: String) {

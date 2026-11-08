@@ -11,7 +11,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.hanreader.app.zh.TokenKind
-import java.util.Locale
 
 /** A sentence to read aloud: characters [start, end) of paragraph [block] in chapter [chapter]. */
 data class Spoken(val chapter: Int, val block: Int, val start: Int, val end: Int, val text: String)
@@ -173,9 +172,9 @@ class ReadAloud(context: Context) : TextToSpeech.OnInitListener {
         word = null
         val engine = tts ?: return
         if (!ready) { pendingSpeak = true; return }
-        val lang = engine.setLanguage(Locale.SIMPLIFIED_CHINESE)
+        val lang = engine.setLanguage(com.hanreader.app.lang.Languages.current.locale)
         if (lang == TextToSpeech.LANG_MISSING_DATA || lang == TextToSpeech.LANG_NOT_SUPPORTED) {
-            message = "Нет китайского голоса. Установи его: Настройки Android → Синтез речи"
+            message = com.hanreader.app.lang.Languages.current.voiceMissing
             pause()
             return
         }

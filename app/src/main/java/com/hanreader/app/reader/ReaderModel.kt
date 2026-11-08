@@ -12,6 +12,11 @@ import com.hanreader.app.zh.ZhEntry
 import com.hanreader.app.zh.ZhSegmenter
 import com.hanreader.app.zh.ZhToken
 import com.hanreader.app.zh.isHan
+import com.hanreader.app.lang.LanguageInfo
+import com.hanreader.app.lang.LanguageModule
+import com.hanreader.app.lang.Languages
+import com.hanreader.app.lang.PreparedText
+import com.hanreader.app.lang.TextOptions
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,7 +67,7 @@ class HskLevels(private val levels: Map<String, Int>) {
     }
 }
 
-/** Dictionary + segmenter, loaded once per process in the background. */
+/** The Chinese language module: dictionary + segmenter, loaded once per process in the background. */
 class ZhEngine(
     val dictionary: ZhDictionary,
     val loadMs: Long,
@@ -77,7 +82,9 @@ class ZhEngine(
     val script: ZhScript = ZhScript.NONE,
     /** Single characters by reading (assets/zh/ru_chars.tsv): 得 -> [dé: получить…, de: частица…], most frequent first. */
     private val russianChars: Map<String, List<Pair<String, String>>> = emptyMap()
-) {
+) : LanguageModule {
+    override val info: LanguageInfo get() = Languages.CHINESE
+
     enum class NameKind(val title: String) { PERSON("человек"), PLACE("место"), ORGANISATION("организация") }
 
     /** Kind of a proper name from the names lexicon, or null for an ordinary word. */
@@ -205,13 +212,13 @@ class ZhEngine(
      * A few words to write above an unknown word: the first Russian sense (first part, without
      * remarks in brackets or subject labels), else the first English sense; null if none.
      */
-    fun glossShort(word: String, reading: String? = null): String? = firstSense(word, reading) ?: composedGloss(word)
+    override fun glossShort(word: String, reading: String?): String? = firstSense(word, reading) ?: composedGloss(word)
 
     /**
      * The meaning stored on a flash card: Russian when available (first two senses), otherwise
      * the short English CC-CEDICT gloss, otherwise null.
      */
-    fun cardTranslation(word: String, reading: String? = null): String? {
+    override fun cardTranslation(word: String, reading: String?): String? {
         val ru = russianSenses(word, reading)
         if (ru.isNotEmpty()) return ru.take(2).joinToString("; ")
         return dictionary.lookup(word)?.takeIf { it.hasDefinition }?.shortGloss() ?: composedGloss(word)
@@ -219,6 +226,38 @@ class ZhEngine(
 
 
     val segmenter = ZhSegmenter(dictionary)
+
+    /**
+     * A chapter in traditional script is segmented and looked up in simplified form (the
+     * dictionary's), every conversion keeping offsets; [TextOptions.script] picks what is drawn.
+     */
+    override fun chapter(paragraphs: List<String>, options: TextOptions): (String) -> PreparedText {
+        val traditional = script.looksTraditional(paragraphs)
+        return { raw ->
+            val simple = if (traditional) script.toSimplified(raw) else raw
+            val shown = when (options.script) {
+                ScriptMode.AS_BOOK -> raw
+                ScriptMode.SIMPLIFIED -> simple
+                ScriptMode.TRADITIONAL -> if (traditional) raw else script.toTraditional(simple)
+            }.takeIf { it.length == simple.length } ?: simple
+            val segmented = segmenter.segment(simple, options.extra, options.blocked)
+            val tokens = segmented.mapIndexed { k, tok ->
+                // A standalone polyphone reads as its neighbours say (慢慢地 de, 很长 cháng).
+                val contextual = com.hanreader.app.zh.Polyphones.reading(segmented, k)
+                RToken(
+                    text = tok.text,
+                    pinyin = contextual ?: pinyinOf(tok),
+                    kind = tok.kind,
+                    start = tok.start,
+                    end = tok.end,
+                    defined = tok.entry?.hasDefinition == true,
+                    display = if (shown === simple) tok.text else shown.substring(tok.start, tok.end),
+                    syllables = contextual?.let { listOf(it) } ?: syllablesOf(tok)
+                )
+            }
+            PreparedText(simple, shown, tokens)
+        }
+    }
 
     /** Word pinyin without spaces ("Zhōngguó"); for words without a CEDICT entry, built from characters. */
     fun pinyinOf(token: ZhToken): String {
@@ -379,13 +418,13 @@ data class ChapterContent(
 
 object ChapterBuilder {
     /**
-     * [script]: the characters to draw. A chapter in traditional script is segmented and looked up
-     * in simplified form (the dictionary's), every conversion keeping offsets.
+     * Builds a chapter through the language module ([engine]): it splits each paragraph into words
+     * and writes the line above them. [script]: Chinese only, the characters to draw.
      */
     fun build(
         book: BookSource,
         index: Int,
-        engine: ZhEngine,
+        engine: LanguageModule,
         extra: Set<String> = emptySet(),
         script: ScriptMode = ScriptMode.AS_BOOK,
         /** Words the reader split: never kept whole. */
@@ -394,41 +433,21 @@ object ChapterBuilder {
         val t = System.nanoTime()
         var chars = 0
         val source = book.blocks(index)
-        val traditional = engine.script.looksTraditional(source.mapNotNull { (it as? EpubBlock.Text)?.text })
+        val prepare = engine.chapter(source.mapNotNull { (it as? EpubBlock.Text)?.text }, TextOptions(extra, blocked, script))
         val blocks = source.map { b ->
             when (b) {
                 is EpubBlock.Image -> ReaderBlock.Image(b.path)
                 is EpubBlock.Text -> {
                     chars += b.text.length
-                    val simple = if (traditional) engine.script.toSimplified(b.text) else b.text
-                    val shown = when (script) {
-                        ScriptMode.AS_BOOK -> b.text
-                        ScriptMode.SIMPLIFIED -> simple
-                        ScriptMode.TRADITIONAL -> if (traditional) b.text else engine.script.toTraditional(simple)
-                    }.takeIf { it.length == simple.length } ?: simple
-                    val segmented = engine.segmenter.segment(simple, extra, blocked)
-                    val tokens = segmented.mapIndexed { k, tok ->
-                        // A standalone polyphone reads as its neighbours say (慢慢地 de, 很长 cháng).
-                        val contextual = com.hanreader.app.zh.Polyphones.reading(segmented, k)
-                        RToken(
-                            text = tok.text,
-                            pinyin = contextual ?: engine.pinyinOf(tok),
-                            kind = tok.kind,
-                            start = tok.start,
-                            end = tok.end,
-                            defined = tok.entry?.hasDefinition == true,
-                            display = if (shown === simple) tok.text else shown.substring(tok.start, tok.end),
-                            syllables = contextual?.let { listOf(it) } ?: engine.syllablesOf(tok)
-                        )
-                    }
-                    ReaderBlock.Text(simple, b.heading, tokens, shown)
+                    val p = prepare(b.text)
+                    ReaderBlock.Text(p.text, b.heading, p.tokens, p.shown)
                 }
             }
         }
         return ChapterContent(index, book.chapters[index].title, blocks, (System.nanoTime() - t) / 1_000_000, chars)
     }
 
-    private const val SENTENCE_END = "。！？!?…；;\n"
+    private val SENTENCE_END = Languages.current.sentenceEnd
     private const val MAX_SENTENCE = 140
 
     /** The sentence around [start, end) in a paragraph, trimmed to a readable length. */
