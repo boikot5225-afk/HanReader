@@ -70,7 +70,7 @@ val BOOK_MIME_TYPES = arrayOf(
 )
 
 @Composable
-fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) -> Unit, onStats: (Long) -> Unit, onReadingStats: () -> Unit = {}) {
+fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) -> Unit, onStats: (Long) -> Unit, onReadingStats: () -> Unit = {}, onPaste: () -> Unit = {}) {
     val all by vm.library.collectAsState()
     val sort by vm.sort.collectAsState()
     val grid by vm.grid.collectAsState()
@@ -168,6 +168,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
                 }
             } else {
                 BigButton("Добавить книгу", onClick = { picker.launch(BOOK_MIME_TYPES) })
+                androidx.compose.material3.TextButton(onClick = onPaste, modifier = Modifier.fillMaxWidth()) { Text("Вставить текст") }
                 Text(
                     "EPUB, FB2, FB2.ZIP, TXT, DOCX, DOC",
                     Modifier.fillMaxWidth().padding(top = 6.dp),

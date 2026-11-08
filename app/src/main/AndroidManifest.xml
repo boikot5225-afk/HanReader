@@ -34,6 +34,18 @@
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
                 <data android:mimeType="application/octet-stream"/>
             </intent-filter>
+            <!-- «Поделиться» text (an article, a message): it opens as a text to read. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="text/plain"/>
+            </intent-filter>
+            <!-- «HanReader» in the text selection menu of other apps. -->
+            <intent-filter android:label="Читать в HanReader">
+                <action android:name="android.intent.action.PROCESS_TEXT"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="text/plain"/>
+            </intent-filter>
             <!-- «Поделиться» a book file. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND"/>

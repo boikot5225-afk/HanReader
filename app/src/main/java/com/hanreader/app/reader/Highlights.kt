@@ -270,8 +270,11 @@ internal fun openInTranslator(context: android.content.Context, text: String): B
     val process = android.content.Intent(android.content.Intent.ACTION_PROCESS_TEXT).setType("text/plain")
         .putExtra(android.content.Intent.EXTRA_PROCESS_TEXT, text)
         .putExtra(android.content.Intent.EXTRA_PROCESS_TEXT_READONLY, true)
-    val apps = context.packageManager.queryIntentActivities(process, 0)
+    // HanReader itself takes selected text too («Читать в HanReader»): leave it out of the choice.
+    val apps = context.packageManager.queryIntentActivities(process, 0).filter { it.activityInfo.packageName != context.packageName }
+    val own = android.content.ComponentName(context, com.hanreader.app.MainActivity::class.java)
     val intent = if (apps.isNotEmpty()) android.content.Intent.createChooser(process, "Перевести")
+        .putExtra(android.content.Intent.EXTRA_EXCLUDE_COMPONENTS, arrayOf(own))
         else android.content.Intent.createChooser(
             android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, text), "Перевести"
         )

@@ -225,42 +225,66 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     val temp = File(booksDir, "import-$stamp.tmp")
                     val input = app.contentResolver.openInputStream(uri) ?: error("Не удалось открыть файл")
                     input.use { src -> temp.outputStream().use { src.copyTo(it, 1 shl 16) } }
-                    val format = BookFiles.sniff(temp)
-                    if (format == null) {
-                        temp.delete()
-                        throw EpubException("Это не книга: поддерживаются EPUB, FB2, TXT, DOCX и DOC")
-                    }
-                    val name = "book-$stamp.${format.extension}"
-                    val target = File(booksDir, name)
-                    if (!temp.renameTo(target)) { temp.copyTo(target, overwrite = true); temp.delete() }
-                    try {
-                        BookFiles.open(target, format).use { book ->
-                            // A book with no text at all (an empty file, an EPUB without chapters) would have
-                            // nothing to open: refuse it here instead of failing on every opening.
-                            val hasText = book.chapters.asSequence().take(50).any { c ->
-                                book.blocks(c.index).any { it is com.hanreader.app.epub.EpubBlock.Text && it.text.isNotBlank() }
-                            }
-                            if (!hasText) throw EpubException("В книге не нашлось текста")
-                            val shown = displayName(uri)
-                            val plain = format == BookFormat.TXT || format == BookFormat.DOC
-                            val title = if (plain || book.title.startsWith("book-") || book.title.startsWith("import-")) shown ?: book.title else book.title
-                            val id = books.insert(
-                                BookEntity(
-                                    title = title.ifBlank { shown ?: "Без названия" },
-                                    author = book.author,
-                                    fileName = name,
-                                    chapterCount = book.chapters.size
-                                )
-                            )
-                            runCatching { saveCover(id, book) }
-                            id
-                        }
-                    } catch (e: Exception) {
-                        target.delete()
-                        throw e
-                    }
+                    importFile(temp, stamp, displayName(uri))
                 }
             })
+        }
+    }
+
+    /**
+     * Pasted or shared text as a book of its own: tidied (line ends, trailing spaces, runs of blank
+     * lines), refused without Chinese, then stored and opened like a TXT file. [title]: blank takes
+     * the first line.
+     */
+    fun importText(title: String?, text: String, onDone: (Result<Long>) -> Unit) {
+        viewModelScope.launch {
+            onDone(runCatching<Long> {
+                withContext(Dispatchers.IO) {
+                    val clean = PastedText.tidy(text)
+                    if (clean.none { it.isHan() }) throw EpubException("В тексте нет китайских иероглифов")
+                    val stamp = System.currentTimeMillis()
+                    val temp = File(booksDir, "import-$stamp.tmp")
+                    temp.writeText(clean, Charsets.UTF_8)
+                    importFile(temp, stamp, title?.trim()?.takeIf { it.isNotEmpty() } ?: PastedText.title(clean))
+                }
+            })
+        }
+    }
+
+    /** Recognises, checks and stores a book file copied to [temp]; returns the new book's id. */
+    private suspend fun importFile(temp: File, stamp: Long, shownName: String?): Long {
+        val format = BookFiles.sniff(temp)
+        if (format == null) {
+            temp.delete()
+            throw EpubException("Это не книга: поддерживаются EPUB, FB2, TXT, DOCX и DOC")
+        }
+        val name = "book-$stamp.${format.extension}"
+        val target = File(booksDir, name)
+        if (!temp.renameTo(target)) { temp.copyTo(target, overwrite = true); temp.delete() }
+        try {
+            BookFiles.open(target, format).use { book ->
+                // A book with no text at all (an empty file, an EPUB without chapters) would have
+                // nothing to open: refuse it here instead of failing on every opening.
+                val hasText = book.chapters.asSequence().take(50).any { c ->
+                    book.blocks(c.index).any { it is com.hanreader.app.epub.EpubBlock.Text && it.text.isNotBlank() }
+                }
+                if (!hasText) throw EpubException("В книге не нашлось текста")
+                val plain = format == BookFormat.TXT || format == BookFormat.DOC
+                val title = if (plain || book.title.startsWith("book-") || book.title.startsWith("import-")) shownName ?: book.title else book.title
+                val id = books.insert(
+                    BookEntity(
+                        title = title.ifBlank { shownName ?: "Без названия" },
+                        author = book.author,
+                        fileName = name,
+                        chapterCount = book.chapters.size
+                    )
+                )
+                runCatching { saveCover(id, book) }
+                return id
+            }
+        } catch (e: Exception) {
+            target.delete()
+            throw e
         }
     }
 

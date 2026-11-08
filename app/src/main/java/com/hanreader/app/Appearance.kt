@@ -325,9 +325,19 @@ object ReaderKeys {
 /** A book file another app asked HanReader to open (VIEW / SEND), waiting to be imported. */
 object IncomingBooks {
     val pending = MutableStateFlow<android.net.Uri?>(null)
+    /** Text shared or selected in another app, waiting in the paste window. */
+    val text = MutableStateFlow<String?>(null)
 
     fun take(intent: android.content.Intent?) {
         intent ?: return
+        // Selected text («Читать в HanReader») or shared text without a file.
+        val shared = when (intent.action) {
+            android.content.Intent.ACTION_PROCESS_TEXT -> intent.getCharSequenceExtra(android.content.Intent.EXTRA_PROCESS_TEXT)
+            android.content.Intent.ACTION_SEND ->
+                if (intent.hasExtra(android.content.Intent.EXTRA_STREAM)) null else intent.getCharSequenceExtra(android.content.Intent.EXTRA_TEXT)
+            else -> null
+        }
+        if (!shared.isNullOrBlank()) { text.value = shared.toString(); return }
         val uri = when (intent.action) {
             android.content.Intent.ACTION_VIEW -> intent.data
             android.content.Intent.ACTION_SEND ->

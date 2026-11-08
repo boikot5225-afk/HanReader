@@ -287,4 +287,41 @@ class ReaderFlowTest {
         assertTrue("refused: $imported", imported!!.isFailure)
         assertTrue(imported!!.exceptionOrNull()!!.message!!.contains("текст"))
     }
+
+    /** Pasted text becomes a book that opens; text without Chinese is refused. Own sample text. */
+    @Test
+    fun pastedTextIsABook() {
+        val vm = ReaderViewModel(app)
+        var r: Result<Long>? = null
+        vm.importText("", "  雨夜\r\n\r\n\r\n\r\n那天晚上一直在下雨。   \n他站在门口，等一个不会来的人。\n", ) { r = it }
+        waitFor { r != null }
+        val id = r!!.getOrThrow()
+        val book = runBlocking { LexiconDatabase.get(app).bookDao().get(id) }!!
+        assertEquals("雨夜", book.title)
+        vm.openBook(id)
+        waitFor(60_000) { vm.open.value?.chapter != null || vm.open.value?.error != null }
+        assertEquals(null, vm.open.value!!.error)
+        val text = vm.open.value!!.chapter!!.blocks.filterIsInstance<ReaderBlock.Text>().joinToString("|") { it.text }
+        assertTrue(text, text.contains("那天晚上一直在下雨。") && !text.contains("   "))
+
+        var bad: Result<Long>? = null
+        vm.importText("x", "Only English here.") { bad = it }
+        waitFor { bad != null }
+        assertTrue(bad!!.isFailure)
+        assertTrue(bad!!.exceptionOrNull()!!.message!!.contains("китайск"))
+    }
+
+    /** «Поделиться» text and «Читать в HanReader» from the selection menu reach the paste window. */
+    @Test
+    fun sharedAndSelectedText() {
+        com.hanreader.app.IncomingBooks.text.value = null
+        com.hanreader.app.IncomingBooks.take(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+            .putExtra(android.content.Intent.EXTRA_TEXT, "他说了一句话。"))
+        assertEquals("他说了一句话。", com.hanreader.app.IncomingBooks.text.value)
+        com.hanreader.app.IncomingBooks.take(android.content.Intent(android.content.Intent.ACTION_PROCESS_TEXT).setType("text/plain")
+            .putExtra(android.content.Intent.EXTRA_PROCESS_TEXT, "门开了。"))
+        assertEquals("门开了。", com.hanreader.app.IncomingBooks.text.value)
+        com.hanreader.app.IncomingBooks.text.value = null
+        assertEquals(null, com.hanreader.app.IncomingBooks.pending.value)
+    }
 }

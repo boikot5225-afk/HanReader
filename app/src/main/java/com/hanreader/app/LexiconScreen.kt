@@ -103,6 +103,31 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = 
                 .onFailure { e -> android.widget.Toast.makeText(ctx, e.message ?: "Не удалось открыть книгу", android.widget.Toast.LENGTH_LONG).show() }
         }
     }
+    // Text to read: pasted in the library, shared from another app or selected there.
+    val incomingText by IncomingBooks.text.collectAsState()
+    var pasting by remember { mutableStateOf<String?>(null) }
+    var pasteBusy by remember { mutableStateOf(false) }
+    var pasteError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(incomingText) {
+        val t = incomingText ?: return@LaunchedEffect
+        IncomingBooks.text.value = null
+        pasteError = null
+        pasting = t
+    }
+    pasting?.let { initial ->
+        com.hanreader.app.reader.PasteTextDialog(
+            initial = initial, busy = pasteBusy, error = pasteError,
+            onDismiss = { pasting = null },
+            onSave = { title, text ->
+                pasteBusy = true
+                reader.importText(title, text) { r ->
+                    pasteBusy = false
+                    r.onSuccess { id -> pasting = null; session = null; bookStats = null; tab = Tab.READ; reading = id }
+                        .onFailure { e -> pasteError = e.message ?: "Не удалось сохранить текст" }
+                }
+            }
+        )
+    }
     var wordFilter by rememberSaveable { mutableStateOf(WordFilter.ALL) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val selectedLanguage by vm.language.collectAsState()
@@ -180,7 +205,8 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = 
                     bottomBar = { BottomNav(tab) { tab = it } }
                 ) { padding ->
                     when (tab) {
-                        Tab.READ -> LibraryScreen(reader, padding, onOpen = { reading = it }, onStats = { bookStats = it }, onReadingStats = { readingStats = true })
+                        Tab.READ -> LibraryScreen(reader, padding, onOpen = { reading = it }, onStats = { bookStats = it }, onReadingStats = { readingStats = true },
+                            onPaste = { pasteError = null; pasting = "" })
                         Tab.TODAY -> TodayScreen(
                             cards = visibleCards,
                             settings = settings,
