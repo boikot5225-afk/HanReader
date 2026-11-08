@@ -45,6 +45,34 @@ class SortedTsv private constructor(private val b: ByteBuffer, private val start
         }
     }
 
+    /**
+     * Lines whose fields hold [needle] right after a tab, «|» or «!» (an item of a list), decoded
+     * only when they match: a scan of the forms table for one verb's forms stays cheap.
+     */
+    fun forEachWithItem(needle: String, action: (String, List<String>) -> Unit) {
+        val k = needle.toByteArray(Charsets.UTF_8)
+        for (line in 0 until size) {
+            val s = starts.get(line)
+            var e = s
+            while (e < length && b.get(e) != NL) e++
+            var p = s
+            var hit = false
+            while (!hit && p + k.size <= e) {
+                val before = if (p > s) b.get(p - 1) else 0
+                if (before == TAB || before == PIPE || before == BANG) {
+                    var j = 0
+                    while (j < k.size && b.get(p + j) == k[j]) j++
+                    if (j == k.size) hit = true
+                }
+                p++
+            }
+            if (hit) {
+                val parts = line(line).split('\t')
+                action(parts[0], parts.drop(1))
+            }
+        }
+    }
+
     /** Compares the key of the line starting at [at] with [k], as unsigned bytes. */
     private fun compare(at: Int, k: ByteArray): Int {
         var i = 0
@@ -74,6 +102,8 @@ class SortedTsv private constructor(private val b: ByteBuffer, private val start
     companion object {
         private const val TAB = '\t'.code.toByte()
         private const val NL = '\n'.code.toByte()
+        private const val PIPE = '|'.code.toByte()
+        private const val BANG = '!'.code.toByte()
 
         fun read(input: InputStream): SortedTsv = of(input.use { it.readBytes() })
 

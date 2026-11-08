@@ -25,9 +25,42 @@ data class EsEntry(
     /** Frequency rank in Spanish subtitles: 1 = most frequent, 0 = not in the list. */
     val rank: Int = 0,
     /** The main meaning in a few words (frequent words, edited pass), for the note over the word. */
-    val short: String = ""
+    val short: String = "",
+    /** Gender of a noun: «м», «ж», «мж» (both); empty for other words. */
+    val gender: String = ""
 ) {
+    /** «сущ., ж. р.», «сущ., м. и ж. р.», «гл.». */
+    val posLabel: String get() = when (gender) {
+        "м" -> "$pos, м. р."
+        "ж" -> "$pos, ж. р."
+        "мж" -> "$pos, м. и ж. р."
+        else -> pos
+    }
+
     val isName: Boolean get() = pos == "имя"
+}
+
+/**
+ * The variant of Spanish whose regional senses come first. Senses carry their region in a label:
+ * «(Исп.) компьютер», «(Лат. Ам.) автомобиль», «(Мекс., разг.) работа».
+ */
+enum class EsVariant(val title: String, private val marks: List<String>) {
+    ANY("Не важно", emptyList()),
+    SPAIN("Испания", listOf("Исп", "Канары", "Андалус")),
+    LATAM("Лат. Америка", listOf("Лат. Ам", "Мекс", "Ла-Плата", "Аргент", "Уругв", "Чили", "Колумб", "Перу", "Венес",
+        "Куб", "Центр", "Карибы", "Эквад", "Болив", "Гват", "Пуэрто", "Доминик", "Парагв", "Гондур", "Никараг", "Сальв", "Коста", "Панам", "Юж. Ам"));
+
+    /** 0: a sense of this variant, 1: a sense used everywhere, 2: a sense of another region. */
+    fun rank(sense: String): Int {
+        if (this == ANY || !sense.startsWith("(")) return 1
+        val label = sense.substringAfter("(").substringBefore(")")
+        val regional = (SPAIN.marks + LATAM.marks).any { it in label }
+        return when {
+            marks.any { it in label } -> 0
+            regional -> 2
+            else -> 1
+        }
+    }
 }
 
 /** One reading of a word on the page: hablo → hablar, «1 л. ед. ч., наст.». */
@@ -54,7 +87,7 @@ class EsEngine(
         val f = dict.get(lemma) ?: return null
         fun senses(i: Int) = f.getOrNull(i).orEmpty().split(" ; ").map { it.trim() }.filter { it.isNotEmpty() }
         return EsEntry(lemma, f.getOrNull(0).orEmpty(), senses(1), senses(2), machine = f.getOrNull(3) == "a" || f.getOrNull(3) == "r",
-            rank = f.getOrNull(4)?.toIntOrNull() ?: 0, short = f.getOrNull(5).orEmpty())
+            rank = f.getOrNull(4)?.toIntOrNull() ?: 0, short = f.getOrNull(5).orEmpty(), gender = f.getOrNull(6).orEmpty())
     }
 
     /** Every dictionary reading of [word], the most useful first (a word with a Russian meaning first). */
@@ -231,15 +264,23 @@ class EsEngine(
         return out
     }
 
+    /** The variant chosen in «Оформление» (Spain, Latin America or none). */
+    private val variant: EsVariant get() = com.hanreader.app.AppearanceStore.appearance.value.esVariant
+
+    /** Russian senses with the chosen variant's regional ones first and other regions' last. */
+    fun senses(e: EsEntry): List<String> = e.ru.sortedBy { variant.rank(it) }
+
     override fun glossShort(word: String, reading: String?): String? {
         val e = pick(word, reading)?.entry ?: return null
+        // A sense of the chosen variant wins over the general main meaning (carro: «автомобиль» in Latin America).
+        e.ru.firstOrNull { variant.rank(it) == 0 }?.let { s -> shortSense(s)?.let { return it } }
         if (e.short.isNotEmpty()) return e.short
         return (e.ru.firstOrNull() ?: e.en.firstOrNull()?.removePrefix("to "))?.let { shortSense(it) }
     }
 
     override fun cardTranslation(word: String, reading: String?): String? {
         val e = pick(word, reading)?.entry ?: return null
-        return (e.ru.ifEmpty { e.en }).take(2).joinToString("; ").ifEmpty { null }
+        return (senses(e).ifEmpty { e.en }).take(2).joinToString("; ").ifEmpty { null }
     }
 
     /**
@@ -346,10 +387,42 @@ class EsEngine(
         override fun knownAt(level: Int): Set<String> = (1..level.coerceAtMost(bands.size)).flatMapTo(HashSet()) { byLevel[it - 1] }
     }
 
+    /**
+     * The conjugation of verb [lemma] from the forms table: tense label («наст.») -> person
+     * («1 ед») -> forms («hablara / hablase»), in the order of the forms' grammar; plus «герундий»
+     * and «причастие» under person «». Voseo forms are left out. Scans the table (in the background).
+     */
+    fun conjugation(lemma: String): Map<String, Map<String, List<String>>> {
+        val out = LinkedHashMap<String, LinkedHashMap<String, MutableList<String>>>()
+        val person = Regex("(\\d) л\\. (ед|мн)\\. ч\\.")
+        forms.forEachWithItem("$lemma:") { form, f ->
+            for (item in f.firstOrNull().orEmpty().removePrefix("!").split('|')) {
+                if (item.substringBefore(':') != lemma) continue
+                val g = item.substringAfter(':', "0").toIntOrNull()?.let { grammar.getOrNull(it) }.orEmpty()
+                if (g.isEmpty() || "восео" in g || " + " in g) continue
+                val parts = g.split(", ").map { it.trim() }
+                val tense = parts.lastOrNull { it in CONJ_TENSES } ?: continue
+                val key = when {
+                    tense.contains("причастие") -> if ("ж. р." in g || "мн. ч." in g || !form.endsWith("o")) continue else "причастие"
+                    // A gerund with a pronoun attached (hablándose) is not the gerund itself.
+                    tense == "герундий" -> if (!form.endsWith("ndo")) continue else tense
+                    else -> tense
+                }
+                val who = person.find(g)?.let { "${it.groupValues[1]} ${it.groupValues[2]}" } ?: ""
+                out.getOrPut(key) { LinkedHashMap() }.getOrPut(who) { ArrayList() }.let { if (form !in it) it += form }
+            }
+        }
+        return out
+    }
+
     /** Searched without case and stress marks: «cancion» finds «canción». */
     override fun searchForm(text: String): String = unaccent(text.lowercase())
 
     companion object {
+        /** Tense and mood labels of the forms' grammar, in the order of a conjugation table. */
+        val CONJ_TENSES = listOf("наст.", "претерит", "имперфект", "буд.", "условн.", "наст. субх.", "имперфект субх.",
+            "буд. субх.", "повел.", "герундий", "причастие", "прош. причастие")
+
         private val PRONOUNS = listOf("nos", "los", "las", "les", "me", "te", "se", "os", "lo", "la", "le")
 
         /** Drops stress marks, keeping the length (ñ and ü stay). */

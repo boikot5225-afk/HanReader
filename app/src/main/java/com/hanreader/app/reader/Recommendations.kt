@@ -72,7 +72,8 @@ object Recommendations {
             if (b !is ReaderBlock.Text) continue
             val inNames = VocabularyStats.nameTokens(b, names, engine)
             for ((i, t) in b.tokens.withIndex()) {
-                if (t.kind == TokenKind.HAN && i !in inNames) counts[t.text] = (counts[t.text] ?: 0) + 1
+                // By dictionary form (Spanish habló -> hablar), as the book's counts and the cards.
+                if (t.kind == TokenKind.HAN && i !in inNames && t.text !in names) engine.lemma(t.text).let { w -> counts[w] = (counts[w] ?: 0) + 1 }
             }
         }
         return counts.entries.asSequence()

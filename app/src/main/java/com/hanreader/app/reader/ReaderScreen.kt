@@ -205,9 +205,15 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         if (!wantRecommended || chapter == null || eng == null || readerLevel == null) emptyList()
         else Recommendations.forChapter(chapter, matcher, saved, names, bookWordMap, eng, readerLevel, appearance.recommendedPerChapter)
     }
-    val recommendedSet = remember(recommended) { recommended.mapTo(HashSet()) { it.word } }
     val chapterWords = remember(chapter) {
         chapter?.blocks?.flatMap { b -> (b as? ReaderBlock.Text)?.tokens?.filter { it.kind == TokenKind.HAN }?.map { it.text }.orEmpty() }?.toHashSet() ?: hashSetOf()
+    }
+    // Recommendations are dictionary forms (Spanish hablar); the marks and hints go on the words of
+    // the page that are forms of them (habló, hablaban).
+    val recommendedSet = remember(recommended, chapterWords, engine) {
+        val lemmas = recommended.mapTo(HashSet()) { it.word }
+        val eng = engine
+        if (eng == null || eng is ZhEngine) lemmas else chapterWords.filterTo(HashSet()) { eng.lemma(it) in lemmas }
     }
     val wantUnknown = appearance.markUnknown || appearance.gloss == GlossMode.UNKNOWN
     val unknownSet = remember(chapterWords, knownHere, saved, names, wantUnknown) {
@@ -216,7 +222,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
     // Short translations above the pinyin: over unknown words or over recommended ones.
-    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings) {
+    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant) {
         val eng = engine
         val zhless = eng != null && eng !is ZhEngine
         val words = when (appearance.gloss) {
@@ -596,7 +602,11 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onSplit = { w, split -> vm.setSplit(w, split); selection = null },
             onChange = { selection = it },
             onDismiss = { selection = null },
-            recommendations = recommended.associateBy { it.word },
+            recommendations = recommended.associateBy { it.word }.let { byLemma ->
+                // The word card looks a recommendation up by the word on the page: Spanish forms too.
+                val eng = engine
+                if (eng == null || eng is ZhEngine) byLemma else chapterWords.mapNotNull { w -> byLemma[eng.lemma(w)]?.let { w to it } }.toMap() + byLemma
+            },
             userNames = userNames,
             onUserName = { w, on -> vm.setUserName(w, on); selection = null },
             onSave = { word, reading, translation, sentence, done ->
@@ -1271,7 +1281,7 @@ private fun WordSheet(
         else entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
     // A single character: the meanings of the reading on the page (得 de after a verb, not dé «получить»).
     val pageReading = if (selection.first == selection.last && first.text.length == 1) first.pinyin.takeIf { it.isNotEmpty() } else null
-    val russian = remember(word, pageReading) { zh?.russianSenses(word, pageReading) ?: es.firstOrNull()?.entry?.ru.orEmpty() }
+    val russian = remember(word, pageReading) { zh?.russianSenses(word, pageReading) ?: es.firstOrNull()?.entry?.let { (engine as com.hanreader.app.es.EsEngine).senses(it) }.orEmpty() }
     val otherReadings = remember(word, pageReading) { zh?.otherReadings(word, pageReading).orEmpty() }
     val translation = userMeaning ?: (if (zh == null) engine.cardTranslation(word, es.firstOrNull()?.entry?.lemma) else engine.cardTranslation(word, pageReading))
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
@@ -1427,7 +1437,7 @@ private fun WordSheet(
             if (zh == null && es.isNotEmpty()) {
                 // Spanish: what the form is (hablar, гл. · 3 л. ед. ч., претерит), other readings, English.
                 es.forEachIndexed { i, a ->
-                    val about = listOf(a.entry.pos, a.grammar).filter { it.isNotEmpty() }.joinToString(" · ")
+                    val about = listOf(a.entry.posLabel, a.grammar).filter { it.isNotEmpty() }.joinToString(" · ")
                     if (i > 0) {
                         Text("${a.entry.lemma} — ${(a.entry.ru.ifEmpty { a.entry.en }).take(2).joinToString("; ")}",
                             style = MaterialTheme.typography.bodyMedium)
@@ -1452,6 +1462,24 @@ private fun WordSheet(
                             n.pronouns?.let { Text("с местоимениями: $it", style = MaterialTheme.typography.bodyMedium) }
                             Text(n.explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                    }
+                }
+                // The whole conjugation of the verb, on demand (built from the forms table in the background).
+                if (es.first().entry.pos == "гл.") {
+                    val lemma = es.first().entry.lemma
+                    var showConj by remember(lemma) { mutableStateOf(false) }
+                    TextButton(onClick = { showConj = !showConj }, contentPadding = PaddingValues(0.dp)) {
+                        Text(if (showConj) "Скрыть спряжение" else "Спряжение $lemma")
+                    }
+                    if (showConj) {
+                        val conj by produceState<Map<String, Map<String, List<String>>>?>(null, lemma) {
+                            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                (engine as com.hanreader.app.es.EsEngine).conjugation(lemma)
+                            }
+                        }
+                        val c = conj
+                        if (c == null) Text("Собираю формы…", style = MaterialTheme.typography.bodySmall)
+                        else ConjugationTable(c)
                     }
                 }
                 val en = es.first().entry.en
@@ -1497,7 +1525,8 @@ private fun WordSheet(
             }
             Surface(
                 onClick = {
-                    onSave(cardWord, reading, translation, sentence) { r ->
+                    // Spanish: the card's second line is the part of speech and gender («сущ., ж. р.»).
+                    onSave(cardWord, if (zh == null) es.firstOrNull()?.entry?.posLabel.orEmpty() else reading, translation, sentence) { r ->
                         scope.launch {
                             status = r.fold(
                                 onSuccess = { created -> if (created) "Добавлено в карточки" else "Уже в карточках: добавлен новый пример" },
@@ -1547,6 +1576,31 @@ private fun WordSheet(
             )
             status?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             speaker.message.takeIf { it.isNotEmpty() }?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        }
+    }
+}
+
+/** A Spanish verb's forms by tense and person (yo hablo, tú hablas…), gerund and participle first. */
+@Composable
+private fun ConjugationTable(c: Map<String, Map<String, List<String>>>) {
+    val persons = listOf("1 ед" to "yo", "2 ед" to "tú", "3 ед" to "él, ella, usted", "1 мн" to "nosotros", "2 мн" to "vosotros", "3 мн" to "ellos, ustedes")
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        val nonFinite = listOf("герундий" to "Gerundio", "причастие" to "Participio").mapNotNull { (k, t) -> c[k]?.get("")?.let { "$t: ${it.joinToString(" / ")}" } }
+        if (nonFinite.isNotEmpty()) Text(nonFinite.joinToString("   "), style = MaterialTheme.typography.bodyMedium)
+        for (tense in com.hanreader.app.es.EsEngine.CONJ_TENSES) {
+            val rows = c[tense] ?: continue
+            if (tense == "герундий" || tense.contains("причастие")) continue
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(com.hanreader.app.es.EsGrammar.spanishName(tense), style = MaterialTheme.typography.labelLarge)
+                for ((key, who) in persons) {
+                    val forms = rows[key] ?: continue
+                    Row {
+                        Text(who, Modifier.width(118.dp), style = MaterialTheme.typography.bodySmall, color = muted)
+                        Text(forms.joinToString(" / "), style = MaterialTheme.typography.bodyMedium, fontFamily = WordFont)
+                    }
+                }
+            }
         }
     }
 }

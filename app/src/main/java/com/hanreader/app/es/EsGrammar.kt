@@ -67,6 +67,9 @@ object EsGrammar {
             "hubiera + причастие: нереальное прошлое: «si lo hubiera sabido, no habría venido» — если бы я знал, не пришёл бы.")
     )
 
+    /** «Presente de indicativo» for a tense label of the forms («наст.»). */
+    fun spanishName(label: String): String = SIMPLE[label]?.name?.substringBefore(" — ") ?: label
+
     private val PRONOUNS_OF = mapOf(
         "1 ед" to "yo", "2 ед" to "tú", "3 ед" to "él, ella, usted",
         "1 мн" to "nosotros", "2 мн" to "vosotros", "3 мн" to "ellos, ellas, ustedes"

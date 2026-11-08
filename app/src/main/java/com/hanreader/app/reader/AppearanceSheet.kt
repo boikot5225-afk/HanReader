@@ -162,6 +162,18 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
                 )
             }
 
+            if (!chinese) {
+                Text("Вариант испанского", style = MaterialTheme.typography.bodyLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.hanreader.app.es.EsVariant.entries.forEach { v ->
+                        FilterChip(selected = a.esVariant == v, onClick = { AppearanceStore.update { it.copy(esVariant = v) } }, label = { Text(v.title) })
+                    }
+                }
+                Text(
+                    "Значения этих стран идут первыми: carro — «автомобиль» в Латинской Америке, ordenador — «компьютер» в Испании.",
+                    style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
+                )
+            }
             if (chinese) Text("Цвет тонов", style = MaterialTheme.typography.bodyLarge)
             if (chinese) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 ToneColors.entries.forEach { m ->

@@ -185,6 +185,27 @@ class EsEngineTest {
         assertEquals(setOf("Rocosas", "Supermax", "Madrid"), names)
     }
 
+    @Test
+    fun genderAndConjugation() {
+        assertEquals("сущ., ж. р.", engine.entry("casa")!!.posLabel)
+        assertEquals("сущ., м. р.", engine.entry("mapa")!!.posLabel)
+        val c = engine.conjugation("hablar")
+        assertEquals(listOf("hablo"), c["наст."]!!["1 ед"])
+        assertEquals(listOf("habló"), c["претерит"]!!["3 ед"])
+        assertTrue(c["имперфект субх."]!!["1 ед"]!!.containsAll(listOf("hablara", "hablase")))
+        assertEquals(listOf("hablando"), c["герундий"]!![""])
+        assertEquals(listOf("hablado"), c["причастие"]!![""])
+        assertEquals(listOf("fui"), engine.conjugation("ir")["претерит"]!!["1 ед"])
+    }
+
+    @Test
+    fun spanishVariantPutsItsSensesFirst() {
+        assertEquals(0, EsVariant.LATAM.rank("(Лат. Ам.) автомобиль"))
+        assertEquals(2, EsVariant.SPAIN.rank("(Мекс., разг.) работа"))
+        assertEquals(1, EsVariant.SPAIN.rank("(разг.) парень"))
+        assertEquals(1, EsVariant.ANY.rank("(Исп.) компьютер"))
+    }
+
     companion object {
         fun load(): EsEngine {
             val dir = File("src/main/assets/es")

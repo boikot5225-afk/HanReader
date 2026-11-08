@@ -6,10 +6,11 @@ assets/licenses/ES_WIKTIONARY_NOTICE.txt):
   ru.jsonl  Spanish words of the Russian Wiktionary (https://kaikki.org/ruwiktionary/Испанский/)
   en.jsonl  Spanish words of the English Wiktionary (https://kaikki.org/dictionary/Spanish/)
 
-dict.tsv   lemma \t part of speech \t Russian senses \t English senses \t Russian source \t frequency rank \t main meaning
+dict.tsv   lemma \t part of speech \t Russian senses \t English senses \t Russian source \t frequency rank \t main meaning \t gender
            (senses joined by " ; "; source: w = Russian Wiktionary, a = machine translation (ru_ai.jsonl),
            r = Wiktionary or machine senses edited by the second pass (ru_refined.jsonl);
-           rank: 1 = most frequent, empty = not in the frequency list; main meaning: 1-3 words, edited pass only)
+           rank: 1 = most frequent, empty = not in the frequency list; main meaning: 1-3 words, edited pass only;
+           gender of a noun: м, ж, мж (both), from the first noun entry of the English Wiktionary)
 forms.tsv  form \t lemma:n|lemma:n   (forms that differ from the lemma; n = line of grammar.tsv, 0 = none)
 grammar.tsv  one description of a form per line: «3 л. ед. ч., претерит»
 Verbs with attached pronouns (dámelo) are left out: the app strips the pronouns itself. Voseo forms
@@ -168,6 +169,7 @@ def main(ru_path, en_path, out_dir):
     pos = {}      # lemma -> part of speech
     forms = {}    # form -> {lemma: description}
     regional = set()  # words with a sense used only in some countries or in a marked style
+    gender = {}       # noun -> м / ж / мж
 
     def set_pos(w, p):
         # A common word first: «al» is a contraction before it is an initialism (имя); an infinitive
@@ -223,6 +225,9 @@ def main(ru_path, en_path, out_dir):
                     en[w].append(g)
         if lemma_entry:
             set_pos(w, e.get("pos"))
+            if e.get("pos") == "noun" and w not in gender:
+                g = next((h.get("args", {}).get("1", "") for h in e.get("head_templates", []) if h.get("args", {}).get("1", "") not in ("", "es")), "")
+                gender[w] = "мж" if g.startswith("mf") or g in ("m-f", "fm") else "м" if g.startswith("m") else "ж" if g.startswith("f") else ""
 
     for w, senses in MANUAL_RU.items():
         ru[w] = senses + [x for x in ru.get(w, []) if x not in senses]
@@ -264,7 +269,7 @@ def main(ru_path, en_path, out_dir):
             g = en.get(w, [])[:MAX_SENSES]
             if not r and not g:
                 continue
-            f.write(f"{w}\t{pos.get(w, '')}\t{' ; '.join(r)}\t{' ; '.join(g)}\t{source.get(w, '')}\t{rank.get(w, '')}\t{short.get(w, '')}\n")
+            f.write(f"{w}\t{pos.get(w, '')}\t{' ; '.join(r)}\t{' ; '.join(g)}\t{source.get(w, '')}\t{rank.get(w, '')}\t{short.get(w, '')}\t{gender.get(w, '') if pos.get(w) == 'сущ.' else ''}\n")
             n += 1
     known = set(lemmas)
     grammar = [""]

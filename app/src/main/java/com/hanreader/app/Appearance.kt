@@ -257,7 +257,9 @@ data class Appearance(
     val script: ScriptMode = ScriptMode.AS_BOOK,
     val tones: ToneColors = ToneColors.OFF,
     /** The translation over a word fades after its first [GLOSS_REPEATS] appearances in a chapter. */
-    val glossFade: Boolean = true
+    val glossFade: Boolean = true,
+    /** Spanish: the variant whose regional senses come first (Spain, Latin America) or none. */
+    val esVariant: com.hanreader.app.es.EsVariant = com.hanreader.app.es.EsVariant.ANY
 ) {
     fun hanFontFor(spec: ThemeSpec): HanFont =
         if (com.hanreader.app.lang.Languages.current.readingTitle != null) hanFont?.takeIf { !it.latin } ?: spec.defaultHanFont
@@ -307,7 +309,8 @@ object AppearanceStore {
             gloss = GlossMode.entries.firstOrNull { it.name == p.getString("gloss", null) } ?: d.gloss,
             script = ScriptMode.entries.firstOrNull { it.name == p.getString("script", null) } ?: d.script,
             tones = ToneColors.entries.firstOrNull { it.name == p.getString("tones", null) } ?: d.tones,
-            glossFade = p.getBoolean("glossFade", d.glossFade)
+            glossFade = p.getBoolean("glossFade", d.glossFade),
+            esVariant = com.hanreader.app.es.EsVariant.entries.firstOrNull { it.name == p.getString("esVariant", null) } ?: d.esVariant
         )
         appContext = context.applicationContext
     }
@@ -339,6 +342,7 @@ object AppearanceStore {
             putString("script", next.script.name)
             putString("tones", next.tones.name)
             putBoolean("glossFade", next.glossFade)
+            putString("esVariant", next.esVariant.name)
             apply()
         }
     }
