@@ -14,3 +14,7 @@ content licensed CC BY-SA 4.0.
 Russian meanings marked as machine translation: English Wiktionary meanings translated into Russian
 with the DeepSeek API (tools/translate_es_ru.py, data/es/ru_ai.jsonl), not checked by a lexicographer;
 distributed under CC BY-SA 4.0 as a derivative of Wiktionary.
+
+Edited meanings (source "r"): for the most frequent words, the Russian meanings (Wiktionary or machine
+translation) reordered by use and given a main meaning by the DeepSeek API (tools/refine_es_ru.py,
+data/es/ru_refined.jsonl); distributed under CC BY-SA 4.0.
