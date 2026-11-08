@@ -18,3 +18,4 @@ signing-secrets.txt
 !app/debug.keystore
 /.work/
 __pycache__/
+.kotlin/
