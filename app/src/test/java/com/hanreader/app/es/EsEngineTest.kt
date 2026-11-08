@@ -78,6 +78,18 @@ class EsEngineTest {
         assertEquals(1, words["Blancornelas"])
     }
 
+    @Test
+    fun frequentVerbFormsReadAsTheVerb() {
+        assertEquals("ser", engine.lemma("era"))
+        assertEquals("ser", engine.lemma("son"))
+        assertEquals("haber", engine.lemma("ha"))
+        assertEquals("saber", engine.lemma("sé"))
+        // The word itself where it is the usual reading: como «как», not a form of comer.
+        assertEquals("como", engine.lemma("como"))
+        assertEquals("гл.", engine.entry("poder")!!.pos)
+        assertTrue(engine.entry("ser")!!.rank in 1..50)
+    }
+
     companion object {
         fun load(): EsEngine {
             val dir = File("src/main/assets/es")
