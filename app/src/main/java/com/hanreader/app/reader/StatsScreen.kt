@@ -80,6 +80,7 @@ fun StatsScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                     StatTile("Повторения", "${todayRow.reviews}", "сегодня", Modifier.weight(1f))
                 }
             }
+            item { InputTotal(days.sumOf { it.readChars.toLong() }) }
             item {
                 ChartPanel(
                     title = "Чтение за 14 дней, минут",
@@ -196,6 +197,27 @@ internal fun ChartPanel(title: String, days: List<Int>, values: List<Int>, total
                 Text("сегодня", style = MaterialTheme.typography.labelSmall, color = muted)
             }
             Text(total, style = MaterialTheme.typography.bodySmall, color = muted)
+        }
+    }
+}
+
+/**
+ * All characters read so far and the way to the next milestone: the amount of reading is what
+ * builds a language (comprehensible input), more than the number of words learned.
+ */
+@Composable
+internal fun InputTotal(total: Long, modifier: Modifier = Modifier) {
+    val next = ReadingStats.nextMilestone(total)
+    val previous = ReadingStats.MILESTONES.lastOrNull { it <= total } ?: 0L
+    Panel(modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Overline("Прочитано всего")
+            Text("${ReadingStats.amount(total)} знаков", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            ProgressBar(((total - previous).toFloat() / (next - previous).coerceAtLeast(1)).coerceIn(0f, 1f), Modifier.fillMaxWidth())
+            Text(
+                "До ${ReadingStats.amount(next)}: ещё ${ReadingStats.amount(next - total)}",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

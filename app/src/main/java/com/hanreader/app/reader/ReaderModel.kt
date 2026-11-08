@@ -179,6 +179,18 @@ class ZhEngine(
         .trim().replace(Regex("^([а-яёa-z]{2,12}\\.\\s*)+", RegexOption.IGNORE_CASE), "")
         .split(',', ';', '；', '，').map { it.trim() }.firstOrNull { it.isNotEmpty() }
 
+    /**
+     * A character's meaning in a few words for the breakdown of a word: up to two short senses of
+     * [reading] (the character's reading inside the word), so both senses of a merged character show
+     * (须: «должен; борода»). Null if the character has no meaning.
+     */
+    fun charGloss(ch: String, reading: String? = null): String? {
+        val senses = russianSenses(ch, reading).mapNotNull { cleanSense(it) }.distinct()
+        val ru = senses.take(2).map { if (it.length > 14) it.take(13) + "…" else it }
+        if (ru.isNotEmpty()) return ru.joinToString("; ")
+        return firstSense(ch, reading)
+    }
+
     /** The shortest of a word's first few senses: parts of a combination must fit side by side. */
     private fun shortSense(word: String): String? {
         val ru = russianSenses(word).take(3).mapNotNull { cleanSense(it) }

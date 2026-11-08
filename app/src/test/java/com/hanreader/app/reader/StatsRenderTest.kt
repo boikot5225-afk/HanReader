@@ -41,6 +41,7 @@ class StatsRenderTest {
                         StatTile("Серия", "4 дня", "рекорд 6", Modifier.weight(1f))
                         StatTile("Повторения", "35", "сегодня", Modifier.weight(1f))
                     }
+                    InputTotal(128_400)
                     ChartPanel("Чтение за 14 дней, минут", days, minutes, "Всего ${minutes.sum()} мин") { d, v -> "${ReadingStats.label(d)}: $v мин" }
                 }
             }

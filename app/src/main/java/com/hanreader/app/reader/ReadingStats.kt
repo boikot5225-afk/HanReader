@@ -60,6 +60,36 @@ object ReadingStats {
         return Streak(current, maxOf(best, current))
     }
 
+    /**
+     * How readable a text is from the share of word occurrences the reader knows (Nation: about
+     * 95-98% for comfortable reading). Null below any data.
+     */
+    enum class Difficulty(val title: String) {
+        COMFORTABLE("комфортно"), WITH_HINTS("с подсказками"), HARD("трудно"), TOO_HARD("пока рано");
+
+        companion object {
+            fun of(percent: Int): Difficulty = when {
+                percent >= 95 -> COMFORTABLE
+                percent >= 90 -> WITH_HINTS
+                percent >= 80 -> HARD
+                else -> TOO_HARD
+            }
+        }
+    }
+
+    /** Characters read: milestones that mark progress. */
+    val MILESTONES = listOf(10_000L, 50_000L, 100_000L, 250_000L, 500_000L, 1_000_000L, 2_000_000L, 5_000_000L, 10_000_000L)
+
+    fun nextMilestone(total: Long): Long = MILESTONES.firstOrNull { it > total } ?: ((total / 5_000_000L) + 1) * 5_000_000L
+
+    /** "128 тыс.", "1,2 млн", "940" for a count of characters. */
+    fun amount(n: Long): String = when {
+        n >= 1_000_000L -> String.format(java.util.Locale("ru"), "%.1f млн", n / 1_000_000.0).replace(",0 ", " ")
+        n >= 10_000L -> "${n / 1_000} тыс."
+        n >= 1_000L -> String.format(java.util.Locale("ru"), "%.1f тыс.", n / 1_000.0).replace(",0 ", " ")
+        else -> n.toString()
+    }
+
     /** "6 нояб." for a day number. */
     fun label(day: Int): String {
         val months = listOf("янв.", "февр.", "марта", "апр.", "мая", "июня", "июля", "авг.", "сент.", "окт.", "нояб.", "дек.")

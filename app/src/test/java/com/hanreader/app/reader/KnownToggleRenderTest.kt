@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
@@ -29,10 +30,15 @@ import java.io.File
 
 /** The word sheet header with the «Знаю / Не знаю» switch beside a short and a long word: build/screens/known-toggle.png. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w360dp-h400dp-xxhdpi")
+@Config(sdk = [34], qualifiers = "w360dp-h640dp-xxhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class KnownToggleRenderTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    private val engine by lazy {
+        fun lines(f: String) = java.io.File("src/main/assets/zh/$f").bufferedReader().readLines().asSequence()
+        ZhEngine(com.hanreader.app.zh.ZhSegmenterTest.dict, 0, russianChars = ZhEngine.parseRussianChars(lines("ru_chars.tsv")))
+    }
 
     @Test
     fun header() {
@@ -40,13 +46,17 @@ class KnownToggleRenderTest {
         compose.setContent {
             LexiconTheme {
                 Column(Modifier.width(360.dp).background(MaterialTheme.colorScheme.surface).padding(24.dp)) {
-                    for ((word, reading, known) in listOf(Triple("那个", "nà gè", false), Triple("目不转睛", "mù bù zhuǎn jīng", true))) {
+                    for ((word, reading, known) in listOf(Triple("那个", "nà gè", false), Triple("目不转睛", "mù bù zhuǎn jīng", true), Triple("胡须", "hú xū", false))) {
                         Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(bottom = 16.dp)) {
                             Column(Modifier.weight(1f)) {
                                 Text(word, fontFamily = WordFont, fontSize = if (word.length > 6) 28.sp else 40.sp, fontWeight = FontWeight.SemiBold)
                                 Text(reading, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                             }
-                            KnownToggle(known = known, onKnown = {}, modifier = Modifier.padding(top = 8.dp))
+                            Column(Modifier.padding(top = 8.dp).widthIn(max = 190.dp), horizontalAlignment = Alignment.End) {
+                                KnownToggle(known = known, onKnown = {})
+                                val syl = reading.split(" ")
+                                CharBreakdown(word.mapIndexed { k, c -> c.toString() to engine.charGloss(c.toString(), syl.getOrNull(k)) }, Modifier.padding(top = 10.dp))
+                            }
                         }
                     }
                 }

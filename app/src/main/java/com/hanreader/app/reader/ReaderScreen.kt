@@ -63,6 +63,7 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -113,6 +114,7 @@ import com.hanreader.app.zh.isHan
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Tapped word: paragraph index and token range, which the user can widen or narrow. */
@@ -153,6 +155,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // A search match to mark in the text, and the place to return to after a jump.
     var highlight by remember { mutableStateOf<SearchHit?>(null) }
     var returnTo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    // Chapters whose «трудная глава» note was already shown in this session.
+    var hardShown by remember(book.entity.id) { mutableStateOf(setOf<Int>()) }
     // Shows paragraph [block] at character [char] (the page holding it); set by the page or scroll view.
     var blockJump by remember { mutableStateOf<((Int, Int) -> Unit)?>(null) }
     // One subscription per book: calling vm.bookmarks() in every recomposition re-queried the database each time.
@@ -459,6 +463,20 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bars).padding(bottom = if (readAloud.active) 110.dp else 36.dp)
             )
         }
+        // A chapter well below comfortable reading: offer to prepare its words, once, for a few seconds.
+        val cov = coverage
+        val hard = chapter != null && cov != null && cov.total >= 50 && cov.percent < 90 && chapter.index !in hardShown
+        LaunchedEffect(chapter?.index, hard) {
+            if (hard) { delay(9_000); chapter?.let { hardShown = hardShown + it.index } }
+        }
+        if (hard && !chrome && back == null && !readAloud.active && cov != null) {
+            HardChapterPill(
+                percent = cov.percent,
+                onPrepare = { chapter?.let { hardShown = hardShown + it.index }; showPrepare = true },
+                onDismiss = { chapter?.let { hardShown = hardShown + it.index } },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bars).padding(bottom = 36.dp, start = 16.dp, end = 16.dp)
+            )
+        }
         if (readAloud.active && !chrome) {
             ReadAloudBar(
                 readAloud,
@@ -670,6 +688,19 @@ private fun ReturnPill(onReturn: () -> Unit, onDismiss: () -> Unit, modifier: Mo
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onReturn) { Text("← Вернуться", color = scheme.inverseOnSurface) }
             IconButton(onClick = onDismiss) { Icon(LexiconIcons.Close, contentDescription = "Не возвращаться", tint = scheme.inverseOnSurface, modifier = Modifier.size(18.dp)) }
+        }
+    }
+}
+
+/** «Трудная глава: знакомо 74%» with a way to prepare its words first. */
+@Composable
+private fun HardChapterPill(percent: Int, onPrepare: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(modifier = modifier, shape = RoundedCornerShape(24.dp), color = scheme.inverseSurface, contentColor = scheme.inverseOnSurface, shadowElevation = 4.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp)) {
+            Text("Трудная глава: знакомо $percent%", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f, fill = false))
+            TextButton(onClick = onPrepare) { Text("Подготовиться", color = scheme.inverseOnSurface, fontWeight = FontWeight.SemiBold) }
+            IconButton(onClick = onDismiss) { Icon(LexiconIcons.Close, contentDescription = "Скрыть", tint = scheme.inverseOnSurface, modifier = Modifier.size(18.dp)) }
         }
     }
 }
@@ -1247,7 +1278,8 @@ private fun WordSheet(
             Row(verticalAlignment = Alignment.Top) {
             FlowRow(Modifier.weight(1f), verticalArrangement = Arrangement.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val shownWord = block.shown.substring(first.start, last.end)
-                Text(shownWord, fontFamily = WordFont, fontSize = if (word.length > 6) 28.sp else 40.sp, fontWeight = FontWeight.SemiBold,
+                // 3-4 characters share the row with the breakdown: a little smaller, so the word stays on one line.
+                Text(shownWord, fontFamily = WordFont, fontSize = when { word.length > 6 -> 28.sp; word.length >= 3 -> 32.sp; else -> 40.sp }, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.alignByBaseline())
                 if (shownWord != word) {
                     Text(word, fontFamily = WordFont, style = MaterialTheme.typography.titleMedium,
@@ -1256,7 +1288,20 @@ private fun WordSheet(
                 Text(reading, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.alignByBaseline())
             }
-            if (canMark) KnownToggle(known = knownNow, onKnown = { onKnown(word, it) }, modifier = Modifier.padding(top = 8.dp))
+            // Beside the word: the switch, and under it what each character means (目 глаз, 不 не…).
+            val charRows = remember(word, selection) {
+                val inWord = tokens.subList(selection.first, selection.last + 1)
+                val syllables = inWord.flatMap { t -> if (t.syllables.size == t.text.length) t.syllables else List(t.text.length) { "" } }
+                if (entry == null || word.length !in 2..4 || !word.all { it.isHan() }) emptyList()
+                else word.mapIndexed { k, c -> c.toString() to engine.charGloss(c.toString(), syllables.getOrNull(k)?.takeIf { it.isNotEmpty() }) }
+                    .takeIf { rows -> rows.all { it.second != null } }.orEmpty()
+            }
+            if (canMark || charRows.isNotEmpty()) {
+                Column(Modifier.padding(top = 8.dp).widthIn(max = 190.dp), horizontalAlignment = Alignment.End) {
+                    if (canMark) KnownToggle(known = knownNow, onKnown = { onKnown(word, it) })
+                    if (charRows.isNotEmpty()) CharBreakdown(charRows, Modifier.padding(top = 10.dp))
+                }
+            }
             }
             if (canMark && knownReason != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1483,5 +1528,22 @@ private fun OwnMeaning(word: String, meaning: String?, onChange: (String, String
         }
     } else {
         TextButton(onClick = { editing = true }, contentPadding = PaddingValues(0.dp)) { Text("+ Своё значение") }
+    }
+}
+
+/** One line per character of a word: the character and its meaning in a few words. */
+@Composable
+internal fun CharBreakdown(rows: List<Pair<String, String?>>, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        for ((c, gloss) in rows) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(c, fontFamily = WordFont, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    gloss.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }

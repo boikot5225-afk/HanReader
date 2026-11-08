@@ -76,6 +76,9 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
     val grid by vm.grid.collectAsState()
     val books = remember(all, sort) { vm.sorted(all, sort) }
     val analysis by vm.analysis.collectAsState()
+    // The latest share of known words in each book (its understanding, from the statistics).
+    val progressRows by vm.bookProgress.collectAsState(initial = emptyList())
+    val knownShare = remember(progressRows) { progressRows.groupBy { it.bookId }.mapValues { (_, r) -> r.maxBy { it.day }.percent } }
     val known by vm.knownWords.collectAsState()
     val levelMark by vm.levelMark.collectAsState()
     var showLevel by remember { mutableStateOf(false) }
@@ -138,7 +141,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
             items(books.chunked(3), key = { row -> row.first().id }) { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     row.forEach { book ->
-                        BookTile(vm, book, analysis[book.id], Modifier.weight(1f), onOpen = { onOpen(book.id) }, onStats = { onStats(book.id) }, onDelete = { confirmDelete = book })
+                        BookTile(vm, book, analysis[book.id], knownShare[book.id], Modifier.weight(1f), onOpen = { onOpen(book.id) }, onStats = { onStats(book.id) }, onDelete = { confirmDelete = book })
                     }
                     repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
@@ -149,6 +152,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
                     vm,
                     book,
                     progress = analysis[book.id],
+                    known = knownShare[book.id],
                     onOpen = { onOpen(book.id) },
                     onStats = { onStats(book.id) },
                     onDelete = { confirmDelete = book }
@@ -196,7 +200,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
 }
 
 @Composable
-private fun BookRow(vm: ReaderViewModel, book: BookEntity, progress: Float?, onOpen: () -> Unit, onStats: () -> Unit, onDelete: () -> Unit) {
+private fun BookRow(vm: ReaderViewModel, book: BookEntity, progress: Float?, known: Int?, onOpen: () -> Unit, onStats: () -> Unit, onDelete: () -> Unit) {
     Surface(onClick = onOpen, shape = RoundedCornerShape(LocalThemeSpec.current.corner), color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
@@ -217,6 +221,7 @@ private fun BookRow(vm: ReaderViewModel, book: BookEntity, progress: Float?, onO
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                known?.let { DifficultyLabel(it) }
                 BookVocabularyAction(book, progress, onStats)
             }
             Spacer(Modifier.width(8.dp))
@@ -232,7 +237,7 @@ private fun readFraction(book: BookEntity) = if (book.chapterCount > 0 && book.l
 /** A book in the cover grid; long press offers the book's vocabulary and deleting. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BookTile(vm: ReaderViewModel, book: BookEntity, progress: Float?, modifier: Modifier, onOpen: () -> Unit, onStats: () -> Unit, onDelete: () -> Unit) {
+private fun BookTile(vm: ReaderViewModel, book: BookEntity, progress: Float?, known: Int?, modifier: Modifier, onOpen: () -> Unit, onStats: () -> Unit, onDelete: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box {
@@ -249,8 +254,22 @@ private fun BookTile(vm: ReaderViewModel, book: BookEntity, progress: Float?, mo
         Text(book.title, fontFamily = WordFont, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (progress != null) {
             Text("Словарь… ${(progress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        } else known?.let { DifficultyLabel(it, short = true) }
     }
+}
+
+/** «Для тебя: 97% · комфортно»: how much of the book the reader knows and what that means for reading. */
+@Composable
+private fun DifficultyLabel(percent: Int, short: Boolean = false) {
+    val d = ReadingStats.Difficulty.of(percent)
+    val color = when (d) {
+        ReadingStats.Difficulty.COMFORTABLE, ReadingStats.Difficulty.WITH_HINTS -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Text(
+        (if (short) "" else "Для тебя: ") + "$percent% · ${d.title}",
+        style = MaterialTheme.typography.bodySmall, color = color, maxLines = 1
+    )
 }
 
 /** The book's own cover, or one drawn from its title in the theme's colours. */
@@ -373,7 +392,8 @@ private fun ActivityPanel(vm: ReaderViewModel, onOpen: () -> Unit) {
                 Overline("Статистика")
                 Text(
                     "Сегодня ${(row?.readMillis ?: 0L) / 60_000} мин · серия ${streak.current} " +
-                        com.hanreader.app.RussianText.plural(streak.current, "день", "дня", "дней"),
+                        com.hanreader.app.RussianText.plural(streak.current, "день", "дня", "дней") +
+                        days.sumOf { it.readChars.toLong() }.let { if (it > 0) " · прочитано ${ReadingStats.amount(it)}" else "" },
                     style = MaterialTheme.typography.titleSmall
                 )
             }
