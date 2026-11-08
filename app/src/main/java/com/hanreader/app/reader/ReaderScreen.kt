@@ -194,7 +194,10 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val showPinyin = pinyinMode != PinyinMode.OFF && com.hanreader.app.lang.Languages.current.readingTitle != null
     // Recommended words for the reader's level (blue), words not known yet (red).
     val levelMark by vm.levelMark.collectAsState()
-    val readerLevel = remember(matcher, levelMark, engine) { engine?.let { Recommendations.level(levelMark, matcher, (it as? ZhEngine)?.hsk ?: HskLevels(emptyMap())) } }
+    val readerLevel = remember(matcher, levelMark, engine) { engine?.let { e ->
+        if (e is ZhEngine) Recommendations.level(levelMark, matcher, e.hsk)
+        else e.levels?.let { Recommendations.level(levelMark.level, matcher, it) }
+    } }
     val bookWordMap = remember(bookWords) { bookWords.associateBy { it.word } }
     val wantRecommended = appearance.markRecommended || pinyinMode == PinyinMode.RECOMMENDED || appearance.gloss == GlossMode.RECOMMENDED
     val recommended = remember(chapter, matcher, saved, names, bookWordMap, readerLevel, appearance.recommendedPerChapter, wantRecommended) {
@@ -1283,6 +1286,8 @@ private fun WordSheet(
                 mark?.source == ReaderViewModel.UNKNOWN -> "отмечено «Не знаю»"
                 mark?.source == "manual" -> "отмечено «Знаю»"
                 mark != null -> "знакомо по уровню " + mark!!.source.replace("hsk3:", "HSK 3.0 · ").replace("hsk2:", "HSK 2.0 · ")
+                    .let { s -> engine.levels?.takeIf { zh == null && s.startsWith(com.hanreader.app.lang.Languages.current.tag + ":") }
+                        ?.label(s.substringAfter(':').toIntOrNull() ?: 0) ?: s }
                 word in known || cardWord in known -> "выучено в карточках"
                 knownNow -> "знакомо по частям слова"
                 else -> null

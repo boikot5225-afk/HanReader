@@ -145,11 +145,15 @@ interface LanguageModule {
 
 /** Word levels of a language, from easiest. Chinese: HSK 3.0, 1..7 (7 = 7–9). */
 interface WordLevels {
-    /** "HSK". */
+    /** "HSK"; empty when the titles say it all (A1). */
     val name: String
+    /** The scale in a sentence: «HSK 3.0», «уровней A1–C2 (по частотности слов)». */
+    val scaleTitle: String get() = name
     val all: List<Int>
     /** "7–9" for level 7 of HSK 3.0. */
     fun title(level: Int): String
+    /** "HSK 7–9", "B1". */
+    fun label(level: Int): String = if (name.isEmpty()) title(level) else "$name ${title(level)}"
     /** The level of a listed word; 0 when it is not on the lists. */
     fun of(word: String): Int
     /** The level of any word: listed, or guessed (e.g. from frequency); above [all] for rare words. */
@@ -179,7 +183,7 @@ object Languages {
         tag = "es-ES",
         title = "Испанский",
         readingTitle = null,
-        levelsTitle = null,
+        levelsTitle = "A1–C2",
         sentenceEnd = ".!?…;\n",
         voiceMissing = "Нет испанского голоса. Установи его: Настройки Android → Синтез речи",
         noWordsMessage = "В тексте нет испанских слов",

@@ -429,6 +429,16 @@ interface KnownWordDao {
         return putAllIfAbsent(words).count { it > 0 }
     }
 
+    @Query("DELETE FROM known_words WHERE source LIKE :prefix || '%'")
+    suspend fun removeMarksStartingWith(prefix: String)
+
+    /** Level marks of another language ([prefix] "es-ES:"): replaced, the Chinese HSK marks stay. */
+    @Transaction
+    suspend fun setLevelMarks(words: List<KnownWord>, prefix: String): Int {
+        removeMarksStartingWith(prefix)
+        return putAllIfAbsent(words).count { it > 0 }
+    }
+
     @Transaction
     suspend fun replaceAll(words: List<KnownWord>) {
         removeAll()

@@ -102,6 +102,18 @@ class EsEngineTest {
         assertTrue(engine.cardTranslation("sin embargo")!!.contains("однако"))
     }
 
+    @Test
+    fun levelsByFrequency() {
+        val lv = engine.levels
+        assertEquals(1, lv.of("ser"))
+        assertEquals(1, lv.of("habló"))
+        assertTrue(lv.of("orinar") >= 4)
+        assertEquals(7, lv.estimate("comemierda"))
+        assertTrue("casa" in lv.knownAt(1))
+        assertTrue(lv.knownAt(2).size in 1_200..1_600)
+        assertEquals("B1", lv.label(3))
+    }
+
     companion object {
         fun load(): EsEngine {
             val dir = File("src/main/assets/es")

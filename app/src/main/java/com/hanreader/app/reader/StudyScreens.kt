@@ -276,20 +276,22 @@ fun BookStatsScreen(vm: ReaderViewModel, bookId: Long, onClose: () -> Unit) {
             if (s.levels.isNotEmpty()) item {
                 Panel(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Overline("Сложность относительно HSK 3.0")
+                        val lv = eng?.levels
+                        fun label(l: Int) = lv?.label(l) ?: "HSK ${HskSystem.HSK3.levelTitle(l)}"
+                        Overline("Сложность относительно " + (lv?.scaleTitle ?: "HSK 3.0"))
                         val level95 = s.levelFor(95)
                         val level90 = s.levelFor(90)
                         Text(
                             when {
-                                level90 == null -> "Даже словарь всех уровней HSK покрывает меньше 90% текста: много редких слов и имён."
-                                level95 == null -> "Слова до HSK ${HskSystem.HSK3.levelTitle(level90)} покрывают 90% текста; 95% не набирается."
-                                else -> "Для 95% знакомых слов нужен примерно HSK ${HskSystem.HSK3.levelTitle(level95)}."
+                                level90 == null -> "Даже слова всех уровней покрывают меньше 90% текста: много редких слов и имён."
+                                level95 == null -> "Слова до ${label(level90)} покрывают 90% текста; 95% не набирается."
+                                else -> "Для 95% знакомых слов нужен примерно ${label(level95)}."
                             },
                             style = MaterialTheme.typography.bodyLarge
                         )
                         s.levels.forEach { l ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("HSK ${HskSystem.HSK3.levelTitle(l.level)}", Modifier.width(76.dp), style = MaterialTheme.typography.bodyMedium)
+                                Text(label(l.level), Modifier.width(76.dp), style = MaterialTheme.typography.bodyMedium)
                                 ProgressBar(l.percent / 100f, Modifier.weight(1f))
                                 Text("${l.percent}%", Modifier.width(48.dp).padding(start = 8.dp), style = MaterialTheme.typography.bodyMedium)
                             }

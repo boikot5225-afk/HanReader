@@ -116,10 +116,13 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         prefs.edit().putString("pinyin", mode.name).apply()
     }
 
+    private val chinese = com.hanreader.app.lang.Languages.current == com.hanreader.app.lang.Languages.CHINESE
+    /** The chosen level is kept per language: HSK for Chinese, A1–C2 for Spanish. */
+    private val levelKey = if (chinese) "hskLevel" else "level_" + com.hanreader.app.lang.Languages.current.tag
     private val _levelMark = MutableStateFlow(
         LevelMark(
             HskSystem.entries.firstOrNull { it.name == prefs.getString("hskSystem", null) } ?: HskSystem.HSK3,
-            prefs.getInt("hskLevel", 0)
+            prefs.getInt(levelKey, 0)
         )
     )
     val levelMark: StateFlow<LevelMark> = _levelMark.asStateFlow()
@@ -153,12 +156,25 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         return listed + engine.expandKnown(listed)
     }
 
-    /** Marks every word up to [level] of [system] as known (0 removes the level marks). Manual marks stay. */
+    /**
+     * Marks every word up to [level] as known (0 removes the level marks). Manual marks stay.
+     * Chinese: [system] is HSK 3.0 or 2.0. Another language: its own levels ([system] ignored),
+     * marked "es-ES:3", so the Chinese marks stay as they are.
+     */
     fun setLevel(system: HskSystem, level: Int, onDone: (Result<Int>) -> Unit) {
         viewModelScope.launch {
             onDone(runCatching {
-                // HSK levels: Chinese only.
-                val engine = engineDeferred.await() as? ZhEngine ?: throw IllegalStateException("Уровни HSK есть только у китайского")
+                val any = engineDeferred.await()
+                if (any !is ZhEngine) {
+                    val levels = any.levels ?: throw IllegalStateException("У этого языка нет уровней")
+                    val prefix = com.hanreader.app.lang.Languages.current.tag + ":"
+                    val words = if (level == 0) emptySet() else withContext(Dispatchers.Default) { levels.knownAt(level) }
+                    val added = knownDao.setLevelMarks(words.map { KnownWord(it, prefix + level) }, prefix)
+                    _levelMark.value = LevelMark(system, level)
+                    prefs.edit().putInt(levelKey, level).apply()
+                    return@runCatching added
+                }
+                val engine = any
                 val words = withContext(Dispatchers.Default) { levelWords(engine, system, level) }
                 val tag = levelTag(system, level)
                 val added = knownDao.setLevelMarks(words.map { KnownWord(it, tag) })
@@ -187,7 +203,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         }
         // HSK lists were corrected after the level was chosen: mark the same level again with the new data.
         val mark = _levelMark.value
-        if (mark.level > 0 && prefs.getInt("hskData", 1) < HSK_DATA_VERSION) setLevel(mark.system, mark.level) {}
+        if (chinese && mark.level > 0 && prefs.getInt("hskData", 1) < HSK_DATA_VERSION) setLevel(mark.system, mark.level) {}
         // Simplified / traditional chosen in the settings: redraw the open chapter in that script.
         viewModelScope.launch {
             com.hanreader.app.AppearanceStore.appearance.map { it.script }.distinctUntilChanged().drop(1)

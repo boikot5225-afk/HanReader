@@ -6,8 +6,8 @@ import com.hanreader.app.lang.LanguageModule
 import kotlin.math.ln
 
 /** The reader's level on the HSK 3.0 scale (1..7, 7 = 7–9), and whether it was worked out automatically. */
-data class ReaderLevel(val hsk3: Int, val auto: Boolean) {
-    val title: String get() = "HSK ${HskSystem.HSK3.levelTitle(hsk3)}"
+data class ReaderLevel(val hsk3: Int, val auto: Boolean, val label: String? = null) {
+    val title: String get() = label ?: "HSK ${HskSystem.HSK3.levelTitle(hsk3)}"
 }
 
 /** Why a word is recommended: shown in the word sheet. */
@@ -31,6 +31,25 @@ object Recommendations {
             if (share >= AUTO_SHARE) level = l else break
         }
         return ReaderLevel(level, auto = true)
+    }
+
+    /**
+     * Another language's levels ([levels], e.g. A1–C2 by frequency): the chosen one, or the highest
+     * level whose words the reader knows for at least [AUTO_SHARE], minimum 1.
+     */
+    fun level(chosen: Int, known: KnownMatcher, levels: com.hanreader.app.lang.WordLevels): ReaderLevel {
+        if (chosen > 0) return ReaderLevel(chosen, auto = false, label = levels.label(chosen))
+        var level = 1
+        var below = emptySet<String>()
+        for (l in levels.all) {
+            val upTo = levels.knownAt(l)
+            val words = upTo - below
+            below = upTo
+            if (words.isEmpty()) continue
+            val share = words.count { known.isKnown(it) }.toDouble() / words.size
+            if (share >= AUTO_SHARE) level = l else break
+        }
+        return ReaderLevel(level, auto = true, label = levels.label(level))
     }
 
     /**

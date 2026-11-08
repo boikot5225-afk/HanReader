@@ -280,6 +280,7 @@ class ZhEngine(
     /** HSK 3.0 (1..7, 7 = 7–9). HSK 2.0, chosen in the library, is mapped onto it. */
     override val levels: WordLevels = object : WordLevels {
         override val name = "HSK"
+        override val scaleTitle = "HSK 3.0"
         override val all = HskSystem.HSK3.levels
         override fun title(level: Int) = HskSystem.HSK3.levelTitle(level)
         override fun of(word: String) = hsk.hsk3(word)

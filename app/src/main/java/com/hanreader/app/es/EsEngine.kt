@@ -201,6 +201,32 @@ class EsEngine(
     override fun knownByParts(word: String, known: Set<String>): Boolean =
         word.lowercase() in known || analyses(word).any { it.entry.lemma in known }
 
+    /**
+     * Levels A1–C2 by frequency, not an official list: the most frequent 500 words count as A1,
+     * up to 1 500 A2, 3 000 B1, 5 000 B2, 8 000 C1, 16 000 C2 (ranks of FrequencyWords).
+     */
+    override val levels: com.hanreader.app.lang.WordLevels = object : com.hanreader.app.lang.WordLevels {
+        private val bands = intArrayOf(500, 1_500, 3_000, 5_000, 8_000, 16_000)
+        private val titles = listOf("A1", "A2", "B1", "B2", "C1", "C2")
+        private val byLevel: List<Set<String>> by lazy {
+            val sets = List(bands.size) { HashSet<String>() }
+            dict.forEach { lemma, f ->
+                val r = f.getOrNull(4)?.toIntOrNull() ?: 0
+                if (r > 0) levelOf(r).takeIf { it > 0 }?.let { sets[it - 1] += lemma }
+            }
+            sets
+        }
+        private fun levelOf(rank: Int): Int = bands.indexOfFirst { rank <= it } + 1
+
+        override val name = ""
+        override val scaleTitle = "уровней A1–C2 (по частотности слов)"
+        override val all = (1..bands.size).toList()
+        override fun title(level: Int) = titles.getOrElse(level - 1) { "C2+" }
+        override fun of(word: String): Int = analyses(word).firstOrNull()?.entry?.rank?.takeIf { it > 0 }?.let { levelOf(it) } ?: 0
+        override fun estimate(word: String): Int = of(word).takeIf { it > 0 } ?: (bands.size + 1)
+        override fun knownAt(level: Int): Set<String> = (1..level.coerceAtMost(bands.size)).flatMapTo(HashSet()) { byLevel[it - 1] }
+    }
+
     /** Searched without case and stress marks: «cancion» finds «canción». */
     override fun searchForm(text: String): String = unaccent(text.lowercase())
 

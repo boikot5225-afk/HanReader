@@ -29,6 +29,17 @@ class SortedTsv private constructor(private val b: ByteArray, private val starts
 
     fun contains(key: String): Boolean = get(key) != null
 
+    /** Every line as key and fields after it, in order. */
+    fun forEach(action: (String, List<String>) -> Unit) {
+        for (k in starts.indices) {
+            val s = starts[k]
+            var e = s
+            while (e < b.size && b[e] != NL) e++
+            val parts = String(b, s, e - s, Charsets.UTF_8).split('\t')
+            action(parts[0], parts.drop(1))
+        }
+    }
+
     /** Compares the key of the line starting at [at] with [k], as unsigned bytes. */
     private fun compare(at: Int, k: ByteArray): Int {
         var i = 0

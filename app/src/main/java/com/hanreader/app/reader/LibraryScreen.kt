@@ -190,7 +190,10 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
         }
     }
 
-    if (showLevel) LevelDialog(vm, levelMark, onClose = { showLevel = false })
+    if (showLevel) {
+        if (com.hanreader.app.lang.Languages.current == com.hanreader.app.lang.Languages.CHINESE) LevelDialog(vm, levelMark, onClose = { showLevel = false })
+        else SimpleLevelDialog(vm, levelMark, onClose = { showLevel = false })
+    }
 
     confirmDelete?.let { book ->
         AlertDialog(
@@ -332,8 +335,9 @@ private fun KnownWordsPanel(count: Int, mark: LevelMark, onChoose: () -> Unit, w
                     Text("Отмечай слова «Знаю» в карточке слова", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else Text(
-                    if (mark.level == 0) "Отметь свой уровень — пиньинь останется только над новыми словами"
-                    else "Отмечено до ${mark.system.title} ${mark.system.levelTitle(mark.level)} и слова «Знаю»",
+                    if (mark.level == 0) "Отметь свой уровень — " + (if (com.hanreader.app.lang.Languages.current.readingTitle != null) "пиньинь останется" else "подсказки останутся") + " только над новыми словами"
+                    else "Отмечено до " + (if (com.hanreader.app.lang.Languages.current == com.hanreader.app.lang.Languages.CHINESE)
+                        "${mark.system.title} ${mark.system.levelTitle(mark.level)}" else listOf("A1", "A2", "B1", "B2", "C1", "C2").getOrElse(mark.level - 1) { "?" }) + " и слова «Знаю»",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -341,6 +345,47 @@ private fun KnownWordsPanel(count: Int, mark: LevelMark, onChoose: () -> Unit, w
             if (withLevels) TextButton(onClick = onChoose) { Text(if (mark.level == 0) "Уровень" else "Изменить") }
         }
     }
+}
+
+/** Levels of a language other than Chinese (Spanish: A1–C2 by word frequency). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SimpleLevelDialog(vm: ReaderViewModel, current: LevelMark, onClose: () -> Unit) {
+    val engine by vm.engine.collectAsState()
+    val levels = engine?.levels
+    var level by remember { mutableStateOf(current.level) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = { if (!busy) onClose() },
+        title = { Text("Какие слова ты уже знаешь?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Все слова до выбранного уровня станут знакомыми. Уровни приблизительные: по частотности слов, " +
+                        "A1 — 500 самых частых, A2 — 1 500, B1 — 3 000, B2 — 5 000, C1 — 8 000, C2 — 16 000. Слова «Знаю» не изменятся.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (levels == null) Text("Словарь ещё загружается…")
+                else FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = level == 0, onClick = { level = 0 }, label = { Text("Начинаю") })
+                    levels.all.forEach { l -> FilterChip(selected = level == l, onClick = { level = l }, label = { Text(levels.label(l)) }) }
+                }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !busy && levels != null, onClick = {
+                busy = true
+                vm.setLevel(current.system, level) { r ->
+                    busy = false
+                    r.onSuccess { onClose() }.onFailure { error = it.message ?: "Не получилось" }
+                }
+            }) { Text(if (busy) "Сохраняю…" else "Готово") }
+        },
+        dismissButton = { TextButton(enabled = !busy, onClick = onClose) { Text("Отмена") } }
+    )
 }
 
 /** The language being read, and the switch to another one (the app restarts with its dictionary). */
