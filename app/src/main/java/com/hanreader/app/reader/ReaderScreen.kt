@@ -1283,6 +1283,13 @@ private fun WordSheet(
     val pageReading = if (selection.first == selection.last && first.text.length == 1) first.pinyin.takeIf { it.isNotEmpty() } else null
     val russian = remember(word, pageReading) { zh?.russianSenses(word, pageReading) ?: es.firstOrNull()?.entry?.let { (engine as com.hanreader.app.es.EsEngine).senses(it) }.orEmpty() }
     val otherReadings = remember(word, pageReading) { zh?.otherReadings(word, pageReading).orEmpty() }
+    // A tapped marker of a Chinese construction in this sentence (把, 虽然 … 但是): what the construction means.
+    val grammar = remember(word, selection) {
+        if (zh == null || selection.first != selection.last) emptyList() else {
+            val r = Highlights.sentence(block, selection.first, selection.first)
+            com.hanreader.app.zh.Grammar.at(tokens.subList(r.first, r.last + 1).map { it.text }, selection.first - r.first)
+        }
+    }
     val translation = userMeaning ?: (if (zh == null) engine.cardTranslation(word, es.firstOrNull()?.entry?.lemma) else engine.cardTranslation(word, pageReading))
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
@@ -1378,6 +1385,7 @@ private fun WordSheet(
                     Text("$p — $ru", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            grammar.forEach { GrammarNote(it.point) }
             if (entry != null) {
                 if (russian.isNotEmpty()) {
                     Text("English", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1601,6 +1609,19 @@ private fun ConjugationTable(c: Map<String, Map<String, List<String>>>) {
                     }
                 }
             }
+        }
+    }
+}
+
+/** A grammar construction the tapped word belongs to: its pattern, what it means, an example. */
+@Composable
+private fun GrammarNote(point: com.hanreader.app.zh.GrammarPoint) {
+    Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Грамматика · ${point.title}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text(point.explanation, style = MaterialTheme.typography.bodyMedium)
+            Text(point.example, fontFamily = WordFont, style = MaterialTheme.typography.titleMedium)
+            Text(point.exampleRu, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

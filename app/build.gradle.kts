@@ -14,8 +14,8 @@ android {
         manifestPlaceholders["appLabel"] = "HanReader ES"
         minSdk = 26
         targetSdk = 36
-        versionCode = 37
-        versionName = "0.17.1"
+        versionCode = 38
+        versionName = "0.18.0"
         // Instrumented tests (app/src/androidTest) on emulators in CI.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
