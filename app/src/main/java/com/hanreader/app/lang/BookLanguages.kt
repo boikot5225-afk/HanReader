@@ -13,11 +13,15 @@ import com.hanreader.app.zh.isHan
 object BookLanguages {
     private const val PREFS = "book_languages"
 
+    /** Bumped on every change, so the library refilters (a book's language is saved after its row). */
+    val changes = kotlinx.coroutines.flow.MutableStateFlow(0)
+
     fun of(context: Context, bookId: Long): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(bookId.toString(), null) ?: Languages.CHINESE.tag
 
     fun set(context: Context, bookId: Long, tag: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(bookId.toString(), tag).apply()
+        changes.value++
     }
 
     /** After restoring a backup: exactly these languages (book id -> tag); other books are Chinese. */
@@ -25,6 +29,7 @@ object BookLanguages {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply {
             languages.forEach { (id, tag) -> putString(id.toString(), tag) }
         }.apply()
+        changes.value++
     }
 
     fun remove(context: Context, bookId: Long) {

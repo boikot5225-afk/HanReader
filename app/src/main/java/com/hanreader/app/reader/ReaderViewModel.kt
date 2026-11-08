@@ -74,7 +74,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The books of the language being read (see [com.hanreader.app.lang.BookLanguages]). */
     val library: StateFlow<List<BookEntity>> =
-        books.observeAll().map { all ->
+        books.observeAll().combine(com.hanreader.app.lang.BookLanguages.changes) { all, _ ->
             val tag = com.hanreader.app.lang.Languages.current.tag
             all.filter { com.hanreader.app.lang.BookLanguages.of(app, it.id) == tag }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
