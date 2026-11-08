@@ -38,7 +38,9 @@ data class LanguageInfo(
     /** A letter of the language: tells a text in it from other text, and a name the reader may mark. */
     val isWordChar: (Char) -> Boolean,
     /** The usual encoding of old .txt files that are not UTF-8. */
-    val legacyCharset: String
+    val legacyCharset: String,
+    /** Where a word may be broken across lines (offsets of the break); null: words are never broken. */
+    val hyphenate: ((String) -> List<Int>)? = null
 ) {
     val locale: Locale get() = Locale.forLanguageTag(tag)
 }
@@ -182,7 +184,8 @@ object Languages {
         voiceMissing = "Нет испанского голоса. Установи его: Настройки Android → Синтез речи",
         noWordsMessage = "В тексте нет испанских слов",
         isWordChar = { it.isLetter() },
-        legacyCharset = "windows-1252"
+        legacyCharset = "windows-1252",
+        hyphenate = com.hanreader.app.es.EsHyphenator::points
     )
 
     val ALL = listOf(CHINESE, SPANISH)

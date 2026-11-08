@@ -84,10 +84,12 @@ object Paginator {
                     if (laid.lineCount == 0) continue
                     val lineChars = IntArray(laid.lineCount)
                     val lineStart = IntArray(laid.lineCount) { Int.MAX_VALUE }
+                    val counted = HashSet<Int>()
                     for (p in laid.items) {
                         val t = block.tokens[p.token]
                         val l = laid.lineOf(p).coerceIn(0, laid.lineCount - 1)
-                        if (t.kind == TokenKind.HAN) lineChars[l] += t.text.length
+                        // A word broken across lines (hyphenation) counts once.
+                        if (t.kind == TokenKind.HAN && counted.add(p.token)) lineChars[l] += t.text.length
                         if (t.start < lineStart[l]) lineStart[l] = t.start
                     }
                     var line = 0

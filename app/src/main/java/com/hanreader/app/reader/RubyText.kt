@@ -200,6 +200,7 @@ internal fun layout(
     /** Only these tokens get their translation drawn (it fades after a few appearances); null: all. */
     glossOnly: Set<Int>? = null
 ): RubyLayout {
+    val hyphenate = com.hanreader.app.lang.Languages.current.hyphenate
     // The pinyin row is kept even above known words, so lines keep one rhythm; so is the translation row.
     val glossH = if (glossFor != null && !heading) metrics.glossHeight.toFloat() else 0f
     val pinH = if (showPinyin) metrics.pinyinHeight.toFloat() else 0f
@@ -230,6 +231,22 @@ internal fun layout(
         // Closing punctuation never starts a line: let it hang past the margin.
         val hangs = t.kind == TokenKind.PUNCT && t.text[0] in CLOSING
         if (lineHasContent && x + w > widthPx && !hangs) {
+            // A language with hyphenation: the part of the word that fits stays, with a hyphen.
+            val split = if (hyphenate != null && t.kind == TokenKind.HAN && !heading && pinLayout == null && t.display == t.text)
+                hyphenate(t.display).lastOrNull { p -> x + metrics.han(t.display.substring(0, p) + "-", false).size.width <= widthPx }
+            else null
+            if (split != null) {
+                val head = metrics.han(t.display.substring(0, split) + "-", false)
+                items += Placed(i, x, y, head.size.width.toFloat(), head, null)
+                if (items.size - lineStart >= 2) stretch += lineStart until items.size
+                x = 0f; y += lineH
+                lineStart = items.size
+                val tail = metrics.han(t.display.substring(split), false)
+                items += Placed(i, x, y, tail.size.width.toFloat(), tail, null)
+                x += tail.size.width
+                lineHasContent = true
+                continue
+            }
             // A full line ends here: it may be justified (the last line of the paragraph is not).
             if (items.size - lineStart >= 2) stretch += lineStart until items.size
             x = 0f; y += lineH
@@ -263,7 +280,8 @@ private fun placeGlosses(
     only: Set<Int>? = null
 ): List<GlossPlaced> {
     val out = ArrayList<GlossPlaced>()
-    val byLine = items.filter { tokens[it.token].kind == TokenKind.HAN && (only == null || it.token in only) && glossOf(glossFor, tokens[it.token]) != null }
+    // A word broken across lines gets its translation once, over its first part.
+    val byLine = items.distinctBy { it.token }.filter { tokens[it.token].kind == TokenKind.HAN && (only == null || it.token in only) && glossOf(glossFor, tokens[it.token]) != null }
         .groupBy { it.lineTop }
     val pad = metrics.emWidth * 0.15f
     for ((top, line) in byLine) {
