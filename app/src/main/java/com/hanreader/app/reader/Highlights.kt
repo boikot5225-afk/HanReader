@@ -243,11 +243,37 @@ internal fun PhraseSheet(
                 Text("Выбери цвет — потом можно добавить заметку.", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            androidx.compose.material3.OutlinedButton(
-                onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(text)); copied = true },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp)
-            ) { Text(if (copied) "Скопировано" else "Копировать") }
+            val context = androidx.compose.ui.platform.LocalContext.current
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(text)); copied = true },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(18.dp)
+                ) { Text(if (copied) "Скопировано" else "Копировать") }
+                // A full translation stays one step away, in another app: the page itself teaches reading.
+                androidx.compose.material3.OutlinedButton(
+                    onClick = { openInTranslator(context, text) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(18.dp)
+                ) { Text("В переводчик") }
+            }
         }
     }
+}
+
+/**
+ * Hands [text] to a translator app on the phone (Google, Yandex...) the way other apps' «Перевести»
+ * does (ACTION_PROCESS_TEXT): nothing goes through HanReader, no key, no internet of ours. Without
+ * such an app, the share sheet. False if nothing can take it.
+ */
+internal fun openInTranslator(context: android.content.Context, text: String): Boolean {
+    val process = android.content.Intent(android.content.Intent.ACTION_PROCESS_TEXT).setType("text/plain")
+        .putExtra(android.content.Intent.EXTRA_PROCESS_TEXT, text)
+        .putExtra(android.content.Intent.EXTRA_PROCESS_TEXT_READONLY, true)
+    val apps = context.packageManager.queryIntentActivities(process, 0)
+    val intent = if (apps.isNotEmpty()) android.content.Intent.createChooser(process, "Перевести")
+        else android.content.Intent.createChooser(
+            android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, text), "Перевести"
+        )
+    return runCatching { context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
 }

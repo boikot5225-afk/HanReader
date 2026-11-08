@@ -71,6 +71,11 @@ class BackupFormatTest {
         assertThrows(BackupFormatException::class.java) { BackupFormat.decode(json) }
     }
 
+    @Test fun keepsOwnMeanings() {
+        val json = BackupFormat.encode(Backup(1L, listOf(card), examples, settings, userMeanings = listOf(UserMeaning("端", "держать в руках", 7))))
+        assertEquals(listOf(UserMeaning("端", "держать в руках", 7)), BackupFormat.decode(json).userMeanings)
+    }
+
     @Test fun rejectsExamplesWithoutWord() {
         val json = BackupFormat.encode(
             Backup(1L, listOf(card), examples + CardExample(cardId = 99, example = "x", exampleTranslation = "y"), settings)

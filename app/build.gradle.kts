@@ -11,8 +11,8 @@ android {
         applicationId = "com.hanreader.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 33
-        versionName = "0.14.6"
+        versionCode = 34
+        versionName = "0.15.0"
         // Instrumented tests (app/src/androidTest) on emulators in CI.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

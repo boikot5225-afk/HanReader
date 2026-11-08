@@ -562,6 +562,20 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     /** A page of [chars] characters was read in [millis]; implausible times are ignored. */
     private val statsDao = db.statsDao()
+    private val meaningDao = db.userMeaningDao()
+
+    /** The reader's own meanings of words (word -> meaning). */
+    val userMeanings: StateFlow<Map<String, String>> = meaningDao.observeAll()
+        .map { list -> list.associate { it.word to it.meaning } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    /** Sets the reader's meaning of [word]; a blank one removes it. */
+    fun setUserMeaning(word: String, meaning: String) {
+        val m = meaning.trim()
+        viewModelScope.launch {
+            if (m.isEmpty()) meaningDao.remove(word) else meaningDao.put(com.hanreader.app.UserMeaning(word, m))
+        }
+    }
 
     /** Days of reading and reviews, for the statistics screen. */
     val activity = statsDao.observeDays()

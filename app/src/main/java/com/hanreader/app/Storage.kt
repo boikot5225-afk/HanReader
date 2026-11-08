@@ -268,6 +268,35 @@ interface StatsDao {
     suspend fun allProgress(): List<BookProgress>
 }
 
+/** The reader's own meaning of a word: shown first, used over the word and on its card. */
+@Entity(tableName = "user_meanings")
+data class UserMeaning(
+    @PrimaryKey val word: String,
+    val meaning: String,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface UserMeaningDao {
+    @Query("SELECT * FROM user_meanings")
+    fun observeAll(): Flow<List<UserMeaning>>
+
+    @Query("SELECT * FROM user_meanings ORDER BY word")
+    suspend fun all(): List<UserMeaning>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun put(m: UserMeaning)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putAll(list: List<UserMeaning>)
+
+    @Query("DELETE FROM user_meanings WHERE word = :word")
+    suspend fun remove(word: String)
+
+    @Query("DELETE FROM user_meanings")
+    suspend fun removeAll()
+}
+
 /** How often a word occurs in a book, from the one-time book analysis. */
 @Entity(
     tableName = "book_words",
@@ -660,13 +689,13 @@ interface CardDao {
 // so no database of version 3 exists under this name; Lexicon data arrives through backups.
 // Version 5 (0.2.0): known_words. Schemas are exported to app/schemas for migration checks.
 // Version 6 (0.3.0): book_words and books.analyzedTokens (book vocabulary analysis).
-// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names. Version 9 (0.9.9): books.charOffset. Version 10 (0.10.0): highlights. Version 11 (0.13.0): daily_activity, book_progress.
+// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names. Version 9 (0.9.9): books.charOffset. Version 10 (0.10.0): highlights. Version 11 (0.13.0): daily_activity, book_progress. Version 12 (0.15.0): user_meanings.
 @Database(
     entities = [
         WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
-        Bookmark::class, UserName::class, Highlight::class, DailyActivity::class, BookProgress::class
+        Bookmark::class, UserName::class, Highlight::class, DailyActivity::class, BookProgress::class, UserMeaning::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
@@ -677,6 +706,7 @@ abstract class LexiconDatabase : RoomDatabase() {
     abstract fun userNameDao(): UserNameDao
     abstract fun highlightDao(): HighlightDao
     abstract fun statsDao(): StatsDao
+    abstract fun userMeaningDao(): UserMeaningDao
 
     companion object {
         @Volatile private var instance: LexiconDatabase? = null
@@ -796,7 +826,16 @@ abstract class LexiconDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `user_meanings` (`word` TEXT NOT NULL, `meaning` TEXT NOT NULL, " +
+                        "`updatedAt` INTEGER NOT NULL, PRIMARY KEY(`word`))"
+                )
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {

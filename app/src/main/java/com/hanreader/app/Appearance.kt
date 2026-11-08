@@ -231,7 +231,9 @@ data class Appearance(
     val recommendedPerChapter: Int = 12,
     val gloss: GlossMode = GlossMode.OFF,
     val script: ScriptMode = ScriptMode.AS_BOOK,
-    val tones: ToneColors = ToneColors.OFF
+    val tones: ToneColors = ToneColors.OFF,
+    /** The translation over a word fades after its first [GLOSS_REPEATS] appearances in a chapter. */
+    val glossFade: Boolean = true
 ) {
     fun hanFontFor(spec: ThemeSpec): HanFont = hanFont ?: spec.defaultHanFont
 
@@ -242,6 +244,7 @@ data class Appearance(
         val MARGINS = 8..44
         val PINYIN_SCALE = 0.38f..0.7f
         val RECOMMENDED = 3..40
+        const val GLOSS_REPEATS = 3
     }
 }
 
@@ -276,7 +279,8 @@ object AppearanceStore {
             recommendedPerChapter = p.getInt("recommendedPerChapter", d.recommendedPerChapter).coerceIn(Appearance.RECOMMENDED),
             gloss = GlossMode.entries.firstOrNull { it.name == p.getString("gloss", null) } ?: d.gloss,
             script = ScriptMode.entries.firstOrNull { it.name == p.getString("script", null) } ?: d.script,
-            tones = ToneColors.entries.firstOrNull { it.name == p.getString("tones", null) } ?: d.tones
+            tones = ToneColors.entries.firstOrNull { it.name == p.getString("tones", null) } ?: d.tones,
+            glossFade = p.getBoolean("glossFade", d.glossFade)
         )
         appContext = context.applicationContext
     }
@@ -306,6 +310,7 @@ object AppearanceStore {
             putString("gloss", next.gloss.name)
             putString("script", next.script.name)
             putString("tones", next.tones.name)
+            putBoolean("glossFade", next.glossFade)
             apply()
         }
     }

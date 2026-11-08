@@ -141,6 +141,7 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         ignored = db.bookDao().allIgnored(),
                         progress = db.statsDao().allProgress()
                     ),
+                    userMeanings = db.userMeaningDao().all(),
                     activity = db.statsDao().allDays()
                 )
                 withContext(Dispatchers.IO) {
@@ -194,6 +195,10 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         db.highlightDao().insertAllStrict(lib.highlights)
                         lib.ignored.chunked(2_000).forEach { books.insertWords(it) }
                         db.statsDao().putProgressAll(lib.progress)
+                    }
+                    backup.userMeanings?.let { list ->
+                        db.userMeaningDao().removeAll()
+                        db.userMeaningDao().putAll(list)
                     }
                     backup.activity?.let { days ->
                         db.statsDao().clearDays()

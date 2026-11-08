@@ -59,6 +59,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -177,6 +181,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val bookWordsFlow = remember(book.entity.id) { vm.bookWords(book.entity.id) }
     val bookWords by bookWordsFlow.collectAsState(initial = emptyList())
     val userNames by vm.userNames.collectAsState()
+    val userMeanings by vm.userMeanings.collectAsState()
     // Names of this book (found or «Не учить») and the reader's own «Это имя».
     val names = remember(bookWords, userNames) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word }.apply { addAll(userNames) } }
     val coverage = remember(chapter, matcher, names) { chapter?.let { KnownCoverage.of(it, matcher, names, engine) } }
@@ -202,7 +207,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
     // Short translations above the pinyin: over unknown words or over recommended ones.
-    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter) {
+    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings) {
         val eng = engine
         val words = when (appearance.gloss) {
             GlossMode.OFF -> null
@@ -211,17 +216,23 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         }
         if (words == null || eng == null) null
         else HashMap<String, String>().apply {
-            for (w in words) eng.glossShort(w)?.let { put(w, it) }
+            // The reader's own meaning wins over the dictionary's.
+            for (w in words) (userMeanings[w] ?: eng.glossShort(w))?.let { put(w, it) }
             // A single character gets the meaning of each reading it has on these pages (慢慢地 de, 土地 dì).
             chapter?.blocks?.forEach { b ->
                 (b as? ReaderBlock.Text)?.tokens?.forEach { t ->
-                    if (t.text.length == 1 && t.text in words && t.pinyin.isNotEmpty()) {
+                    if (t.text.length == 1 && t.text in words && t.pinyin.isNotEmpty() && t.text !in userMeanings) {
                         val key = t.text + "|" + t.pinyin
                         if (key !in this) eng.glossShort(t.text, t.pinyin)?.let { put(key, it) }
                     }
                 }
             }
         }
+    }
+    // Fading translations: a word's first few appearances in the chapter carry it, the later ones only the underline.
+    val glossTokens: Map<Int, Set<Int>>? = remember(glossFor, chapter, appearance.glossFade) {
+        val g = glossFor
+        if (g == null || chapter == null || !appearance.glossFade) null else fadingGlosses(chapter, g, com.hanreader.app.Appearance.GLOSS_REPEATS)
     }
     val hidePinyinFor = when (pinyinMode) {
         PinyinMode.UNKNOWN -> knownHere
@@ -257,6 +268,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             },
             lines = lines,
             glossFor = glossFor,
+            glossOnly = glossTokens?.let { it[i] ?: emptySet() },
             unknownMarks = if (appearance.markUnknown) unknownSet else null,
             noMarks = remember(block, names, engine) { engine?.let { VocabularyStats.nameTokens(block, names, it) } ?: emptySet() },
             recommendedMarks = if (appearance.markRecommended) recommendedSet else null,
@@ -551,6 +563,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             },
             onNote = { h, note -> vm.updateHighlight(h.copy(note = note)) },
             onRemoveHighlight = { vm.removeHighlight(it.id) },
+            userMeaning = userMeanings[block.text.substring(block.tokens[sel.first].start, block.tokens[sel.last].end)],
+            onUserMeaning = vm::setUserMeaning,
             onChange = { selection = it },
             onDismiss = { selection = null },
             recommendations = recommended.associateBy { it.word },
@@ -1175,6 +1189,9 @@ private fun WordSheet(
     onHighlight: (Int, com.hanreader.app.Highlight?) -> Unit,
     onNote: (com.hanreader.app.Highlight, String) -> Unit,
     onRemoveHighlight: (com.hanreader.app.Highlight) -> Unit,
+    /** The reader's own meaning of the word, if any, and how to change it (blank removes it). */
+    userMeaning: String? = null,
+    onUserMeaning: (String, String) -> Unit = { _, _ -> },
     onChange: (Selection) -> Unit,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String, (Result<Boolean>) -> Unit) -> Unit,
@@ -1197,7 +1214,7 @@ private fun WordSheet(
     val pageReading = if (selection.first == selection.last && first.text.length == 1) first.pinyin.takeIf { it.isNotEmpty() } else null
     val russian = remember(word, pageReading) { engine.russianSenses(word, pageReading) }
     val otherReadings = remember(word, pageReading) { engine.otherReadings(word, pageReading) }
-    val translation = engine.cardTranslation(word, pageReading)
+    val translation = userMeaning ?: engine.cardTranslation(word, pageReading)
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
     var status by remember(word) { mutableStateOf<String?>(null) }
@@ -1215,7 +1232,20 @@ private fun WordSheet(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Wraps: a long combination must not squeeze the reading into a column.
-            FlowRow(verticalArrangement = Arrangement.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            val markFlow = remember(word) { markOf(word) }
+            val mark by markFlow.collectAsState(initial = null)
+            val knownNow = isKnown(word)
+            val canMark = word.length <= 8 && word.all { it.isHan() }
+            val knownReason = when {
+                mark?.source == ReaderViewModel.UNKNOWN -> "отмечено «Не знаю»"
+                mark?.source == "manual" -> "отмечено «Знаю»"
+                mark != null -> "знакомо по уровню " + mark!!.source.replace("hsk3:", "HSK 3.0 · ").replace("hsk2:", "HSK 2.0 · ")
+                word in known -> "выучено в карточках"
+                knownNow -> "знакомо по частям слова"
+                else -> null
+            }
+            Row(verticalAlignment = Alignment.Top) {
+            FlowRow(Modifier.weight(1f), verticalArrangement = Arrangement.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val shownWord = block.shown.substring(first.start, last.end)
                 Text(shownWord, fontFamily = WordFont, fontSize = if (word.length > 6) 28.sp else 40.sp, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.alignByBaseline())
@@ -1226,6 +1256,20 @@ private fun WordSheet(
                 Text(reading, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.alignByBaseline())
             }
+            if (canMark) KnownToggle(known = knownNow, onKnown = { onKnown(word, it) }, modifier = Modifier.padding(top = 8.dp))
+            }
+            if (canMark && knownReason != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(knownReason.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (mark?.source == ReaderViewModel.UNKNOWN || mark?.source == "manual") {
+                        TextButton(onClick = { onClearKnown(word) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                            Text("Сбросить", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+            OwnMeaning(word, userMeaning, onUserMeaning)
             if (russian.isNotEmpty()) {
                 russian.forEachIndexed { i, sense ->
                     Text("${i + 1}. $sense", style = MaterialTheme.typography.bodyLarge)
@@ -1348,61 +1392,32 @@ private fun WordSheet(
                 onNote = { n -> highlight?.let { onNote(it, n) } },
                 onRemove = { highlight?.let(onRemoveHighlight) }
             )
-            val markFlow = remember(word) { markOf(word) }
-            val mark by markFlow.collectAsState(initial = null)
-            val knownNow = isKnown(word)
-            if (word.length <= 8 && word.all { it.isHan() }) KnownChoice(
-                known = knownNow,
-                reason = when {
-                    mark?.source == ReaderViewModel.UNKNOWN -> "Отмечено «Не знаю»"
-                    mark?.source == "manual" -> "Отмечено «Знаю»"
-                    mark != null -> "Знакомо по уровню " + mark!!.source.replace("hsk3:", "HSK 3.0 · ").replace("hsk2:", "HSK 2.0 · ")
-                    word in known -> "Выучено в карточках"
-                    knownNow -> "Знакомо по частям слова"
-                    else -> null
-                },
-                canReset = mark?.source == ReaderViewModel.UNKNOWN || mark?.source == "manual",
-                onKnown = { onKnown(word, it) },
-                onReset = { onClearKnown(word) }
-            )
             status?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             speaker.message.takeIf { it.isNotEmpty() }?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }
 }
 
-/** «Знаю» / «Не знаю» side by side; the current state is filled, with why the word counts so. */
+/** «Знаю» / «Не знаю» as one small two-part switch next to the word: the current state is filled. */
 @Composable
-private fun KnownChoice(
-    known: Boolean,
-    reason: String?,
-    canReset: Boolean,
-    onKnown: (Boolean) -> Unit,
-    onReset: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            for (value in listOf(true, false)) {
-                val selected = known == value
-                val label = if (value) "Знаю" else "Не знаю"
-                val mod = Modifier.weight(1f).height(52.dp)
-                if (selected) {
-                    Button(onClick = { onKnown(value) }, modifier = mod, shape = RoundedCornerShape(18.dp)) {
-                        Icon(LexiconIcons.Check, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-                        Text(label, style = MaterialTheme.typography.titleMedium)
-                    }
-                } else {
-                    OutlinedButton(onClick = { onKnown(value) }, modifier = mod, shape = RoundedCornerShape(18.dp)) {
-                        Text(label, style = MaterialTheme.typography.titleMedium)
-                    }
-                }
+internal fun KnownToggle(known: Boolean, onKnown: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        modifier.height(36.dp).border(1.dp, scheme.outline, RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp))
+    ) {
+        for (value in listOf(true, false)) {
+            val selected = known == value
+            Box(
+                Modifier.fillMaxHeight().background(if (selected) scheme.primary else Color.Transparent)
+                    .clickable { onKnown(value) }.padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    if (value) "Знаю" else "Не знаю",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (selected) scheme.onPrimary else scheme.onSurfaceVariant
+                )
             }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            reason?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            } ?: Spacer(Modifier.weight(1f))
-            if (canReset) TextButton(onClick = onReset) { Text("Сбросить") }
         }
     }
 }
@@ -1437,5 +1452,36 @@ private fun ReadAloudBar(r: ReadAloud, modifier: Modifier = Modifier) {
                     modifier = Modifier.padding(start = 12.dp, bottom = 6.dp))
             }
         }
+    }
+}
+
+/** The reader's own meaning: shown first; added, edited or removed in place. */
+@Composable
+private fun OwnMeaning(word: String, meaning: String?, onChange: (String, String) -> Unit) {
+    var editing by remember(word) { mutableStateOf(false) }
+    var text by remember(word, meaning) { mutableStateOf(meaning.orEmpty()) }
+    if (editing) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            androidx.compose.material3.OutlinedTextField(
+                value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth(),
+                label = { Text("Моё значение") }, placeholder = { Text("например: держать в руках") },
+                shape = RoundedCornerShape(14.dp), maxLines = 4
+            )
+            Row {
+                TextButton(onClick = { onChange(word, text); editing = false }) { Text("Сохранить") }
+                if (meaning != null) TextButton(onClick = { onChange(word, ""); editing = false }) { Text("Удалить") }
+                TextButton(onClick = { text = meaning.orEmpty(); editing = false }) { Text("Отмена") }
+            }
+        }
+    } else if (meaning != null) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Моё значение", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(meaning, style = MaterialTheme.typography.bodyLarge)
+            }
+            TextButton(onClick = { editing = true }) { Text("Изменить") }
+        }
+    } else {
+        TextButton(onClick = { editing = true }, contentPadding = PaddingValues(0.dp)) { Text("+ Своё значение") }
     }
 }

@@ -164,19 +164,30 @@ class ZhEngine(
 
     /** The first short sense of a defined word, Russian if possible. */
     private fun firstSense(word: String, reading: String? = null): String? {
-        fun clean(x: String) = x.replace(Regex("\\([^)]*\\)|\\[[^]]*]|（[^）]*）"), " ")
-            .replace(Regex("^(перен|разг|книжн|лит|мед|юр|хим|физ|бот|зоол|воен|ист|диал|офиц|вежл|груб|арх|устар|сокр)\\.\\s*"), "")
-            .split(',', ';', '；', '，').map { it.trim() }.firstOrNull { it.isNotEmpty() }
-        russianSenses(word, reading).firstNotNullOfOrNull { clean(it) }?.let { return it }
+        russianSenses(word, reading).firstNotNullOfOrNull { cleanSense(it) }?.let { return it }
         val e = dictionary.lookup(word)?.takeIf { it.hasDefinition } ?: return null
         return e.gloss.split("; ", "/").firstNotNullOfOrNull { s ->
-            clean(s.removePrefix("lit. ").removePrefix("to "))?.takeIf { !it.startsWith("variant of") && !it.startsWith("see ") }
+            cleanSense(s.removePrefix("lit. ").removePrefix("to "))?.takeIf { !it.startsWith("variant of") && !it.startsWith("see ") }
         }
+    }
+
+    /**
+     * The first part of a sense without remarks: brackets and leading labels such as «астрон.»,
+     * «орнитол.», «перен. разг.» are dropped (a short note over the text has no room for them).
+     */
+    private fun cleanSense(x: String): String? = x.replace(Regex("\\([^)]*\\)|\\[[^]]*]|（[^）]*）"), " ")
+        .trim().replace(Regex("^([а-яёa-z]{2,12}\\.\\s*)+", RegexOption.IGNORE_CASE), "")
+        .split(',', ';', '；', '，').map { it.trim() }.firstOrNull { it.isNotEmpty() }
+
+    /** The shortest of a word's first few senses: parts of a combination must fit side by side. */
+    private fun shortSense(word: String): String? {
+        val ru = russianSenses(word).take(3).mapNotNull { cleanSense(it) }
+        return ru.minByOrNull { it.length } ?: firstSense(word)
     }
 
     /** "революция + партия" for a word made of dictionary words; null if it cannot be composed. */
     fun composedGloss(word: String): String? =
-        compose(word)?.map { firstSense(it.word) ?: return null }?.joinToString(" + ")
+        compose(word)?.map { shortSense(it.word) ?: return null }?.joinToString(" + ")
 
     /**
      * A few words to write above an unknown word: the first Russian sense (first part, without

@@ -185,7 +185,9 @@ internal fun layout(
     justify: Boolean,
     indent: Boolean,
     /** Short translations to draw above the pinyin (word -> text); null: no translation row. */
-    glossFor: Map<String, String>? = null
+    glossFor: Map<String, String>? = null,
+    /** Only these tokens get their translation drawn (it fades after a few appearances); null: all. */
+    glossOnly: Set<Int>? = null
 ): RubyLayout {
     // The pinyin row is kept even above known words, so lines keep one rhythm; so is the translation row.
     val glossH = if (glossFor != null && !heading) metrics.glossHeight.toFloat() else 0f
@@ -228,7 +230,7 @@ internal fun layout(
     }
     if (justify && !heading) justifyLines(items, stretch, widthPx)
     val count = if (items.isEmpty()) 0 else (y / lineH + 0.5f).toInt() + 1
-    val glosses = if (glossH > 0f) placeGlosses(items, tokens, glossFor!!, metrics, widthPx) else emptyList()
+    val glosses = if (glossH > 0f) placeGlosses(items, tokens, glossFor!!, metrics, widthPx, glossOnly) else emptyList()
     return RubyLayout(items, if (items.isEmpty()) 0f else y + lineH, glossH + pinH, hanH, lineH, count, glossH, glosses)
 }
 
@@ -246,10 +248,11 @@ private fun placeGlosses(
     tokens: List<RToken>,
     glossFor: Map<String, String>,
     metrics: RubyMetrics,
-    widthPx: Float
+    widthPx: Float,
+    only: Set<Int>? = null
 ): List<GlossPlaced> {
     val out = ArrayList<GlossPlaced>()
-    val byLine = items.filter { tokens[it.token].kind == TokenKind.HAN && glossOf(glossFor, tokens[it.token]) != null }
+    val byLine = items.filter { tokens[it.token].kind == TokenKind.HAN && (only == null || it.token in only) && glossOf(glossFor, tokens[it.token]) != null }
         .groupBy { it.lineTop }
     val pad = metrics.emWidth * 0.15f
     for ((top, line) in byLine) {
@@ -303,15 +306,17 @@ fun RubyParagraph(
      */
     onRange: ((Int, Int, Boolean) -> Unit)? = null,
     /** Tokens being read aloud right now: underlined boldly. */
-    spoken: IntRange? = null
+    spoken: IntRange? = null,
+    /** Tokens whose translation is drawn; null: every one in [glossFor]. */
+    glossOnly: Set<Int>? = null
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val density = LocalDensity.current
         val widthPx = constraints.maxWidth.toFloat()
         val gapPx = with(density) { colors.wordGap.toPx() }
         val lineGapPx = with(density) { colors.lineGap.toPx() }
-        val laid = remember(block, widthPx, metrics, showPinyin, hidePinyinFor, colors, glossFor) {
-            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx, colors.justify, colors.indent, glossFor)
+        val laid = remember(block, widthPx, metrics, showPinyin, hidePinyinFor, colors, glossFor, glossOnly) {
+            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx, colors.justify, colors.indent, glossFor, glossOnly)
         }
         val shown = lines ?: (0 until laid.lineCount)
         val offsetY = shown.first * laid.lineHeight
@@ -506,4 +511,21 @@ object Tones {
 
     val LIGHT = listOf(Color(0xFFD32F2F), Color(0xFF2E7D32), Color(0xFF1565C0), Color(0xFF7B1FA2), Color(0xFF8A8A8A))
     val DARK = listOf(Color(0xFFFF6B6B), Color(0xFF66D17A), Color(0xFF64B0FF), Color(0xFFCB8BFF), Color(0xFF9A9A9A))
+}
+
+/**
+ * Fading translations: for each paragraph, the tokens whose translation is still drawn — a word's
+ * first [repeats] appearances in the chapter, in reading order; later ones keep only the underline.
+ */
+internal fun fadingGlosses(chapter: ChapterContent, glossFor: Map<String, String>, repeats: Int): Map<Int, Set<Int>> {
+    val out = HashMap<Int, Set<Int>>()
+    val seen = HashMap<String, Int>()
+    chapter.blocks.forEachIndexed { bi, b ->
+        val keep = HashSet<Int>()
+        (b as? ReaderBlock.Text)?.tokens?.forEachIndexed { ti, t ->
+            if (t.kind == TokenKind.HAN && glossOf(glossFor, t) != null && seen.merge(t.text, 1, Int::plus)!! <= repeats) keep += ti
+        }
+        out[bi] = keep
+    }
+    return out
 }

@@ -97,6 +97,9 @@ class MigrationTest {
             db.statsDao().addReading(20261106, 60_000, 250)
             assertEquals(250, db.statsDao().allDays().single().readChars)
             db.statsDao().putProgress(BookProgress(7, 20261106, 42))
+            // v12: the reader's own meanings
+            db.userMeaningDao().put(UserMeaning("端", "держать в руках"))
+            assertEquals("держать в руках", db.userMeaningDao().all().single().meaning)
             // v7: bookmarks, removed with their book
             db.bookmarkDao().insert(Bookmark(bookId = 7, chapterIndex = 5, blockIndex = 12, chapterTitle = "第五章", snippet = "他终于回来了"))
             assertEquals(1, db.bookmarkDao().observe(7).first().size)
@@ -109,7 +112,7 @@ class MigrationTest {
             assertEquals(listOf("雷蒙德"), db.userNameDao().all().map { it.word })
             assertEquals(emptyList<String>(), db.bookDao().ignoredWords(7)) // cascade
         }
-        assertEquals(11, db.openHelper.readableDatabase.version)
+        assertEquals(12, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

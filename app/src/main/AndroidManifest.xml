@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <queries>
         <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>
+        <!-- Translator apps that take selected text («Открыть в переводчике»). -->
+        <intent><action android:name="android.intent.action.PROCESS_TEXT"/><data android:mimeType="text/plain"/></intent>
     </queries>
     <application
         android:name=".HanReaderApp"

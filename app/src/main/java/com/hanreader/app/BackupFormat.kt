@@ -18,6 +18,8 @@ data class Backup(
     val sources: List<WordSource>? = null,
     /** HanReader: the library. Null in older files and word-only copies: restoring keeps the current books. */
     val library: LibraryBackup? = null,
+    /** HanReader: the reader's own meanings of words. Null in older files: restoring keeps the current ones. */
+    val userMeanings: List<UserMeaning>? = null,
     /** HanReader: reading time and reviews by day. Null in older files: restoring keeps the current ones. */
     val activity: List<DailyActivity>? = null,
     /** Book files unpacked from the archive (file name -> temporary file); not part of the JSON. */
@@ -151,6 +153,11 @@ object BackupFormat {
                 })
             })
         }
+        backup.userMeanings?.let { list ->
+            root.put("userMeanings", JSONArray().apply {
+                list.forEach { m -> put(JSONObject().apply { put("word", m.word); put("meaning", m.meaning); put("updatedAt", m.updatedAt) }) }
+            })
+        }
         backup.activity?.let { list ->
             root.put("activity", JSONArray().apply {
                 list.forEach { d ->
@@ -250,8 +257,14 @@ object BackupFormat {
                     DailyActivity(d.getInt("day"), d.optLong("readMillis", 0L), d.optInt("readChars", 0), d.optInt("pages", 0), d.optInt("reviews", 0))
                 }.filter { it.day in 19_000_101..29_991_231 }.distinctBy { it.day }
             }
+            val meanings = root.optJSONArray("userMeanings")?.let { arr ->
+                (0 until arr.length()).map { i ->
+                    val m = arr.getJSONObject(i)
+                    UserMeaning(m.getString("word"), m.getString("meaning"), m.optLong("updatedAt", 0L))
+                }.filter { it.word.isNotBlank() && it.meaning.isNotBlank() }.distinctBy { it.word }
+            }
             validate(cards, examples)
-            return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known, names, sources, library, activity)
+            return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known, names, sources, library, meanings, activity)
         } catch (e: JSONException) {
             throw BackupFormatException("Файл копии повреждён: " + (e.message ?: "неверная структура"))
         }
