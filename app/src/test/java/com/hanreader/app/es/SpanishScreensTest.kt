@@ -28,7 +28,6 @@ import com.hanreader.app.reader.RubyParagraph
 import com.hanreader.app.reader.rememberRubyMetrics
 import com.hanreader.app.reader.rubyColors
 import com.hanreader.app.zh.TokenKind
-import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,10 +37,9 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * Pages of a real Spanish book drawn by the reader, to look at the layout of a language with
- * spaces. Run on demand with a book of your own (not committed):
- * HANREADER_ES_BOOK=/path/book.epub gradle :app:testDebugUnitTest --tests '*SpanishScreensTest'
- * Output: build/screens/es-*.png
+ * Pages of Spanish text drawn by the reader, to look at the layout of a language with spaces.
+ * By default a sample text written for the test (test resources es/muestra.txt); with a book of
+ * your own (not committed): HANREADER_ES_BOOK=/path/book.epub. Output: build/screens/es-*.png
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w360dp-h640dp-xxhdpi")
@@ -51,10 +49,15 @@ class SpanishScreensTest {
     private val app: Application = ApplicationProvider.getApplicationContext()
     private val engine by lazy { EsEngineTest.load() }
     private val path = System.getenv("HANREADER_ES_BOOK")
-    private val book by lazy { BookFiles.open(File(path!!)) }
+    private val book by lazy {
+        if (path != null) BookFiles.open(File(path))
+        else com.hanreader.app.epub.TxtBook(File("src/test/resources/es/muestra.txt").readBytes(), "muestra")
+    }
 
     /** The first chapter with real body text. */
-    private val index by lazy { book.chapters.indices.first { i -> book.blocks(i).sumOf { (it as? com.hanreader.app.epub.EpubBlock.Text)?.text?.length ?: 0 } > 3000 } }
+    private val index by lazy {
+        book.chapters.indices.firstOrNull { i -> book.blocks(i).sumOf { (it as? com.hanreader.app.epub.EpubBlock.Text)?.text?.length ?: 0 } > 3000 } ?: 0
+    }
 
     private fun shot(name: String) {
         compose.waitForIdle()
@@ -84,7 +87,7 @@ class SpanishScreensTest {
         )
     }
 
-    private fun on() = assumeTrue(path != null)
+    private fun on() = Unit
 
     @Test
     fun plainPage() {

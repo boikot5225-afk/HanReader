@@ -59,6 +59,14 @@ jobs:
           gh release upload beta "$RUNNER_TEMP/HanReader-beta.apk" --clobber
           gh release edit beta --title "HanReader beta $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
           echo "Beta: https://github.com/${GITHUB_REPOSITORY}/releases/download/beta/HanReader-beta.apk" >> "$GITHUB_STEP_SUMMARY"
+      # Screens drawn by tests (Spanish pages on the experimental branch), to look at the layout.
+      - name: Upload test screens
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-screens
+          path: app/build/screens/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: hanreader-debug-apk
