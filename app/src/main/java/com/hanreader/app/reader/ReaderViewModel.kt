@@ -72,8 +72,12 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
 
+    /** The books of the language being read (see [com.hanreader.app.lang.BookLanguages]). */
     val library: StateFlow<List<BookEntity>> =
-        books.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        books.observeAll().map { all ->
+            val tag = com.hanreader.app.lang.Languages.current.tag
+            all.filter { com.hanreader.app.lang.BookLanguages.of(app, it.id) == tag }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val studyCards = cards.observeByLanguage(STUDY_LANGUAGE)
 
@@ -278,7 +282,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         val name = "book-$stamp.${format.extension}"
         val target = File(booksDir, name)
         if (!temp.renameTo(target)) { temp.copyTo(target, overwrite = true); temp.delete() }
-        try {
+        var language: com.hanreader.app.lang.LanguageInfo? = null
+        val id = try {
             BookFiles.open(target, format).use { book ->
                 // A book with no text at all (an empty file, an EPUB without chapters) would have
                 // nothing to open: refuse it here instead of failing on every opening.
@@ -297,12 +302,19 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 )
                 runCatching { saveCover(id, book) }
-                return id
+                language = com.hanreader.app.lang.BookLanguages.detect(book).also { com.hanreader.app.lang.BookLanguages.set(getApplication(), id, it.tag) }
+                id
             }
         } catch (e: Exception) {
             target.delete()
             throw e
         }
+        // A book in the other language goes to that language's library: say where it is.
+        val l = language
+        if (l != null && l != com.hanreader.app.lang.Languages.current) {
+            throw EpubException("Книга на языке «${l.title.lowercase()}»: она добавлена в его библиотеку. Переключить язык: библиотека → «Язык» → «Сменить».")
+        }
+        return id
     }
 
     private fun displayName(uri: Uri): String? = runCatching {

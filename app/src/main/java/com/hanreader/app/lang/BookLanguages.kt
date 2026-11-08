@@ -1,0 +1,41 @@
+package com.hanreader.app.lang
+
+import android.content.Context
+import com.hanreader.app.epub.BookSource
+import com.hanreader.app.epub.EpubBlock
+import com.hanreader.app.zh.isHan
+
+/**
+ * The language of each book, kept in the app's settings (book id -> tag), so the database schema
+ * stays as it is. A book without a record is Chinese: every book from before languages existed.
+ * The library shows only the books of [Languages.current].
+ */
+object BookLanguages {
+    private const val PREFS = "book_languages"
+
+    fun of(context: Context, bookId: Long): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(bookId.toString(), null) ?: Languages.CHINESE.tag
+
+    fun set(context: Context, bookId: Long, tag: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(bookId.toString(), tag).apply()
+    }
+
+    fun remove(context: Context, bookId: Long) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(bookId.toString()).apply()
+    }
+
+    /** Chinese when a good share of the letters in the first chapters are Chinese characters, else Spanish. */
+    fun detect(book: BookSource): LanguageInfo {
+        var han = 0
+        var letters = 0
+        for (c in book.chapters.take(10)) {
+            for (b in book.blocks(c.index)) {
+                val t = (b as? EpubBlock.Text)?.text ?: continue
+                for (ch in t) if (ch.isLetter()) { letters++; if (ch.isHan()) han++ }
+                if (letters > 20_000) break
+            }
+            if (letters > 20_000) break
+        }
+        return if (letters > 0 && han * 3 >= letters) Languages.CHINESE else Languages.SPANISH
+    }
+}
