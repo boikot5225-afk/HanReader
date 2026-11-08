@@ -52,10 +52,11 @@ class SmokeTest {
         compose.onAllNodes(hasText("蓝色的书"))[0].performClick()
         // The reader: the running header with the chapter title (the text itself is drawn, not semantic).
         compose.waitUntil(60_000) { compose.onAllNodes(hasText("第一章　雨夜书店")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onRoot().performTouchInput { swipeLeft() }
+        // Swipes start inside the screen: from the very edge, Android 10+ takes them as the system Back gesture.
+        compose.onRoot().performTouchInput { swipeLeft(startX = width * 0.8f, endX = width * 0.2f) }
         compose.waitForIdle()
         // A vertical swipe opens the menu.
-        compose.onRoot().performTouchInput { swipeUp() }
+        compose.onRoot().performTouchInput { swipeUp(startY = height * 0.7f, endY = height * 0.3f) }
         compose.waitUntil(15_000) { compose.onAllNodes(hasContentDescription("Назад в библиотеку")).fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodes(hasContentDescription("Назад в библиотеку"))[0].performClick()
         // Back in the library: the settings and «О приложении».
