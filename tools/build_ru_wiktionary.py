@@ -9,6 +9,7 @@ assets/licenses/RU_WIKTIONARY_NOTICE.txt.
 Output, sorted by word:  word \\t meanings   (senses joined by " ; ", at most MAX_SENSES, each trimmed)
 
 Usage: python3 tools/build_ru_wiktionary.py <words.jsonl> <chars.jsonl> <out.tsv>
+Then run tools/clean_ru_wiktionary.py (drops junk, applies data/zh/ru_fixes.tsv).
 """
 import json
 import re
