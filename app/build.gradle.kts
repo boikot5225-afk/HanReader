@@ -8,7 +8,10 @@ android {
     namespace = "com.hanreader.app"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.hanreader.app"
+        // Experimental branch (another language): a separate app id, so this test build installs
+        // next to the regular HanReader and never touches its books and words.
+        applicationId = "com.hanreader.app.es"
+        manifestPlaceholders["appLabel"] = "HanReader ES"
         minSdk = 26
         targetSdk = 36
         versionCode = 37

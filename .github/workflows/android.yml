@@ -2,7 +2,8 @@ name: HanReader Android CI
 on:
   push:
     # main and the working branches: every change gets a tested APK.
-    branches: [main, 'ccr-*']
+    # experiment/** and claude/**: tests and an APK artifact only, never the public beta.
+    branches: [main, 'ccr-*', 'experiment/**', 'claude/**']
   workflow_dispatch:
 # Two pushes in a row: the newer build replaces the older one.
 concurrency:
@@ -40,7 +41,8 @@ jobs:
       # A permanent public link for testers: the latest APK, replaced on every successful build.
       # https://github.com/<owner>/<repo>/releases/download/beta/HanReader-beta.apk
       - name: Publish beta APK
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        # Only main and ccr-* publish the beta; an experimental branch must not replace it for testers.
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref_name == 'main' || startsWith(github.ref_name, 'ccr-'))
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}

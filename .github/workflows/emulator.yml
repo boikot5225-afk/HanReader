@@ -3,7 +3,7 @@ name: HanReader on emulators
 # a typical phone, a new tablet. Separate from the main build so the beta link is not delayed.
 on:
   push:
-    branches: [main, 'ccr-*']
+    branches: [main, 'ccr-*', 'experiment/**', 'claude/**']
   workflow_dispatch:
 concurrency:
   group: emulator-${{ github.ref }}
