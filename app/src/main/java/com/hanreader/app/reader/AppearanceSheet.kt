@@ -155,7 +155,7 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
                 }
             }
             if (a.gloss != GlossMode.OFF) {
-                SwitchRow("Убирать перевод после ${Appearance.GLOSS_REPEATS} встреч в главе", a.glossFade) { on -> AppearanceStore.update { it.copy(glossFade = on) } }
+                SwitchRow("Убирать перевод после ${Appearance.GLOSS_REPEATS} встреч (от места, где начал читать)", a.glossFade) { on -> AppearanceStore.update { it.copy(glossFade = on) } }
                 Text(
                     (if (chinese) "Первое значение из словаря, мелко над пиньинем." else "Первое значение из словаря, мелко над словом.") + " В контексте значение может быть другим — полный перевод по нажатию на слово.",
                     style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant

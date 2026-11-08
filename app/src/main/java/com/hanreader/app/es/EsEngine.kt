@@ -73,7 +73,11 @@ class EsEngine(
         }
         val out = ArrayList<EsAnalysis>(3)
         if (formFirst) { out += asForm; self?.let { out += it } } else { self?.let { out += it }; out += asForm }
-        if (out.isEmpty()) out += withoutPronouns(w)
+        // A form with no grammar of its own that is a verb with pronouns attached (dámelo): the rule
+        // names the form and the pronouns («повел. + me lo»).
+        if (out.isEmpty() || out.all { it.grammar.isEmpty() && it.entry.pos == "гл." && it.entry.lemma != w }) {
+            withoutPronouns(w).takeIf { it.isNotEmpty() }?.let { out.clear(); out += it }
+        }
         // A reading with a Russian meaning first, unless the order was set on purpose ("!").
         val sorted = if (formFirst) out else out.sortedBy { if (it.entry.ru.isNotEmpty()) 0 else 1 }
         synchronized(cache) { cache[w] = sorted }

@@ -240,10 +240,12 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             }
         }
     }
-    // Fading translations: a word's first few appearances in the chapter carry it, the later ones only the underline.
-    val glossTokens: Map<Int, Set<Int>>? = remember(glossFor, chapter, appearance.glossFade) {
+    // Fading translations: a word's first few appearances carry it, the later ones only the underline.
+    // Counted from where reading started in this chapter (the place the book opened at), not from its start.
+    val fadeFrom = remember(chapter?.index) { if (chapter != null && book.entity.chapterIndex == chapter.index) book.entity.blockIndex else 0 }
+    val glossTokens: Map<Int, Set<Int>>? = remember(glossFor, chapter, appearance.glossFade, fadeFrom) {
         val g = glossFor
-        if (g == null || chapter == null || !appearance.glossFade) null else fadingGlosses(chapter, g, com.hanreader.app.Appearance.GLOSS_REPEATS)
+        if (g == null || chapter == null || !appearance.glossFade) null else fadingGlosses(chapter, g, com.hanreader.app.Appearance.GLOSS_REPEATS, fadeFrom)
     }
     val hidePinyinFor = when (pinyinMode) {
         PinyinMode.UNKNOWN -> knownHere
@@ -1433,6 +1435,23 @@ private fun WordSheet(
                     if (about.isNotEmpty()) {
                         Text((if (i > 0 || a.entry.lemma != word.lowercase()) a.entry.lemma + ": " else "") + about,
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                // Grammar of a verb form: tense or mood, person, compound forms with the neighbours, when it is used.
+                val note = remember(word, selection) {
+                    (engine as? com.hanreader.app.es.EsEngine)?.takeIf { selection.first == selection.last }
+                        ?.let { e -> com.hanreader.app.es.EsGrammar.note(e, tokens, selection.first, es) }
+                }
+                note?.let { n ->
+                    Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Разбор", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            n.construction?.let { Text(it, style = MaterialTheme.typography.titleSmall, fontFamily = WordFont) }
+                            Text(n.tense, style = MaterialTheme.typography.bodyLarge)
+                            n.person?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                            n.pronouns?.let { Text("с местоимениями: $it", style = MaterialTheme.typography.bodyMedium) }
+                            Text(n.explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
                 val en = es.first().entry.en

@@ -41,4 +41,17 @@ class WordHintsTest {
         val shown = owls.filter { (bi, ti) -> ti in keep[bi].orEmpty() }
         assertEquals("the first three keep the translation", owls.take(3), shown)
     }
+
+    @Test
+    fun fadeCountsFromWhereReadingStarted() {
+        val text = (1..6).joinToString("\n") { "第${it}次看见猫头鹰。" }
+        val chapter = ChapterBuilder.build(TxtBook(text.toByteArray(), "x"), 0, engine)
+        val owl = mapOf("猫头鹰" to "сова")
+        val owlBlocks = chapter.blocks.withIndex().filter { (_, b) -> (b as? ReaderBlock.Text)?.tokens?.any { it.text == "猫头鹰" } == true }.map { it.index }
+        assertEquals(6, owlBlocks.size)
+        // Opened at the third paragraph: the two before keep theirs, then three more from there.
+        val keep = fadingGlosses(chapter, owl, 3, fromBlock = owlBlocks[2])
+        val shown = owlBlocks.filter { bi -> keep[bi].orEmpty().isNotEmpty() }
+        assertEquals(owlBlocks.take(5), shown)
+    }
 }
