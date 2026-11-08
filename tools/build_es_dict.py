@@ -6,9 +6,10 @@ assets/licenses/ES_WIKTIONARY_NOTICE.txt):
   ru.jsonl  Spanish words of the Russian Wiktionary (https://kaikki.org/ruwiktionary/Испанский/)
   en.jsonl  Spanish words of the English Wiktionary (https://kaikki.org/dictionary/Spanish/)
 
-dict.tsv   lemma \t part of speech \t Russian senses \t English senses \t Russian source \t frequency rank
-           (senses joined by " ; "; source: w = Russian Wiktionary, a = machine translation (ru_ai.jsonl);
-           rank: 1 = most frequent, empty = not in the frequency list)
+dict.tsv   lemma \t part of speech \t Russian senses \t English senses \t Russian source \t frequency rank \t main meaning
+           (senses joined by " ; "; source: w = Russian Wiktionary, a = machine translation (ru_ai.jsonl),
+           r = Wiktionary or machine senses edited by the second pass (ru_refined.jsonl);
+           rank: 1 = most frequent, empty = not in the frequency list; main meaning: 1-3 words, edited pass only)
 forms.tsv  form \t lemma:n|lemma:n   (forms that differ from the lemma; n = line of grammar.tsv, 0 = none)
 grammar.tsv  one description of a form per line: «3 л. ед. ч., претерит»
 Verbs with attached pronouns (dámelo) and voseo forms are left out: the app strips the pronouns itself.
@@ -18,6 +19,7 @@ Also read from data/es (committed):
   es_50k.txt    word frequencies of Spanish subtitles (FrequencyWords, OpenSubtitles 2018, CC BY-SA 4.0)
   ru_ai.jsonl   Russian meanings by machine translation (tools/translate_es_ru.py), for words the
                 Russian Wiktionary lacks
+  ru_refined.jsonl  frequent words: main meaning and senses in order of use (tools/refine_es_ru.py)
 
 Usage: python3 tools/build_es_dict.py <ru.jsonl> <en.jsonl> <out_dir>
 """
@@ -186,6 +188,18 @@ def main(ru_path, en_path, out_dir):
             if senses and not ru.get(w):
                 ru[w] = senses
                 source[w] = "a"
+    short = {}
+    refined_path = os.path.join(data, "ru_refined.jsonl")
+    if os.path.exists(refined_path):
+        for line in open(refined_path, encoding="utf-8"):
+            if not line.strip():
+                continue
+            it = json.loads(line)
+            senses = [x.strip() for x in it["ru"].split(";") if x.strip()]
+            if senses and it["w"] not in MANUAL_RU:
+                ru[it["w"]] = senses
+                source[it["w"]] = "r"
+                short[it["w"]] = it["short"].strip()
 
     lemmas = sorted(set(ru) | set(en), key=lambda x: x.encode("utf-8"))
     rank = frequency_ranks(os.path.join(data, "es_50k.txt"), set(lemmas), forms, ru)
@@ -196,7 +210,7 @@ def main(ru_path, en_path, out_dir):
             g = en.get(w, [])[:MAX_SENSES]
             if not r and not g:
                 continue
-            f.write(f"{w}\t{pos.get(w, '')}\t{' ; '.join(r)}\t{' ; '.join(g)}\t{source.get(w, '')}\t{rank.get(w, '')}\n")
+            f.write(f"{w}\t{pos.get(w, '')}\t{' ; '.join(r)}\t{' ; '.join(g)}\t{source.get(w, '')}\t{rank.get(w, '')}\t{short.get(w, '')}\n")
             n += 1
     known = set(lemmas)
     grammar = [""]
@@ -215,7 +229,11 @@ def main(ru_path, en_path, out_dir):
                     for l2, d2 in forms[l].items():
                         if l2 in known:
                             resolved.setdefault(l2, d or d2)
-            items = sorted(resolved.items(), key=lambda kv: (kv[0] not in ru, kv[0] not in known))
+            # The usual reading first: rare grammar (subjunctive, imperative, 2nd person) after a
+            # plain one (ataques: the plural of ataque before a subjunctive of atacar), then by frequency.
+            def rare(d):
+                return any(x in d for x in ("субх.", "повел.", "2 л."))
+            items = sorted(resolved.items(), key=lambda kv: (rare(kv[1]), rank.get(kv[0], 10**9)))
             items = [(l, d) for l, d in items if l in known][:3]
             if not items:
                 continue

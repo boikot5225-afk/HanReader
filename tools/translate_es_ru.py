@@ -36,18 +36,20 @@ SYSTEM = (
 )
 
 
-def load_selection(top):
+def load_selection(top, everything=False):
+    """Words with English meanings and no Russian ones, not names; by frequency rank, then
+    (with [everything]) the words and phrases outside the frequency list."""
     rows = []
     for line in open(DICT, encoding="utf-8"):
         f = line.rstrip("\n").split("\t")
         if len(f) < 6:
             continue
         w, pos, ru, en, _src, rank = f[:6]
-        if ru or not en or pos == "имя" or not rank:
+        if ru or not en or pos == "имя" or (not rank and not everything):
             continue
-        rows.append((w, pos, en, int(rank)))
+        rows.append((w, pos, en, int(rank) if rank else 10**9))
     rows.sort(key=lambda r: r[3])
-    return rows[:top]
+    return rows if everything else rows[:top]
 
 
 def gloss(g):
@@ -98,7 +100,10 @@ def main():
     ap.add_argument("--spread", action="store_true", help="with --limit: pick words evenly across the list")
     ap.add_argument("--batch", type=int, default=50)
     ap.add_argument("--model", default="deepseek-flash")
+    ap.add_argument("--all", action="store_true", help="every word and phrase without Russian, not only frequent ones")
+    ap.add_argument("--shard", default="0/1", help="k/n: this run takes every n-th word starting at k (parallel runs)")
     args = ap.parse_args()
+    k, n = (int(x) for x in args.shard.split("/"))
 
     key = os.environ.get("DEEPSEEK_API_KEY", "placeholder-inserted-by-proxy")
     done = set()
@@ -106,7 +111,7 @@ def main():
         for line in open(args.out, encoding="utf-8"):
             if line.strip():
                 done.add(json.loads(line)["w"])
-    todo = [r for r in load_selection(args.top) if r[0] not in done]
+    todo = [r for r in load_selection(args.top, args.all) if r[0] not in done][k::n]
     if args.limit:
         if args.spread and len(todo) > args.limit:
             step = len(todo) / args.limit

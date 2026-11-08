@@ -114,6 +114,24 @@ class EsEngineTest {
         assertEquals("B1", lv.label(3))
     }
 
+    @Test
+    fun usualReadingsAndContext() {
+        assertEquals("ataque", engine.lemma("ataques"))
+        assertEquals("casa", engine.lemma("casas"))
+        // «se alza»: the verb alzar, not the noun alza.
+        val t = engine.inContext(engine.tokenize("La prisión se alza en el desierto."))
+        assertEquals("alzar", t.first { it.text == "alza" }.pinyin)
+        assertEquals("", t.first { it.text == "prisión" }.pinyin)
+        assertFalse(engine.glossShort("desierto")!!.startsWith("геогр"))
+    }
+
+    @Test
+    fun capitalisedWordsInsideASentenceAreNames() {
+        val t = engine.tokenize("Llamada el Alcatraz de las Rocosas, o simplemente Supermax. Los presos")
+        val names = engine.sureNames(t).map { t[it.first].text }
+        assertEquals(listOf("Alcatraz", "Rocosas", "Supermax"), names)
+    }
+
     companion object {
         fun load(): EsEngine {
             val dir = File("src/main/assets/es")

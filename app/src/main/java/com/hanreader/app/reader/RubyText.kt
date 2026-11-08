@@ -269,7 +269,7 @@ internal fun layout(
  */
 /** The translation of a token: "text|reading" first (a character read as on the page), then the word. */
 internal fun glossOf(glossFor: Map<String, String>, t: RToken): String? =
-    (if (t.text.length == 1) glossFor[t.text + "|" + t.pinyin] else null) ?: glossFor[t.text]
+    (if (t.pinyin.isNotEmpty()) glossFor[t.text + "|" + t.pinyin] else null) ?: glossFor[t.text]
 
 private fun placeGlosses(
     items: List<Placed>,
@@ -344,8 +344,10 @@ fun RubyParagraph(
         val widthPx = constraints.maxWidth.toFloat()
         val gapPx = with(density) { colors.wordGap.toPx() }
         val lineGapPx = with(density) { colors.lineGap.toPx() }
-        val laid = remember(block, widthPx, metrics, showPinyin, hidePinyinFor, colors, glossFor, glossOnly) {
-            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx, colors.justify, colors.indent, glossFor, glossOnly)
+        // Names (noMarks) get no translation over them either.
+        val only = if (noMarks.isEmpty()) glossOnly else (glossOnly ?: block.tokens.indices.toSet()) - noMarks
+        val laid = remember(block, widthPx, metrics, showPinyin, hidePinyinFor, colors, glossFor, only) {
+            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx, colors.justify, colors.indent, glossFor, only)
         }
         val shown = lines ?: (0 until laid.lineCount)
         val offsetY = shown.first * laid.lineHeight

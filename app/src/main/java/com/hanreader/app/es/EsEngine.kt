@@ -23,7 +23,9 @@ data class EsEntry(
     /** The Russian meaning is a machine translation of the English one (not the Russian Wiktionary). */
     val machine: Boolean = false,
     /** Frequency rank in Spanish subtitles: 1 = most frequent, 0 = not in the list. */
-    val rank: Int = 0
+    val rank: Int = 0,
+    /** The main meaning in a few words (frequent words, edited pass), for the note over the word. */
+    val short: String = ""
 ) {
     val isName: Boolean get() = pos == "имя"
 }
@@ -51,7 +53,8 @@ class EsEngine(
     fun entry(lemma: String): EsEntry? {
         val f = dict.get(lemma) ?: return null
         fun senses(i: Int) = f.getOrNull(i).orEmpty().split(" ; ").map { it.trim() }.filter { it.isNotEmpty() }
-        return EsEntry(lemma, f.getOrNull(0).orEmpty(), senses(1), senses(2), machine = f.getOrNull(3) == "a", rank = f.getOrNull(4)?.toIntOrNull() ?: 0)
+        return EsEntry(lemma, f.getOrNull(0).orEmpty(), senses(1), senses(2), machine = f.getOrNull(3) == "a" || f.getOrNull(3) == "r",
+            rank = f.getOrNull(4)?.toIntOrNull() ?: 0, short = f.getOrNull(5).orEmpty())
     }
 
     /** Every dictionary reading of [word], the most useful first (a word with a Russian meaning first). */
@@ -133,7 +136,33 @@ class EsEngine(
     override fun lemma(word: String): String = analyses(word).firstOrNull()?.entry?.lemma ?: word.lowercase()
 
     override fun chapter(paragraphs: List<String>, options: TextOptions): (String) -> PreparedText = { text ->
-        PreparedText(text, text, tokenize(text))
+        PreparedText(text, text, inContext(tokenize(text)))
+    }
+
+    /**
+     * Readings the neighbours decide, kept in [RToken.pinyin] (never drawn for Spanish): after a
+     * pronoun that goes with a verb (se, me, te, nos, os, le, les) a word that can be a verb is the
+     * verb: «se alza» is alzar, not the noun alza.
+     */
+    fun inContext(tokens: List<RToken>): List<RToken> {
+        var prevWord: String? = null
+        return tokens.map { t ->
+            if (t.kind == TokenKind.SPACE) return@map t
+            if (t.kind != TokenKind.HAN) { prevWord = null; return@map t }
+            val before = prevWord
+            prevWord = t.text.lowercase()
+            if (before == null || before !in VERB_PRONOUNS) return@map t
+            val a = analyses(t.text)
+            if (a.isEmpty() || a.first().entry.pos == "гл.") return@map t
+            val verb = a.firstOrNull { it.entry.pos == "гл." } ?: return@map t
+            t.copy(pinyin = verb.entry.lemma)
+        }
+    }
+
+    /** The reading of [word] with dictionary form [reading] (chosen from the context), else the first. */
+    private fun pick(word: String, reading: String?): EsAnalysis? {
+        val a = analyses(word)
+        return (if (reading.isNullOrEmpty()) null else a.firstOrNull { it.entry.lemma == reading }) ?: a.firstOrNull()
     }
 
     fun tokenize(text: String): List<RToken> {
@@ -159,14 +188,35 @@ class EsEngine(
     }
 
     override fun glossShort(word: String, reading: String?): String? {
-        val e = analyses(word).firstOrNull()?.entry ?: return null
-        (e.ru.firstOrNull() ?: e.en.firstOrNull()?.removePrefix("to "))?.let { return shortSense(it) }
-        return null
+        val e = pick(word, reading)?.entry ?: return null
+        if (e.short.isNotEmpty()) return e.short
+        return (e.ru.firstOrNull() ?: e.en.firstOrNull()?.removePrefix("to "))?.let { shortSense(it) }
     }
 
     override fun cardTranslation(word: String, reading: String?): String? {
-        val e = analyses(word).firstOrNull()?.entry ?: return null
+        val e = pick(word, reading)?.entry ?: return null
         return (e.ru.ifEmpty { e.en }).take(2).joinToString("; ").ifEmpty { null }
+    }
+
+    /**
+     * Spanish writes only proper names with a capital: a capitalised word that does not start a
+     * sentence (Rocosas, Nueva York) is a name, known to the dictionary or not.
+     */
+    override fun sureNames(tokens: List<RToken>): List<IntRange> {
+        val out = ArrayList<IntRange>()
+        var sentenceStart = true
+        for ((i, t) in tokens.withIndex()) {
+            when (t.kind) {
+                TokenKind.SPACE -> if (t.text.contains('\n')) sentenceStart = true
+                TokenKind.HAN -> {
+                    if (!sentenceStart && t.text[0].isUpperCase()) out += i..i
+                    sentenceStart = false
+                }
+                TokenKind.PUNCT -> if (t.text[0] in ".!?¿¡…—«\"“:;") sentenceStart = true
+                else -> sentenceStart = false
+            }
+        }
+        return out
     }
 
     override fun studyable(word: String): Boolean = analyses(word).firstOrNull()?.entry?.isName == false
@@ -241,7 +291,14 @@ class EsEngine(
 
         /** The first part of a sense: brackets and everything after a comma or semicolon dropped. */
         fun shortSense(x: String): String? = x.replace(Regex("\\([^)]*\\)|\\[[^]]*]"), " ")
+            .trim().replace(LABELS, "")
             .split(',', ';').map { it.trim() }.firstOrNull { it.isNotEmpty() }
+
+        /** Labels at the start of a sense: «геогр. пустыня», «разг. устар. …». */
+        private val LABELS = Regex("^([а-яё]{2,12}\\.\\s*)+", RegexOption.IGNORE_CASE)
+
+        /** Pronouns that stand before a verb: the next word is read as a verb if it can be one. */
+        private val VERB_PRONOUNS = setOf("se", "me", "te", "nos", "os", "le", "les")
 
         fun load(dict: java.io.InputStream, forms: java.io.InputStream, grammar: java.io.InputStream): EsEngine {
             val t = System.nanoTime()

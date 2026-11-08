@@ -218,6 +218,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // Short translations above the pinyin: over unknown words or over recommended ones.
     val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings) {
         val eng = engine
+        val zhless = eng != null && eng !is ZhEngine
         val words = when (appearance.gloss) {
             GlossMode.OFF -> null
             GlossMode.UNKNOWN -> unknownSet
@@ -230,7 +231,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             // A single character gets the meaning of each reading it has on these pages (慢慢地 de, 土地 dì).
             chapter?.blocks?.forEach { b ->
                 (b as? ReaderBlock.Text)?.tokens?.forEach { t ->
-                    if (t.text.length == 1 && t.text in words && t.pinyin.isNotEmpty() && t.text !in userMeanings) {
+                    // Spanish: a word read in context (se alza: alzar, not alza) carries that reading too.
+                    if ((t.text.length == 1 || zhless) && t.text in words && t.pinyin.isNotEmpty() && t.text !in userMeanings) {
                         val key = t.text + "|" + t.pinyin
                         if (key !in this) eng.glossShort(t.text, t.pinyin)?.let { put(key, it) }
                     }
@@ -1246,13 +1248,18 @@ private fun WordSheet(
     val word = block.text.substring(first.start, last.end)
     // The Chinese card: dictionary entry, characters, readings. Other languages: their own part below.
     val zh = engine as? ZhEngine
-    val es = remember(word) { (engine as? com.hanreader.app.es.EsEngine)?.analyses(word).orEmpty() }
+    // Spanish: the reading chosen from the context (se alza: alzar) goes first.
+    val es = remember(word) {
+        val all = (engine as? com.hanreader.app.es.EsEngine)?.analyses(word).orEmpty()
+        val inContext = if (selection.first == selection.last) first.pinyin else ""
+        if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.lemma == inContext) 0 else 1 }
+    }
     val entry = remember(word) { zh?.lookup(word)?.takeIf { it.hasDefinition } }
     // A combination the dictionary lacks: its dictionary words (革命 + 党), else its characters.
     val composed = remember(word) { if (entry == null) zh?.compose(word) else null }
     val chars = remember(word) { if (entry == null) composed ?: zh?.characters(word).orEmpty() else emptyList() }
     // The word cards and «Знаю» are about: Spanish hablo → hablar; Chinese: the word itself.
-    val cardWord = remember(word) { if (zh != null) word else engine.lemma(word) }
+    val cardWord = remember(word) { if (zh != null) word else es.firstOrNull()?.entry?.lemma ?: engine.lemma(word) }
     // One token: its reading in context (慢慢地 de, not the dictionary's dì).
     val reading = if (zh == null) "" else if (selection.first == selection.last && first.pinyin.isNotEmpty() && first.text.length == 1) first.pinyin
         else entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
@@ -1260,7 +1267,7 @@ private fun WordSheet(
     val pageReading = if (selection.first == selection.last && first.text.length == 1) first.pinyin.takeIf { it.isNotEmpty() } else null
     val russian = remember(word, pageReading) { zh?.russianSenses(word, pageReading) ?: es.firstOrNull()?.entry?.ru.orEmpty() }
     val otherReadings = remember(word, pageReading) { zh?.otherReadings(word, pageReading).orEmpty() }
-    val translation = userMeaning ?: engine.cardTranslation(word, pageReading)
+    val translation = userMeaning ?: (if (zh == null) engine.cardTranslation(word, es.firstOrNull()?.entry?.lemma) else engine.cardTranslation(word, pageReading))
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
     var status by remember(word) { mutableStateOf<String?>(null) }
