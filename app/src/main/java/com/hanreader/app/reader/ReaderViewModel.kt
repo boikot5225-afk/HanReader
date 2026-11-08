@@ -408,7 +408,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         val result = runCatching {
             val engine = engineCore.await()
             val extra = namesToKeepWhole(current.entity.id)
-            withContext(Dispatchers.Default) { ChapterBuilder.build(current.epub, index, engine, extra, com.hanreader.app.AppearanceStore.appearance.value.script) }
+            val blocked = splitDao.words().toHashSet()
+            withContext(Dispatchers.Default) { ChapterBuilder.build(current.epub, index, engine, extra, com.hanreader.app.AppearanceStore.appearance.value.script, blocked) }
         }
         val now = _open.value ?: return
         _open.value = result.fold(
@@ -587,6 +588,20 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     /** A page of [chars] characters was read in [millis]; implausible times are ignored. */
     private val statsDao = db.statsDao()
     private val meaningDao = db.userMeaningDao()
+    private val splitDao = db.userSplitDao()
+
+    /** Dictionary words the reader split (把头 -> 把 + 头), in every book. */
+    val userSplits: StateFlow<Set<String>> = splitDao.observeWords()
+        .map { it.toHashSet() as Set<String> }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    /** Splits [word] into its characters (or shorter words) everywhere and redraws the chapter; [split] false joins it again. */
+    fun setSplit(word: String, split: Boolean) {
+        viewModelScope.launch {
+            if (split) splitDao.put(com.hanreader.app.UserSplit(word)) else splitDao.remove(word)
+            _open.value?.let { rebuildOpenChapter(it) }
+        }
+    }
 
     /** The reader's own meanings of words (word -> meaning). */
     val userMeanings: StateFlow<Map<String, String>> = meaningDao.observeAll()

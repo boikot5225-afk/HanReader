@@ -100,6 +100,9 @@ class MigrationTest {
             // v12: the reader's own meanings
             db.userMeaningDao().put(UserMeaning("端", "держать в руках"))
             assertEquals("держать в руках", db.userMeaningDao().all().single().meaning)
+            // v13: words the reader split
+            db.userSplitDao().put(UserSplit("把头"))
+            assertEquals(listOf("把头"), db.userSplitDao().words())
             // v7: bookmarks, removed with their book
             db.bookmarkDao().insert(Bookmark(bookId = 7, chapterIndex = 5, blockIndex = 12, chapterTitle = "第五章", snippet = "他终于回来了"))
             assertEquals(1, db.bookmarkDao().observe(7).first().size)
@@ -112,7 +115,7 @@ class MigrationTest {
             assertEquals(listOf("雷蒙德"), db.userNameDao().all().map { it.word })
             assertEquals(emptyList<String>(), db.bookDao().ignoredWords(7)) // cascade
         }
-        assertEquals(12, db.openHelper.readableDatabase.version)
+        assertEquals(13, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

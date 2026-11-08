@@ -387,7 +387,9 @@ object ChapterBuilder {
         index: Int,
         engine: ZhEngine,
         extra: Set<String> = emptySet(),
-        script: ScriptMode = ScriptMode.AS_BOOK
+        script: ScriptMode = ScriptMode.AS_BOOK,
+        /** Words the reader split: never kept whole. */
+        blocked: Set<String> = emptySet()
     ): ChapterContent {
         val t = System.nanoTime()
         var chars = 0
@@ -404,7 +406,7 @@ object ChapterBuilder {
                         ScriptMode.SIMPLIFIED -> simple
                         ScriptMode.TRADITIONAL -> if (traditional) b.text else engine.script.toTraditional(simple)
                     }.takeIf { it.length == simple.length } ?: simple
-                    val segmented = engine.segmenter.segment(simple, extra)
+                    val segmented = engine.segmenter.segment(simple, extra, blocked)
                     val tokens = segmented.mapIndexed { k, tok ->
                         // A standalone polyphone reads as its neighbours say (慢慢地 de, 很长 cháng).
                         val contextual = com.hanreader.app.zh.Polyphones.reading(segmented, k)

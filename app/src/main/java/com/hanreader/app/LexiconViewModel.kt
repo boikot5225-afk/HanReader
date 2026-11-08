@@ -142,6 +142,7 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         progress = db.statsDao().allProgress()
                     ),
                     userMeanings = db.userMeaningDao().all(),
+                    userSplits = db.userSplitDao().all().map { it.word },
                     activity = db.statsDao().allDays()
                 )
                 withContext(Dispatchers.IO) {
@@ -195,6 +196,10 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         db.highlightDao().insertAllStrict(lib.highlights)
                         lib.ignored.chunked(2_000).forEach { books.insertWords(it) }
                         db.statsDao().putProgressAll(lib.progress)
+                    }
+                    backup.userSplits?.let { list ->
+                        db.userSplitDao().removeAll()
+                        db.userSplitDao().putAll(list.map { com.hanreader.app.UserSplit(it) })
                     }
                     backup.userMeanings?.let { list ->
                         db.userMeaningDao().removeAll()

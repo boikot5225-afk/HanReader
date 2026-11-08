@@ -28,7 +28,8 @@ fun Char.isHan(): Boolean {
 class ZhSegmenter(private val dict: ZhDictionary) {
 
     /** [extra]: words to keep whole although the lexicon lacks them (names found in the book or marked by the reader). */
-    fun segment(text: String, extra: Set<String> = emptySet()): List<ZhToken> {
+    /** [blocked]: dictionary words the reader split («把头» is 把 + 头 in their books): never kept whole. */
+    fun segment(text: String, extra: Set<String> = emptySet(), blocked: Set<String> = emptySet()): List<ZhToken> {
         val out = ArrayList<ZhToken>(text.length / 2 + 4)
         var i = 0
         while (i < text.length) {
@@ -51,7 +52,7 @@ class ZhSegmenter(private val dict: ZhDictionary) {
                 ch.isHan() -> {
                     var j = i
                     while (j < text.length && text[j].isHan()) j++
-                    segmentHan(text, i, j, out, extra)
+                    segmentHan(text, i, j, out, extra, blocked)
                     i = j
                 }
                 ch.isWhitespace() -> {
@@ -88,7 +89,7 @@ class ZhSegmenter(private val dict: ZhDictionary) {
         return j
     }
 
-    private fun segmentHan(text: String, from: Int, to: Int, out: MutableList<ZhToken>, extra: Set<String>) {
+    private fun segmentHan(text: String, from: Int, to: Int, out: MutableList<ZhToken>, extra: Set<String>, blocked: Set<String> = emptySet()) {
         val n = to - from
         val best = DoubleArray(n + 1) { Double.MAX_VALUE }
         val back = IntArray(n + 1)
@@ -102,11 +103,12 @@ class ZhSegmenter(private val dict: ZhDictionary) {
             val limit = minOf(maxLen, n - i)
             for (len in 2..limit) {
                 val w = text.substring(base, base + len)
-                if (dict.contains(w)) relax(best, back, i, len, cost(w))
+                if (dict.contains(w) && w !in blocked) relax(best, back, i, len, cost(w))
             }
             if (extra.isNotEmpty()) {
                 for (len in 2..minOf(MAX_WORD, n - i)) {
-                    if (text.substring(base, base + len) in extra) relax(best, back, i, len, extraCost)
+                    val w = text.substring(base, base + len)
+                    if (w in extra && w !in blocked) relax(best, back, i, len, extraCost)
                 }
             }
             val num = numberRun(text, base, to)

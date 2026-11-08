@@ -186,6 +186,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val bookWords by bookWordsFlow.collectAsState(initial = emptyList())
     val userNames by vm.userNames.collectAsState()
     val userMeanings by vm.userMeanings.collectAsState()
+    val userSplits by vm.userSplits.collectAsState()
     // Names of this book (found or «Не учить») and the reader's own «Это имя».
     val names = remember(bookWords, userNames) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word }.apply { addAll(userNames) } }
     val coverage = remember(chapter, matcher, names) { chapter?.let { KnownCoverage.of(it, matcher, names, engine) } }
@@ -583,6 +584,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onRemoveHighlight = { vm.removeHighlight(it.id) },
             userMeaning = userMeanings[block.text.substring(block.tokens[sel.first].start, block.tokens[sel.last].end)],
             onUserMeaning = vm::setUserMeaning,
+            userSplits = userSplits,
+            onSplit = { w, split -> vm.setSplit(w, split); selection = null },
             onChange = { selection = it },
             onDismiss = { selection = null },
             recommendations = recommended.associateBy { it.word },
@@ -1223,6 +1226,9 @@ private fun WordSheet(
     /** The reader's own meaning of the word, if any, and how to change it (blank removes it). */
     userMeaning: String? = null,
     onUserMeaning: (String, String) -> Unit = { _, _ -> },
+    /** Words the reader split, and how to split or join one. */
+    userSplits: Set<String> = emptySet(),
+    onSplit: (String, Boolean) -> Unit = { _, _ -> },
     onChange: (Selection) -> Unit,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String, (Result<Boolean>) -> Unit) -> Unit,
@@ -1376,6 +1382,17 @@ private fun WordSheet(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // The dictionary glued two words together (把头 «подрядчик» where the text means 把 + 头): split it.
+            val oneMultiChar = selection.first == selection.last && word.length >= 2 && word.all { it.isHan() }
+            if (oneMultiChar) {
+                TextButton(onClick = { onSplit(word, true) }, contentPadding = PaddingValues(0.dp)) {
+                    Text("Разделить «$word» на отдельные слова")
+                }
+            } else if (word in userSplits) {
+                TextButton(onClick = { onSplit(word, false) }, contentPadding = PaddingValues(0.dp)) {
+                    Text("Соединить «$word» обратно")
+                }
+            }
             Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
                 Text(sentence, Modifier.padding(14.dp), fontFamily = WordFont, style = MaterialTheme.typography.titleMedium)
             }

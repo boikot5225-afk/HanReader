@@ -268,6 +268,34 @@ interface StatsDao {
     suspend fun allProgress(): List<BookProgress>
 }
 
+/** A dictionary word the reader split: the segmenter never keeps it whole (把头 -> 把 + 头). */
+@Entity(tableName = "user_splits")
+data class UserSplit(@PrimaryKey val word: String, val createdAt: Long = System.currentTimeMillis())
+
+@Dao
+interface UserSplitDao {
+    @Query("SELECT word FROM user_splits")
+    fun observeWords(): Flow<List<String>>
+
+    @Query("SELECT * FROM user_splits ORDER BY word")
+    suspend fun all(): List<UserSplit>
+
+    @Query("SELECT word FROM user_splits")
+    suspend fun words(): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun put(s: UserSplit)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putAll(list: List<UserSplit>)
+
+    @Query("DELETE FROM user_splits WHERE word = :word")
+    suspend fun remove(word: String)
+
+    @Query("DELETE FROM user_splits")
+    suspend fun removeAll()
+}
+
 /** The reader's own meaning of a word: shown first, used over the word and on its card. */
 @Entity(tableName = "user_meanings")
 data class UserMeaning(
@@ -689,13 +717,13 @@ interface CardDao {
 // so no database of version 3 exists under this name; Lexicon data arrives through backups.
 // Version 5 (0.2.0): known_words. Schemas are exported to app/schemas for migration checks.
 // Version 6 (0.3.0): book_words and books.analyzedTokens (book vocabulary analysis).
-// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names. Version 9 (0.9.9): books.charOffset. Version 10 (0.10.0): highlights. Version 11 (0.13.0): daily_activity, book_progress. Version 12 (0.15.0): user_meanings.
+// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names. Version 9 (0.9.9): books.charOffset. Version 10 (0.10.0): highlights. Version 11 (0.13.0): daily_activity, book_progress. Version 12 (0.15.0): user_meanings. Version 13 (0.17.1): user_splits.
 @Database(
     entities = [
         WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
-        Bookmark::class, UserName::class, Highlight::class, DailyActivity::class, BookProgress::class, UserMeaning::class
+        Bookmark::class, UserName::class, Highlight::class, DailyActivity::class, BookProgress::class, UserMeaning::class, UserSplit::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
@@ -707,6 +735,7 @@ abstract class LexiconDatabase : RoomDatabase() {
     abstract fun highlightDao(): HighlightDao
     abstract fun statsDao(): StatsDao
     abstract fun userMeaningDao(): UserMeaningDao
+    abstract fun userSplitDao(): UserSplitDao
 
     companion object {
         @Volatile private var instance: LexiconDatabase? = null
@@ -835,7 +864,13 @@ abstract class LexiconDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `user_splits` (`word` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`word`))")
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {

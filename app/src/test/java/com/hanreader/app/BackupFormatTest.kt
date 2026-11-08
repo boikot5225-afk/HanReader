@@ -76,6 +76,11 @@ class BackupFormatTest {
         assertEquals(listOf(UserMeaning("端", "держать в руках", 7)), BackupFormat.decode(json).userMeanings)
     }
 
+    @Test fun keepsSplits() {
+        val json = BackupFormat.encode(Backup(1L, listOf(card), examples, settings, userSplits = listOf("把头")))
+        assertEquals(listOf("把头"), BackupFormat.decode(json).userSplits)
+    }
+
     @Test fun rejectsExamplesWithoutWord() {
         val json = BackupFormat.encode(
             Backup(1L, listOf(card), examples + CardExample(cardId = 99, example = "x", exampleTranslation = "y"), settings)

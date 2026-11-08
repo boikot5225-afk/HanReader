@@ -20,6 +20,8 @@ data class Backup(
     val library: LibraryBackup? = null,
     /** HanReader: the reader's own meanings of words. Null in older files: restoring keeps the current ones. */
     val userMeanings: List<UserMeaning>? = null,
+    /** HanReader: words the reader split. Null in older files: restoring keeps the current ones. */
+    val userSplits: List<String>? = null,
     /** HanReader: reading time and reviews by day. Null in older files: restoring keeps the current ones. */
     val activity: List<DailyActivity>? = null,
     /** Book files unpacked from the archive (file name -> temporary file); not part of the JSON. */
@@ -158,6 +160,7 @@ object BackupFormat {
                 list.forEach { m -> put(JSONObject().apply { put("word", m.word); put("meaning", m.meaning); put("updatedAt", m.updatedAt) }) }
             })
         }
+        backup.userSplits?.let { list -> root.put("userSplits", JSONArray().apply { list.forEach { put(it) } }) }
         backup.activity?.let { list ->
             root.put("activity", JSONArray().apply {
                 list.forEach { d ->
@@ -263,8 +266,11 @@ object BackupFormat {
                     UserMeaning(m.getString("word"), m.getString("meaning"), m.optLong("updatedAt", 0L))
                 }.filter { it.word.isNotBlank() && it.meaning.isNotBlank() }.distinctBy { it.word }
             }
+            val splits = root.optJSONArray("userSplits")?.let { arr ->
+                (0 until arr.length()).map { arr.getString(it).trim() }.filter { it.length >= 2 }.distinct()
+            }
             validate(cards, examples)
-            return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known, names, sources, library, meanings, activity)
+            return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known, names, sources, library, meanings, splits, activity)
         } catch (e: JSONException) {
             throw BackupFormatException("Файл копии повреждён: " + (e.message ?: "неверная структура"))
         }
