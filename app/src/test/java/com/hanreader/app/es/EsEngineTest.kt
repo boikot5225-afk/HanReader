@@ -90,6 +90,18 @@ class EsEngineTest {
         assertTrue(engine.entry("ser")!!.rank in 1..50)
     }
 
+    @Test
+    fun setPhrasesAroundAWord() {
+        val text = "Sin embargo, llegó a pesar de la lluvia."
+        val t = engine.tokenize(text)
+        fun at(w: String) = t.indexOfFirst { it.text == w }
+        fun phrase(w: String) = engine.phraseAt(t, text, at(w))?.let { text.substring(t[it.first].start, t[it.last].end) }
+        assertEquals("Sin embargo", phrase("embargo"))
+        assertEquals("a pesar de", phrase("pesar"))
+        assertEquals(null, phrase("lluvia"))
+        assertTrue(engine.cardTranslation("sin embargo")!!.contains("однако"))
+    }
+
     companion object {
         fun load(): EsEngine {
             val dir = File("src/main/assets/es")

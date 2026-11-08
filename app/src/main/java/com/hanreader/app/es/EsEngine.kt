@@ -106,6 +106,29 @@ class EsEngine(
         return null
     }
 
+    /**
+     * The longest dictionary phrase of 2–4 words around the word at [index] (sin embargo, a pesar de),
+     * as a range of token indices; words must be separated by single spaces. Null if none.
+     */
+    fun phraseAt(tokens: List<RToken>, text: String, index: Int): IntRange? {
+        if (tokens.getOrNull(index)?.kind != TokenKind.HAN) return null
+        // Word tokens reachable from [index] through single spaces, up to three on each side.
+        fun step(from: Int, dir: Int): Int? {
+            val sp = tokens.getOrNull(from + dir) ?: return null
+            if (sp.kind != TokenKind.SPACE || sp.text != " ") return null
+            return (from + 2 * dir).takeIf { tokens.getOrNull(it)?.kind == TokenKind.HAN }
+        }
+        val left = generateSequence(index) { step(it, -1) }.take(4).toList()
+        val right = generateSequence(index) { step(it, 1) }.take(4).toList()
+        var best: IntRange? = null
+        for (a in left) for (b in right) {
+            val words = (b - a) / 2 + 1
+            if (words < 2 || words > 4 || (best != null && words <= (best.last - best.first) / 2 + 1)) continue
+            if (dict.contains(text.substring(tokens[a].start, tokens[b].end).lowercase())) best = a..b
+        }
+        return best
+    }
+
     /** The dictionary word of [word] (hablo → hablar); the word itself, lower-case, if unknown. */
     override fun lemma(word: String): String = analyses(word).firstOrNull()?.entry?.lemma ?: word.lowercase()
 

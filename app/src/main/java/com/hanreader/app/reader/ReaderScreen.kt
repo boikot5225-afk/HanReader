@@ -1384,7 +1384,29 @@ private fun WordSheet(
                 }
             } else if (es.isEmpty()) {
                 Text("Слова нет в словаре", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
+            }
+            // A word inside a set phrase (sin embargo): the phrase and its meaning, one tap to take it.
+            val phrase = remember(word, selection) {
+                if (selection.first != selection.last) null
+                else (engine as? com.hanreader.app.es.EsEngine)?.let { e ->
+                    e.phraseAt(tokens, block.text, selection.first)?.let { r ->
+                        val p = block.text.substring(tokens[r.first].start, tokens[r.last].end)
+                        Triple(r, p, e.cardTranslation(p))
+                    }
+                }
+            }
+            phrase?.let { (r, p, meaning) ->
+                Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Row(Modifier.padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Выражение: $p", style = MaterialTheme.typography.titleSmall)
+                            meaning?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        }
+                        TextButton(onClick = { onChange(selection.copy(first = r.first, last = r.last)) }) { Text("Выделить") }
+                    }
+                }
+            }
+            if (zh == null && es.isNotEmpty()) {
                 // Spanish: what the form is (hablar, гл. · 3 л. ед. ч., претерит), other readings, English.
                 es.forEachIndexed { i, a ->
                     val about = listOf(a.entry.pos, a.grammar).filter { it.isNotEmpty() }.joinToString(" · ")
