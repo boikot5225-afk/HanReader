@@ -22,16 +22,46 @@ object WritingExercise {
      */
     fun cloze(example: String, word: String, language: String): String? {
         if (word.isBlank() || example.isBlank()) return null
-        val regex = headwordRegex(word, language)
-        if (!regex.containsMatchIn(example)) return null
-        return regex.replace(example, "____")
+        val ranges = occurrences(example, word, language)
+        if (ranges.isEmpty()) return null
+        val out = StringBuilder(example)
+        for (r in ranges.sortedByDescending { it.first }) out.replace(r.first, r.last + 1, "____")
+        return out.toString()
     }
 
-    /** Character ranges of the headword inside an example, using the same rules as [cloze]. */
+    /**
+     * Character ranges of the headword inside an example, using the same rules as [cloze].
+     * Spanish cards keep the dictionary form (hablar) while the book has a form of it (habló):
+     * without an exact match, a word that starts with the stem is taken (habl-). Irregular forms
+     * (fue for ir) are not found, and the example stays hidden as before.
+     */
     fun occurrences(example: String, word: String, language: String): List<IntRange> {
         if (word.isBlank() || example.isBlank()) return emptyList()
-        return headwordRegex(word, language).findAll(example).map { it.range }.toList()
+        val exact = headwordRegex(word, language).findAll(example).map { it.range }.toList()
+        if (exact.isNotEmpty() || !language.startsWith("es")) return exact
+        val stem = spanishStem(word) ?: return emptyList()
+        return Regex("[\\p{L}]+").findAll(example).filter { m ->
+            val w = unaccent(m.value.lowercase(Locale.ROOT))
+            w.startsWith(stem) && m.value.length <= word.length + 5
+        }.map { it.range }.toList()
     }
+
+    /** habl for hablar, com for comer, cas for casa; null when too short to be safe. */
+    private fun spanishStem(word: String): String? {
+        val w = unaccent(word.trim().lowercase(Locale.ROOT))
+        if (w.contains(' ')) return null
+        val stem = when {
+            w.length >= 5 && (w.endsWith("ar") || w.endsWith("er") || w.endsWith("ir")) -> w.dropLast(2)
+            w.length >= 6 && (w.endsWith("arse") || w.endsWith("erse") || w.endsWith("irse")) -> w.dropLast(4)
+            w.length >= 4 && w.last() in "aeo" -> w.dropLast(1)
+            else -> w
+        }
+        return stem.takeIf { it.length >= 3 }
+    }
+
+    private fun unaccent(s: String): String = s.map { c ->
+        when (c) { 'á' -> 'a'; 'é' -> 'e'; 'í' -> 'i'; 'ó' -> 'o'; 'ú' -> 'u'; else -> c }
+    }.joinToString("")
 
     /**
      * Indices in the trimmed expected answer that the typed answer got wrong

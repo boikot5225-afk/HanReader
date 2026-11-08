@@ -133,7 +133,31 @@ class EsEngine(
 
     override fun studyable(word: String): Boolean = analyses(word).firstOrNull()?.entry?.isName == false
 
-    override fun isName(word: String): Boolean = analyses(word).firstOrNull()?.entry?.isName == true
+    /** A name of the dictionary (Sinaloa), or a capitalised word it does not know (Blancornelas). */
+    override fun isName(word: String): Boolean {
+        val a = analyses(word)
+        if (a.isEmpty()) return word.firstOrNull()?.isUpperCase() == true
+        return a.first().entry.isName
+    }
+
+    /** Words counted by dictionary form (habló and hablaban as hablar); unknown words as written. */
+    override fun analyze(bookId: Long, book: com.hanreader.app.epub.BookSource, onProgress: (Int, Int) -> Unit): com.hanreader.app.reader.BookAnalysis {
+        val counts = HashMap<String, IntArray>()
+        var tokens = 0
+        for (c in book.chapters) {
+            for (b in book.blocks(c.index)) {
+                val text = (b as? com.hanreader.app.epub.EpubBlock.Text)?.text ?: continue
+                for (t in tokenize(text)) {
+                    if (t.kind != TokenKind.HAN) continue
+                    tokens++
+                    val key = analyses(t.text).firstOrNull()?.entry?.lemma ?: t.text
+                    counts.getOrPut(key) { intArrayOf(0, c.index) }[0]++
+                }
+            }
+            onProgress(c.index + 1, book.chapters.size)
+        }
+        return com.hanreader.app.reader.BookAnalysis(counts.map { (w, e) -> com.hanreader.app.BookWord(bookId, w, e[0], e[1]) }, tokens)
+    }
 
     /** A form counts as known when its dictionary word is known (habló, if hablar is known). */
     override fun knownByParts(word: String, known: Set<String>): Boolean =

@@ -67,6 +67,17 @@ class EsEngineTest {
         assertEquals("Canción".length, engine.searchForm("Canción").length)
     }
 
+    @Test
+    fun namesAndBookCountsByDictionaryForm() {
+        assertTrue(engine.isName("Blancornelas"))
+        assertTrue(engine.isName("Sinaloa"))
+        assertFalse(engine.isName("casa"))
+        val book = TxtBook("Ella habló. Ellos hablaban. Hablar es fácil, dijo Blancornelas.".toByteArray(), "x")
+        val words = engine.analyze(1L, book).words.associate { it.word to it.count }
+        assertEquals(3, words["hablar"])
+        assertEquals(1, words["Blancornelas"])
+    }
+
     companion object {
         fun load(): EsEngine {
             val dir = File("src/main/assets/es")

@@ -105,10 +105,10 @@ class SpanishScreensTest {
         on()
         val a = Appearance(theme = ReaderTheme.NOIR, mode = ReadingMode.PAGES, fontSize = 20, markUnknown = true, gloss = GlossMode.UNKNOWN)
         AppearanceStore.update { a }
-        // A beginner: only the 300 most common words of this chapter are known.
+        // A beginner: only the 40 most common words of this chapter are known.
         val chapter = ChapterBuilder.build(book, index, engine)
         val words = chapter.blocks.flatMap { (it as? ReaderBlock.Text)?.tokens.orEmpty() }.filter { it.kind == TokenKind.HAN }
-        val common = words.groupingBy { engine.lemma(it.text) }.eachCount().entries.sortedByDescending { it.value }.take(300).map { it.key }.toSet()
+        val common = words.groupingBy { engine.lemma(it.text) }.eachCount().entries.sortedByDescending { it.value }.take(40).map { it.key }.toSet()
         val known = KnownMatcher(common, engine)
         val unknown = words.map { it.text }.filterTo(HashSet()) { !known.isKnown(it) }
         val gloss = unknown.mapNotNull { w -> engine.glossShort(w)?.let { w to it } }.toMap()

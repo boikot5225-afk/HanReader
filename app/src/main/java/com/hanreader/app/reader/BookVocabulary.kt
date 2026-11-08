@@ -238,7 +238,8 @@ object VocabularyStats {
             if (b !is ReaderBlock.Text) continue
             val inNames = nameTokens(b, ignored, engine)
             for ((i, t) in b.tokens.withIndex()) {
-                if (t.kind == TokenKind.HAN && i !in inNames) counts[t.text] = (counts[t.text] ?: 0) + 1
+                // By dictionary form (Spanish habló -> hablar): the cards keep that form.
+                if (t.kind == TokenKind.HAN && i !in inNames) engine.lemma(t.text).let { w -> counts[w] = (counts[w] ?: 0) + 1 }
             }
         }
         return counts.entries.asSequence()
@@ -259,11 +260,11 @@ object VocabularyStats {
         return out
     }
 
-    /** The first sentence of the chapter that contains [word]. */
-    fun firstSentence(chapter: ChapterContent, word: String): String? {
+    /** The first sentence of the chapter that contains [word] (with [engine]: any form of it). */
+    fun firstSentence(chapter: ChapterContent, word: String, engine: LanguageModule? = null): String? {
         for (b in chapter.blocks) {
             if (b !is ReaderBlock.Text) continue
-            val t = b.tokens.firstOrNull { it.kind == TokenKind.HAN && it.text == word } ?: continue
+            val t = b.tokens.firstOrNull { it.kind == TokenKind.HAN && (it.text == word || (engine != null && engine.lemma(it.text) == word)) } ?: continue
             return ChapterBuilder.sentence(b.text, t.start, t.end)
         }
         return null

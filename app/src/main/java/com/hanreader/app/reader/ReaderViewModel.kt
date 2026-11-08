@@ -710,11 +710,11 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 try {
                     for (w in words) {
                         val source = epub ?: own!!
-                        val c = chapter?.takeIf { ch -> VocabularyStats.firstSentence(ch, w.word) != null }
+                        val c = chapter?.takeIf { ch -> VocabularyStats.firstSentence(ch, w.word, engine) != null }
                             ?: loaded.getOrPut(w.firstChapter) {
                                 withContext(Dispatchers.Default) { ChapterBuilder.build(source, w.firstChapter, engine, namesToKeepWhole(book.id)) }
                             }
-                        val sentence = VocabularyStats.firstSentence(c, w.word) ?: w.word
+                        val sentence = VocabularyStats.firstSentence(c, w.word, engine) ?: w.word
                         val reading = engine.reading(w.word) ?: w.pinyin
                         val translation = engine.cardTranslation(w.word) ?: w.gloss
                         val isNew = cards.saveFromReader(

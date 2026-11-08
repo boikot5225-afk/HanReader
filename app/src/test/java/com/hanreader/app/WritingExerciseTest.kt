@@ -60,4 +60,12 @@ class WritingExerciseTest {
         assertEquals(emptySet<Int>(), WritingExercise.mismatches("École", "école"))
         assertEquals(setOf(0, 1), WritingExercise.mismatches("", "ab"))
     }
+
+    @Test
+    fun spanishFormOfTheDictionaryWordIsHidden() {
+        assertEquals("Ella ____ con su madre.", WritingExercise.cloze("Ella habló con su madre.", "hablar", "es-ES"))
+        assertEquals("Las ____ son blancas.", WritingExercise.cloze("Las casas son blancas.", "casa", "es-ES"))
+        // An irregular form is not guessed: the example stays hidden.
+        assertNull(WritingExercise.cloze("Ayer fue al mercado.", "ir", "es-ES"))
+    }
 }

@@ -118,19 +118,30 @@ class RubyMetrics(
 }
 
 /** Spreads the free space of each full line evenly between its tokens. */
-internal fun justifyLines(items: MutableList<Placed>, lines: List<IntRange>, widthPx: Float) {
+/**
+ * Stretches full lines to the margin. Chinese (no spaces): the free room is shared by every gap
+ * between tokens. A text with spaces ([spaceBefore] true for at least half the gaps): only the spaces grow,
+ * so a comma or a full stop stays next to its word.
+ */
+internal fun justifyLines(items: MutableList<Placed>, lines: List<IntRange>, widthPx: Float, spaceBefore: (Placed) -> Boolean = { false }) {
     for (range in lines) {
         val first = items[range.first]
         val last = items[range.last]
         val used = last.x + last.width - first.x
         val free = widthPx - first.x - used
         if (free <= 0f) continue
-        val step = free / (range.last - range.first)
+        // Space mode only for a text written with spaces: a Chinese line with an English name keeps the old way.
+        val spaces = (range.first + 1..range.last).count { spaceBefore(items[it]) }.takeIf { it * 2 >= range.last - range.first } ?: 0
+        val gaps = if (spaces > 0) spaces else range.last - range.first
+        val step = free / gaps
         // Do not stretch absurdly when a long token pushed the line break early.
-        if (step > first.hanLayout.size.width * 0.6f) continue
-        for ((k, i) in range.withIndex()) {
+        val limit = if (spaces > 0) first.hanLayout.size.height * 0.9f else first.hanLayout.size.width * 0.6f
+        if (step > limit) continue
+        var shift = 0f
+        for (i in range) {
             val p = items[i]
-            items[i] = Placed(p.token, p.x + step * k, p.lineTop, p.width, p.hanLayout, p.pinyinLayout)
+            if (i > range.first && (spaces == 0 || spaceBefore(p))) shift += step
+            items[i] = Placed(p.token, p.x + shift, p.lineTop, p.width, p.hanLayout, p.pinyinLayout)
         }
     }
 }
@@ -228,7 +239,7 @@ internal fun layout(
         x += w
         lineHasContent = true
     }
-    if (justify && !heading) justifyLines(items, stretch, widthPx)
+    if (justify && !heading) justifyLines(items, stretch, widthPx) { p -> p.token > 0 && tokens[p.token - 1].kind == TokenKind.SPACE }
     val count = if (items.isEmpty()) 0 else (y / lineH + 0.5f).toInt() + 1
     val glosses = if (glossH > 0f) placeGlosses(items, tokens, glossFor!!, metrics, widthPx, glossOnly) else emptyList()
     return RubyLayout(items, if (items.isEmpty()) 0f else y + lineH, glossH + pinH, hanH, lineH, count, glossH, glosses)
