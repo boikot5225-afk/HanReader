@@ -16,7 +16,7 @@ import com.hanreader.app.zh.TokenKind
 data class Spoken(val chapter: Int, val block: Int, val start: Int, val end: Int, val text: String)
 
 object Sentences {
-    private const val END = "。！？!?…；;"
+    private val END = com.hanreader.app.lang.Languages.current.sentenceEnd.replace("\n", "")
     private const val CLOSING = "”’」』\")）"
 
     /** The chapter's sentences in reading order; headings count as one sentence, empty ones are skipped. */

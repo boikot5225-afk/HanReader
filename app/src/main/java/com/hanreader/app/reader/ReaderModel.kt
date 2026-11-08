@@ -71,7 +71,7 @@ class HskLevels(private val levels: Map<String, Int>) {
 /** The Chinese language module: dictionary + segmenter, loaded once per process in the background. */
 class ZhEngine(
     val dictionary: ZhDictionary,
-    val loadMs: Long,
+    override val loadMs: Long,
     val hsk: HskLevels = HskLevels(emptyMap()),
     /** Russian meanings from the Russian Wiktionary (about 11.7k words), senses joined by " ; ". */
     private val russian: Map<String, String> = emptyMap(),
@@ -311,6 +311,7 @@ class ZhEngine(
      * whose meaning is not the sum of parts are never split.
      */
     override fun knownByParts(word: String, known: Set<String>): Boolean {
+        if (word.length < 2) return false
         if (hsk.hsk3(word) > 0 || hsk.hsk2(word) > 0) return false // a listed word must be learned as such
         val defined = dictionary.lookup(word)?.hasDefinition == true
         if (!defined) return splits(word, known)
@@ -641,7 +642,6 @@ class KnownMatcher(private val known: Set<String>, private val engine: LanguageM
         if (word in unknown) return false
         if (word in known) return true
         val e = engine ?: return false
-        if (word.length < 2) return false
         return cache.getOrPut(word) { e.knownByParts(word, known) }
     }
 

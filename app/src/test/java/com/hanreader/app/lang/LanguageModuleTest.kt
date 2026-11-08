@@ -18,7 +18,7 @@ import kotlinx.coroutines.runBlocking
 class LanguageModuleTest {
     /** A minimal module for a language written with spaces: words are runs of letters. */
     private object Spaced : LanguageModule {
-        override val info = LanguageInfo("es-ES", "Испанский", null, null, ".!?…\n", "Нет испанского голоса", "В тексте нет испанских слов", { it.isLetter() })
+        override val info = LanguageInfo("es-ES", "Испанский", null, null, ".!?…\n", "Нет испанского голоса", "В тексте нет испанских слов", { it.isLetter() }, "windows-1252")
         private val word = Regex("\\p{L}+")
 
         override fun chapter(paragraphs: List<String>, options: TextOptions): (String) -> PreparedText = { text ->

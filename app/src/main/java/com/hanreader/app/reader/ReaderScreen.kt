@@ -190,10 +190,11 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // Names of this book (found or «Не учить») and the reader's own «Это имя».
     val names = remember(bookWords, userNames) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word }.apply { addAll(userNames) } }
     val coverage = remember(chapter, matcher, names) { chapter?.let { KnownCoverage.of(it, matcher, names, engine) } }
-    val showPinyin = pinyinMode != PinyinMode.OFF
+    // A language without a line above words (Spanish) never reserves room for it.
+    val showPinyin = pinyinMode != PinyinMode.OFF && com.hanreader.app.lang.Languages.current.readingTitle != null
     // Recommended words for the reader's level (blue), words not known yet (red).
     val levelMark by vm.levelMark.collectAsState()
-    val readerLevel = remember(matcher, levelMark, engine) { engine?.let { Recommendations.level(levelMark, matcher, it.hsk) } }
+    val readerLevel = remember(matcher, levelMark, engine) { engine?.let { Recommendations.level(levelMark, matcher, (it as? ZhEngine)?.hsk ?: HskLevels(emptyMap())) } }
     val bookWordMap = remember(bookWords) { bookWords.associateBy { it.word } }
     val wantRecommended = appearance.markRecommended || pinyinMode == PinyinMode.RECOMMENDED || appearance.gloss == GlossMode.RECOMMENDED
     val recommended = remember(chapter, matcher, saved, names, bookWordMap, readerLevel, appearance.recommendedPerChapter, wantRecommended) {
@@ -1104,7 +1105,7 @@ private fun ReaderTopBar(
             )
         }
         IconButton(onClick = onToc) { Icon(LexiconIcons.ListBullets, contentDescription = "Оглавление, закладки, поиск") }
-        PinyinMenu(pinyinMode, onPinyin)
+        if (com.hanreader.app.lang.Languages.current.readingTitle != null) PinyinMenu(pinyinMode, onPinyin)
         TextButton(onClick = onAppearance) {
             Text("Aa", fontFamily = WordFont, color = if (appearanceOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
         }
@@ -1152,7 +1153,7 @@ private fun ChapterFooter(
     chapter: ChapterContent,
     matcher: KnownMatcher,
     names: Set<String>,
-    engine: ZhEngine?,
+    engine: com.hanreader.app.lang.LanguageModule?,
     count: Int,
     engineMs: Long?,
     onPrev: () -> Unit,
@@ -1209,7 +1210,7 @@ private fun BookImage(vm: ReaderViewModel, path: String) {
 private fun WordSheet(
     selection: Selection,
     block: ReaderBlock.Text,
-    engine: ZhEngine,
+    engine: com.hanreader.app.lang.LanguageModule,
     saved: Set<String>,
     known: Set<String>,
     /** Whether a word counts as known (marks, level, cards or known parts). */
@@ -1240,23 +1241,28 @@ private fun WordSheet(
     val first = tokens[selection.first]
     val last = tokens[selection.last]
     val word = block.text.substring(first.start, last.end)
-    val entry = remember(word) { engine.lookup(word)?.takeIf { it.hasDefinition } }
+    // The Chinese card: dictionary entry, characters, readings. Other languages: their own part below.
+    val zh = engine as? ZhEngine
+    val es = remember(word) { (engine as? com.hanreader.app.es.EsEngine)?.analyses(word).orEmpty() }
+    val entry = remember(word) { zh?.lookup(word)?.takeIf { it.hasDefinition } }
     // A combination the dictionary lacks: its dictionary words (革命 + 党), else its characters.
-    val composed = remember(word) { if (entry == null) engine.compose(word) else null }
-    val chars = remember(word) { if (entry == null) composed ?: engine.characters(word) else emptyList() }
+    val composed = remember(word) { if (entry == null) zh?.compose(word) else null }
+    val chars = remember(word) { if (entry == null) composed ?: zh?.characters(word).orEmpty() else emptyList() }
+    // The word cards and «Знаю» are about: Spanish hablo → hablar; Chinese: the word itself.
+    val cardWord = remember(word) { if (zh != null) word else engine.lemma(word) }
     // One token: its reading in context (慢慢地 de, not the dictionary's dì).
-    val reading = if (selection.first == selection.last && first.pinyin.isNotEmpty() && first.text.length == 1) first.pinyin
+    val reading = if (zh == null) "" else if (selection.first == selection.last && first.pinyin.isNotEmpty() && first.text.length == 1) first.pinyin
         else entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
     // A single character: the meanings of the reading on the page (得 de after a verb, not dé «получить»).
     val pageReading = if (selection.first == selection.last && first.text.length == 1) first.pinyin.takeIf { it.isNotEmpty() } else null
-    val russian = remember(word, pageReading) { engine.russianSenses(word, pageReading) }
-    val otherReadings = remember(word, pageReading) { engine.otherReadings(word, pageReading) }
+    val russian = remember(word, pageReading) { zh?.russianSenses(word, pageReading) ?: es.firstOrNull()?.entry?.ru.orEmpty() }
+    val otherReadings = remember(word, pageReading) { zh?.otherReadings(word, pageReading).orEmpty() }
     val translation = userMeaning ?: engine.cardTranslation(word, pageReading)
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
     var status by remember(word) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val isSaved = word in saved
+    val isSaved = cardWord in saved
 
     // Neighbouring Han tokens for widening the selection.
     val canGrowLeft = selection.first > 0 && tokens[selection.first - 1].kind == TokenKind.HAN
@@ -1269,15 +1275,15 @@ private fun WordSheet(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Wraps: a long combination must not squeeze the reading into a column.
-            val markFlow = remember(word) { markOf(word) }
+            val markFlow = remember(cardWord) { markOf(cardWord) }
             val mark by markFlow.collectAsState(initial = null)
             val knownNow = isKnown(word)
-            val canMark = word.length <= 8 && word.all { it.isHan() }
+            val canMark = (zh == null || word.length <= 8) && word.all { com.hanreader.app.lang.Languages.current.isWordChar(it) }
             val knownReason = when {
                 mark?.source == ReaderViewModel.UNKNOWN -> "отмечено «Не знаю»"
                 mark?.source == "manual" -> "отмечено «Знаю»"
                 mark != null -> "знакомо по уровню " + mark!!.source.replace("hsk3:", "HSK 3.0 · ").replace("hsk2:", "HSK 2.0 · ")
-                word in known -> "выучено в карточках"
+                word in known || cardWord in known -> "выучено в карточках"
                 knownNow -> "знакомо по частям слова"
                 else -> null
             }
@@ -1293,18 +1299,23 @@ private fun WordSheet(
                 }
                 Text(reading, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.alignByBaseline())
+                // A form of another word: hablo → hablar.
+                if (zh == null && cardWord != word.lowercase()) {
+                    Text("→ $cardWord", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.alignByBaseline())
+                }
             }
             // Beside the word: the switch, and under it what each character means (目 глаз, 不 не…).
             val charRows = remember(word, selection) {
                 val inWord = tokens.subList(selection.first, selection.last + 1)
                 val syllables = inWord.flatMap { t -> if (t.syllables.size == t.text.length) t.syllables else List(t.text.length) { "" } }
-                if (entry == null || word.length !in 2..4 || !word.all { it.isHan() }) emptyList()
-                else word.mapIndexed { k, c -> c.toString() to engine.charGloss(c.toString(), syllables.getOrNull(k)?.takeIf { it.isNotEmpty() }) }
+                if (zh == null || entry == null || word.length !in 2..4 || !word.all { it.isHan() }) emptyList()
+                else word.mapIndexed { k, c -> c.toString() to zh.charGloss(c.toString(), syllables.getOrNull(k)?.takeIf { it.isNotEmpty() }) }
                     .takeIf { rows -> rows.all { it.second != null } }.orEmpty()
             }
             if (canMark || charRows.isNotEmpty()) {
                 Column(Modifier.padding(top = 8.dp).widthIn(max = 190.dp), horizontalAlignment = Alignment.End) {
-                    if (canMark) KnownToggle(known = knownNow, onKnown = { onKnown(word, it) })
+                    if (canMark) KnownToggle(known = knownNow, onKnown = { onKnown(cardWord, it) })
                     if (charRows.isNotEmpty()) CharBreakdown(charRows, Modifier.padding(top = 10.dp))
                 }
             }
@@ -1314,7 +1325,7 @@ private fun WordSheet(
                     Text(knownReason.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (mark?.source == ReaderViewModel.UNKNOWN || mark?.source == "manual") {
-                        TextButton(onClick = { onClearKnown(word) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        TextButton(onClick = { onClearKnown(cardWord) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
                             Text("Сбросить", style = MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -1325,9 +1336,9 @@ private fun WordSheet(
                 russian.forEachIndexed { i, sense ->
                     Text("${i + 1}. $sense", style = MaterialTheme.typography.bodyLarge)
                 }
-                engine.russianSource(word)?.let { src ->
+                (zh?.russianSource(word)?.label ?: if (es.isNotEmpty()) "Викисловарь" else null)?.let { src ->
                     Text(
-                        "Русский · ${src.label}",
+                        "Русский · $src",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1363,7 +1374,7 @@ private fun WordSheet(
                     Text("Частотность: №${entry.rank}", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            } else {
+            } else if (zh != null) {
                 Text(
                     if (composed != null) "Сочетание слов:" else "Слова нет в словаре. По иероглифам:",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1371,13 +1382,36 @@ private fun WordSheet(
                 chars.forEach { c ->
                     Text("${c.word}  ${c.pinyin} — ${engine.cardTranslation(c.word) ?: c.shortGloss(2)}", style = MaterialTheme.typography.bodyLarge)
                 }
+            } else if (es.isEmpty()) {
+                Text("Слова нет в словаре", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                // Spanish: what the form is (hablar, гл. · 3 л. ед. ч., претерит), other readings, English.
+                es.forEachIndexed { i, a ->
+                    val about = listOf(a.entry.pos, a.grammar).filter { it.isNotEmpty() }.joinToString(" · ")
+                    if (i > 0) {
+                        Text("${a.entry.lemma} — ${(a.entry.ru.ifEmpty { a.entry.en }).take(2).joinToString("; ")}",
+                            style = MaterialTheme.typography.bodyMedium)
+                    }
+                    if (about.isNotEmpty()) {
+                        Text((if (i > 0 || a.entry.lemma != word.lowercase()) a.entry.lemma + ": " else "") + about,
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                val en = es.first().entry.en
+                if (en.isNotEmpty()) {
+                    Text("English", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    en.take(if (russian.isEmpty()) 4 else 2).forEachIndexed { i, sense ->
+                        Text("${i + 1}. $sense", style = if (russian.isEmpty()) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                            color = if (russian.isEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onChange(selection.copy(first = selection.first - 1)) }, enabled = canGrowLeft) { Text("← +") }
                 OutlinedButton(onClick = { onChange(selection.copy(last = selection.last - 1)) }, enabled = canShrink) { Text("−") }
                 OutlinedButton(onClick = { onChange(selection.copy(last = selection.last + 1)) }, enabled = canGrowRight) { Text("+ →") }
             }
-            Text(
+            if (zh != null) Text(
                 "Границы слова: расширь выделение, если словарь разрезал сочетание.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1406,7 +1440,7 @@ private fun WordSheet(
             }
             Surface(
                 onClick = {
-                    onSave(word, reading, translation, sentence) { r ->
+                    onSave(cardWord, reading, translation, sentence) { r ->
                         scope.launch {
                             status = r.fold(
                                 onSuccess = { created -> if (created) "Добавлено в карточки" else "Уже в карточках: добавлен новый пример" },
@@ -1427,7 +1461,7 @@ private fun WordSheet(
             if (entry?.gloss?.contains("(idiom)") == true) {
                 Text("成语 · идиома", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            val lexiconName = engine.nameKind(word)
+            val lexiconName = zh?.nameKind(word)
             val isUserName = word in userNames
             if (lexiconName != null || isUserName) {
                 Text(

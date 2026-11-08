@@ -29,8 +29,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AppearanceStore.load(this)
         IncomingBooks.take(intent)
-        // Load the Chinese dictionary in the background right away, so it is ready by the first tap.
-        com.hanreader.app.reader.ZhEngine.warmUp(this)
+        // The language to read (Chinese unless switched in the library), then its dictionary in the
+        // background right away, so it is ready by the first tap.
+        com.hanreader.app.lang.Languages.init(this)
+        com.hanreader.app.lang.LanguageEngines.warmUp(this)
         setContent { LexiconTheme { LexiconScreen() } }
     }
 }

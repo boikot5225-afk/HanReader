@@ -131,7 +131,7 @@ class TxtBook(bytes: ByteArray, name: String) : BookSource {
     companion object {
         private const val PART_CHARS = 6_000
         private val HEADING = Regex(
-            "^(第[0-9０-９零〇一二两三四五六七八九十百千万]+[章节回卷集部篇]|序章|序言|楔子|尾声|后记|番外|引子|Chapter\\s+\\d+|Глава\\s+\\d+).{0,30}$",
+            "^(第[0-9０-９零〇一二两三四五六七八九十百千万]+[章节回卷集部篇]|序章|序言|楔子|尾声|后记|番外|引子|Chapter\\s+\\d+|Глава\\s+\\d+|Cap[ií]tulo\\s+([0-9]+|[IVXLC]+)\\b|Pr[oó]logo|Ep[ií]logo).{0,30}$",
             RegexOption.IGNORE_CASE
         )
 
@@ -140,7 +140,8 @@ class TxtBook(bytes: ByteArray, name: String) : BookSource {
             if (b.size >= 2 && b[0] == 0xFF.toByte() && b[1] == 0xFE.toByte()) return String(b, 2, b.size - 2, Charsets.UTF_16LE)
             if (b.size >= 2 && b[0] == 0xFE.toByte() && b[1] == 0xFF.toByte()) return String(b, 2, b.size - 2, Charsets.UTF_16BE)
             strict(b, Charsets.UTF_8)?.let { return it }
-            return String(b, Charset.forName("GB18030"))
+            // Not UTF-8: the usual old encoding of the language being read (GB18030 for Chinese, Windows-1252 for Spanish).
+            return String(b, Charset.forName(com.hanreader.app.lang.Languages.current.legacyCharset))
         }
 
         private fun strict(b: ByteArray, cs: Charset): String? = try {

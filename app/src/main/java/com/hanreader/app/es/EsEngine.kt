@@ -1,0 +1,186 @@
+package com.hanreader.app.es
+
+import android.content.Context
+import com.hanreader.app.lang.LanguageInfo
+import com.hanreader.app.lang.LanguageModule
+import com.hanreader.app.lang.Languages
+import com.hanreader.app.lang.PreparedText
+import com.hanreader.app.lang.TextOptions
+import com.hanreader.app.reader.RToken
+import com.hanreader.app.zh.TokenKind
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
+/** A dictionary word: [ru] from the Russian Wiktionary, [en] from the English one. */
+data class EsEntry(val lemma: String, val pos: String, val ru: List<String>, val en: List<String>) {
+    val isName: Boolean get() = pos == "имя"
+}
+
+/** One reading of a word on the page: hablo → hablar, «1 л. ед. ч., наст.». */
+data class EsAnalysis(val form: String, val entry: EsEntry, val grammar: String)
+
+/**
+ * The Spanish language module. Words are runs of letters; a word on the page is looked up as it
+ * is, then as a form of a dictionary word (hablo → hablar, fue → ir / ser), then with the
+ * pronouns attached to a verb taken off (dámelo → dar + me + lo).
+ */
+class EsEngine(
+    private val dict: SortedTsv,
+    private val forms: SortedTsv,
+    private val grammar: List<String>,
+    override val loadMs: Long = 0
+) : LanguageModule {
+    override val info: LanguageInfo get() = Languages.SPANISH
+
+    private val cache = object : LinkedHashMap<String, List<EsAnalysis>>(2048, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<EsAnalysis>>?) = size > 20_000
+    }
+
+    fun entry(lemma: String): EsEntry? {
+        val f = dict.get(lemma) ?: return null
+        fun senses(i: Int) = f.getOrNull(i).orEmpty().split(" ; ").map { it.trim() }.filter { it.isNotEmpty() }
+        return EsEntry(lemma, f.getOrNull(0).orEmpty(), senses(1), senses(2))
+    }
+
+    /** Every dictionary reading of [word], the most useful first (a word with a Russian meaning first). */
+    fun analyses(word: String): List<EsAnalysis> {
+        val w = word.lowercase()
+        synchronized(cache) { cache[w] }?.let { return it }
+        val out = ArrayList<EsAnalysis>(2)
+        entry(w)?.let { out += EsAnalysis(w, it, "") }
+        forms.get(w)?.firstOrNull()?.split('|')?.forEach { item ->
+            val lemma = item.substringBefore(':')
+            val g = item.substringAfter(':', "0").toIntOrNull()?.let { grammar.getOrNull(it) }.orEmpty()
+            if (out.none { it.entry.lemma == lemma }) entry(lemma)?.let { out += EsAnalysis(w, it, g) }
+        }
+        if (out.isEmpty()) out += withoutPronouns(w)
+        val sorted = out.sortedBy { if (it.entry.ru.isNotEmpty()) 0 else 1 }
+        synchronized(cache) { cache[w] = sorted }
+        return sorted
+    }
+
+    /** dámelo → dar, «+ местоим.»: up to two attached pronouns, the stress mark they forced dropped. */
+    private fun withoutPronouns(w: String): List<EsAnalysis> {
+        for (p1 in PRONOUNS) {
+            if (!w.endsWith(p1) || w.length - p1.length < 2) continue
+            val one = w.dropLast(p1.length)
+            verb(one)?.let { return listOf(it) }
+            for (p2 in PRONOUNS) {
+                if (!one.endsWith(p2) || one.length - p2.length < 2) continue
+                verb(one.dropLast(p2.length))?.let { return listOf(it) }
+            }
+        }
+        return emptyList()
+    }
+
+    /** A verb form (infinitive, gerund, imperative) under [stem], with or without its stress mark. */
+    private fun verb(stem: String): EsAnalysis? {
+        for (s in listOf(stem, unaccent(stem)).distinct()) {
+            entry(s)?.takeIf { it.pos == "гл." }?.let { return EsAnalysis(stem, it, "+ местоим.") }
+            forms.get(s)?.firstOrNull()?.split('|')?.forEach { item ->
+                val lemma = item.substringBefore(':')
+                entry(lemma)?.takeIf { it.pos == "гл." }?.let { e ->
+                    val g = item.substringAfter(':', "0").toIntOrNull()?.let { grammar.getOrNull(it) }.orEmpty()
+                    return EsAnalysis(stem, e, listOf(g, "+ местоим.").filter { it.isNotEmpty() }.joinToString(", "))
+                }
+            }
+        }
+        return null
+    }
+
+    /** The dictionary word of [word] (hablo → hablar); the word itself, lower-case, if unknown. */
+    override fun lemma(word: String): String = analyses(word).firstOrNull()?.entry?.lemma ?: word.lowercase()
+
+    override fun chapter(paragraphs: List<String>, options: TextOptions): (String) -> PreparedText = { text ->
+        PreparedText(text, text, tokenize(text))
+    }
+
+    fun tokenize(text: String): List<RToken> {
+        val out = ArrayList<RToken>(text.length / 4 + 4)
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            val start = i
+            val kind = when {
+                c.isLetter() -> {
+                    // A word may hold an apostrophe or a hyphen between letters (O'Donnell, franco-español).
+                    while (i < text.length && (text[i].isLetter() || (text[i] in "'’-" && i + 1 < text.length && text[i + 1].isLetter() && i > start))) i++
+                    TokenKind.HAN
+                }
+                c.isWhitespace() -> { while (i < text.length && text[i].isWhitespace()) i++; TokenKind.SPACE }
+                c.isDigit() -> { while (i < text.length && text[i].isLetterOrDigit()) i++; TokenKind.OTHER }
+                else -> { i++; TokenKind.PUNCT }
+            }
+            val t = text.substring(start, i)
+            out += RToken(t, "", kind, start, i, kind == TokenKind.HAN && analyses(t).isNotEmpty())
+        }
+        return out
+    }
+
+    override fun glossShort(word: String, reading: String?): String? {
+        val e = analyses(word).firstOrNull()?.entry ?: return null
+        (e.ru.firstOrNull() ?: e.en.firstOrNull()?.removePrefix("to "))?.let { return shortSense(it) }
+        return null
+    }
+
+    override fun cardTranslation(word: String, reading: String?): String? {
+        val e = analyses(word).firstOrNull()?.entry ?: return null
+        return (e.ru.ifEmpty { e.en }).take(2).joinToString("; ").ifEmpty { null }
+    }
+
+    override fun studyable(word: String): Boolean = analyses(word).firstOrNull()?.entry?.isName == false
+
+    override fun isName(word: String): Boolean = analyses(word).firstOrNull()?.entry?.isName == true
+
+    /** A form counts as known when its dictionary word is known (habló, if hablar is known). */
+    override fun knownByParts(word: String, known: Set<String>): Boolean =
+        word.lowercase() in known || analyses(word).any { it.entry.lemma in known }
+
+    /** Searched without case and stress marks: «cancion» finds «canción». */
+    override fun searchForm(text: String): String = unaccent(text.lowercase())
+
+    companion object {
+        private val PRONOUNS = listOf("nos", "los", "las", "les", "me", "te", "se", "os", "lo", "la", "le")
+
+        /** Drops stress marks, keeping the length (ñ and ü stay). */
+        fun unaccent(s: String): String = buildString(s.length) {
+            for (c in s) append(when (c) { 'á' -> 'a'; 'é' -> 'e'; 'í' -> 'i'; 'ó' -> 'o'; 'ú' -> 'u'
+                'Á' -> 'A'; 'É' -> 'E'; 'Í' -> 'I'; 'Ó' -> 'O'; 'Ú' -> 'U'; else -> c })
+        }
+
+        /** The first part of a sense: brackets and everything after a comma or semicolon dropped. */
+        fun shortSense(x: String): String? = x.replace(Regex("\\([^)]*\\)|\\[[^]]*]"), " ")
+            .split(',', ';').map { it.trim() }.firstOrNull { it.isNotEmpty() }
+
+        fun load(dict: java.io.InputStream, forms: java.io.InputStream, grammar: java.io.InputStream): EsEngine {
+            val t = System.nanoTime()
+            val d = SortedTsv.read(dict)
+            val f = SortedTsv.read(forms)
+            val g = grammar.bufferedReader().use { it.readLines() }
+            return EsEngine(d, f, g, (System.nanoTime() - t) / 1_000_000)
+        }
+
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        @Volatile private var loading: CompletableDeferred<EsEngine>? = null
+
+        /** Loads the dictionary once per process in the background (about 18 MB of text). */
+        fun warmUp(context: Context): CompletableDeferred<EsEngine> {
+            loading?.let { return it }
+            synchronized(this) {
+                loading?.let { return it }
+                val d = CompletableDeferred<EsEngine>()
+                loading = d
+                val app = context.applicationContext
+                scope.launch {
+                    runCatching {
+                        load(app.assets.open("es/dict.tsv"), app.assets.open("es/forms.tsv"), app.assets.open("es/grammar.tsv"))
+                    }.fold({ d.complete(it) }, { d.completeExceptionally(it) })
+                }
+                return d
+            }
+        }
+    }
+}

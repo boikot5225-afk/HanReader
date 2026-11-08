@@ -1,0 +1,8 @@
+Spanish dictionary (es/dict.tsv, es/forms.tsv, es/grammar.tsv), built by tools/build_es_dict.py from:
+- Russian Wiktionary (ru.wiktionary.org), Spanish words: Russian meanings, via the wiktextract
+  extract published at https://kaikki.org/ruwiktionary/ (downloaded November 2026);
+- English Wiktionary (en.wiktionary.org), Spanish words: English meanings and word forms, via
+  https://kaikki.org/dictionary/Spanish/ (downloaded November 2026).
+Wiktionary text: Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0), authors: Wiktionary contributors.
+https://creativecommons.org/licenses/by-sa/4.0/
+The derived files are distributed under the same licence.

@@ -18,19 +18,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 data class Language(val tag: String, val title: String)
-/** HanReader teaches Chinese only. The language column stays in the schema so Lexicon backups restore as-is. */
-val languages = listOf(
-    Language("zh-CN", "中文")
-)
+/** The cards of the language being read ([com.hanreader.app.lang.Languages.current]); other languages' cards stay stored. */
+val languages: List<Language> get() = listOf(com.hanreader.app.lang.Languages.current.let { Language(it.tag, it.title) })
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LexiconViewModel(app: Application) : AndroidViewModel(app) {
     private val dao = LexiconDatabase.get(app).cardDao()
     private val knownDao = LexiconDatabase.get(app).knownWordDao()
     private val booksDir = File(app.filesDir, "books").apply { mkdirs() }
-    private val selection = MutableStateFlow("zh-CN")
+    private val selection = MutableStateFlow(com.hanreader.app.lang.Languages.current.tag)
     private val settingsStore = LearningSettingsStore(app)
-    private val preferences = MutableStateFlow(settingsStore.load("zh-CN"))
+    private val preferences = MutableStateFlow(settingsStore.load(com.hanreader.app.lang.Languages.current.tag))
     val learningSettings: StateFlow<LearningSettings> = preferences.asStateFlow()
     val language: StateFlow<String> = selection.asStateFlow()
     val contexts: StateFlow<List<CardExample>> = selection.flatMapLatest {
@@ -130,7 +128,7 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                     exportedAt = System.currentTimeMillis(),
                     cards = cards,
                     examples = dao.allExamples(),
-                    settings = languages.map { settingsStore.load(it.tag) },
+                    settings = com.hanreader.app.lang.Languages.ALL.map { settingsStore.load(it.tag) },
                     knownWords = knownDao.all(),
                     userNames = db.userNameDao().all().map { it.word },
                     sources = dao.allSources(),
@@ -226,7 +224,7 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 backup.settings
-                    .filter { s -> languages.any { it.tag == s.language } }
+                    .filter { s -> com.hanreader.app.lang.Languages.ALL.any { it.tag == s.language } }
                     .forEach { settingsStore.save(it) }
                 preferences.value = settingsStore.load(selection.value)
             })

@@ -161,7 +161,7 @@ private fun CandidateRow(
 /** «Подготовиться к разделу»: the chapter's most frequent unknown words. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PrepareChapterSheet(vm: ReaderViewModel, book: OpenBook, chapter: ChapterContent, engine: ZhEngine, onDismiss: () -> Unit) {
+fun PrepareChapterSheet(vm: ReaderViewModel, book: OpenBook, chapter: ChapterContent, engine: com.hanreader.app.lang.LanguageModule, onDismiss: () -> Unit) {
     val known by vm.knownWords.collectAsState()
     val saved by vm.savedWords.collectAsState()
     val bookWordsFlow = remember(book.entity.id) { vm.bookWords(book.entity.id) }

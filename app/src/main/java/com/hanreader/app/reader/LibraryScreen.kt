@@ -105,8 +105,11 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item { LanguagePanel() }
         item {
-            KnownWordsPanel(known.size, levelMark, onChoose = { showLevel = true })
+            // Word levels (HSK) exist for Chinese only for now.
+            KnownWordsPanel(known.size, levelMark, onChoose = { showLevel = true },
+                withLevels = com.hanreader.app.lang.Languages.current.levelsTitle != null)
         }
         item { ActivityPanel(vm, onReadingStats) }
         item {
@@ -127,7 +130,11 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
             item {
                 Panel(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Добавь китайскую книгу: EPUB, FB2, TXT или документ Word", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            (if (com.hanreader.app.lang.Languages.current == com.hanreader.app.lang.Languages.SPANISH) "Добавь испанскую книгу" else "Добавь китайскую книгу") +
+                                ": EPUB, FB2, TXT или документ Word",
+                            style = MaterialTheme.typography.titleMedium
+                        )
                         Text(
                             "Над словами появится пиньинь. Нажми на слово — увидишь перевод и сохранишь его в карточки вместе с предложением из книги. Книгу можно открыть и прямо из файлового менеджера или Telegram: «Открыть с помощью» → HanReader.",
                             style = MaterialTheme.typography.bodyMedium,
@@ -316,20 +323,62 @@ private fun SortMenu(sort: ReaderViewModel.LibrarySort, onPick: (ReaderViewModel
 }
 
 @Composable
-private fun KnownWordsPanel(count: Int, mark: LevelMark, onChoose: () -> Unit) {
+private fun KnownWordsPanel(count: Int, mark: LevelMark, onChoose: () -> Unit, withLevels: Boolean = true) {
     Panel(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 20.dp, end = 12.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Знакомые слова: $count", style = MaterialTheme.typography.titleMedium)
-                Text(
+                if (!withLevels) {
+                    Text("Отмечай слова «Знаю» в карточке слова", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else Text(
                     if (mark.level == 0) "Отметь свой уровень — пиньинь останется только над новыми словами"
                     else "Отмечено до ${mark.system.title} ${mark.system.levelTitle(mark.level)} и слова «Знаю»",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            TextButton(onClick = onChoose) { Text(if (mark.level == 0) "Уровень" else "Изменить") }
+            if (withLevels) TextButton(onClick = onChoose) { Text(if (mark.level == 0) "Уровень" else "Изменить") }
         }
+    }
+}
+
+/** The language being read, and the switch to another one (the app restarts with its dictionary). */
+@Composable
+private fun LanguagePanel() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val current = com.hanreader.app.lang.Languages.current
+    var choosing by remember { mutableStateOf(false) }
+    Panel(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(start = 20.dp, end = 12.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Язык: ${current.title}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = { choosing = true }) { Text("Сменить") }
+        }
+    }
+    if (choosing) {
+        AlertDialog(
+            onDismissRequest = { choosing = false },
+            title = { Text("Какой язык читать?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Приложение перезапустится со словарём выбранного языка. Книги, карточки и знакомые слова сохранятся.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    com.hanreader.app.lang.Languages.ALL.forEach { l ->
+                        FilterChip(selected = l == current, onClick = {
+                            choosing = false
+                            if (l != current) {
+                                com.hanreader.app.lang.Languages.choose(context, l)
+                                com.hanreader.app.lang.Languages.restart(context)
+                            }
+                        }, label = { Text(l.title) })
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { choosing = false }) { Text("Отмена") } }
+        )
     }
 }
 

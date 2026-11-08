@@ -8,7 +8,9 @@ import com.hanreader.app.reader.BookAnalysis
 import com.hanreader.app.reader.RToken
 import com.hanreader.app.zh.TokenKind
 import com.hanreader.app.zh.isHan
+import android.content.Context
 import java.util.Locale
+import kotlinx.coroutines.Deferred
 
 /**
  * The "socket" between the reader and a language. Everything the reader, pages, themes,
@@ -34,7 +36,9 @@ data class LanguageInfo(
     /** Shown when pasted text has no words of the language. */
     val noWordsMessage: String,
     /** A letter of the language: tells a text in it from other text, and a name the reader may mark. */
-    val isWordChar: (Char) -> Boolean
+    val isWordChar: (Char) -> Boolean,
+    /** The usual encoding of old .txt files that are not UTF-8. */
+    val legacyCharset: String
 ) {
     val locale: Locale get() = Locale.forLanguageTag(tag)
 }
@@ -57,6 +61,12 @@ data class PreparedText(val text: String, val shown: String, val tokens: List<RT
 
 interface LanguageModule {
     val info: LanguageInfo
+
+    /** How long the dictionary took to load, ms (shown under a chapter). */
+    val loadMs: Long get() = 0
+
+    /** The dictionary form of a word on the page (Spanish: hablo → hablar); cards and «Знаю» use it. */
+    fun lemma(word: String): String = word
 
     /**
      * Prepares a chapter: called once with all its paragraphs (a module may look at the whole
@@ -93,8 +103,8 @@ interface LanguageModule {
     val levels: WordLevels? get() = null
 
     /**
-     * [word] is not in [known] but follows from words in it (Chinese: 看 + 着, 一 + 个人).
-     * Called only for words of two or more characters.
+     * [word] is not in [known] but follows from words in it (Chinese: 看 + 着, 一 + 个人;
+     * Spanish: habló, if hablar is known).
      */
     fun knownByParts(word: String, known: Set<String>): Boolean = false
 
@@ -146,7 +156,10 @@ interface WordLevels {
     fun knownAt(level: Int): Set<String>
 }
 
-/** The languages the app knows. One build reads one language: [current]. */
+/**
+ * The languages the app knows. One language is read at a time: [current], chosen in the library
+ * and kept in the app's settings; switching restarts the app with the other dictionary.
+ */
 object Languages {
     val CHINESE = LanguageInfo(
         tag = "zh-CN",
@@ -156,8 +169,61 @@ object Languages {
         sentenceEnd = "。！？!?…；;\n",
         voiceMissing = "Нет китайского голоса. Установи его: Настройки Android → Синтез речи",
         noWordsMessage = "В тексте нет китайских иероглифов",
-        isWordChar = { it.isHan() }
+        isWordChar = { it.isHan() },
+        legacyCharset = "GB18030"
     )
 
-    val current: LanguageInfo = CHINESE
+    val SPANISH = LanguageInfo(
+        tag = "es-ES",
+        title = "Испанский",
+        readingTitle = null,
+        levelsTitle = null,
+        sentenceEnd = ".!?…;\n",
+        voiceMissing = "Нет испанского голоса. Установи его: Настройки Android → Синтез речи",
+        noWordsMessage = "В тексте нет испанских слов",
+        isWordChar = { it.isLetter() },
+        legacyCharset = "windows-1252"
+    )
+
+    val ALL = listOf(CHINESE, SPANISH)
+
+    /** Chinese until [init] reads the setting (tests never call it). */
+    @Volatile var current: LanguageInfo = CHINESE
+        private set
+
+    private const val PREFS = "language"
+    private const val KEY = "studyLanguage"
+
+    fun init(context: Context) {
+        val tag = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null)
+        current = ALL.firstOrNull { it.tag == tag } ?: CHINESE
+    }
+
+    /** Saves [language] as the one to read; takes effect after a restart ([restart]). */
+    fun choose(context: Context, language: LanguageInfo) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, language.tag).commit()
+    }
+
+    /** Starts the app again, so every screen and the dictionary load for the chosen language. */
+    fun restart(context: Context) {
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        context.startActivity(intent)
+        Runtime.getRuntime().exit(0)
+    }
+}
+
+/** Loads the module of [Languages.current] once per process. */
+object LanguageEngines {
+    /** The complete module: everything it knows (Chinese: Russian meanings, HSK, names). */
+    fun warmUp(context: Context): Deferred<LanguageModule> = when (Languages.current) {
+        Languages.SPANISH -> com.hanreader.app.es.EsEngine.warmUp(context)
+        else -> com.hanreader.app.reader.ZhEngine.warmUp(context)
+    }
+
+    /** Enough to build and show a chapter, as soon as possible (Chinese: the dictionary alone). */
+    fun core(context: Context): Deferred<LanguageModule> = when (Languages.current) {
+        Languages.SPANISH -> com.hanreader.app.es.EsEngine.warmUp(context)
+        else -> com.hanreader.app.reader.ZhEngine.core(context)
+    }
 }

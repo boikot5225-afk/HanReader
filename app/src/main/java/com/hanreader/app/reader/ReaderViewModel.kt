@@ -63,9 +63,9 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val cards = db.cardDao()
     private val knownDao = db.knownWordDao()
     private val prefs = app.getSharedPreferences("reader_settings", android.content.Context.MODE_PRIVATE)
-    private val engineDeferred = ZhEngine.warmUp(app)
+    private val engineDeferred = com.hanreader.app.lang.LanguageEngines.warmUp(app)
     /** The dictionary alone: chapters, analysis and search need nothing more and start at once. */
-    private val engineCore = ZhEngine.core(app)
+    private val engineCore = com.hanreader.app.lang.LanguageEngines.core(app)
     private val booksDir = File(app.filesDir, "books").apply { mkdirs() }
     private val openMutex = Mutex()
     private val images = object : LruCache<String, Bitmap>(24 * 1024 * 1024) {
@@ -135,7 +135,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             knownDao.remove(word)
             val mark = _levelMark.value
             if (mark.level == 0) return@launch
-            val engine = runCatching { engineDeferred.await() }.getOrNull() ?: return@launch
+            val engine = runCatching { engineDeferred.await() }.getOrNull() as? ZhEngine ?: return@launch
             val inLevel = withContext(Dispatchers.Default) { levelWords(engine, mark.system, mark.level).contains(word) }
             if (inLevel) knownDao.put(KnownWord(word, levelTag(mark.system, mark.level)))
         }
@@ -157,7 +157,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun setLevel(system: HskSystem, level: Int, onDone: (Result<Int>) -> Unit) {
         viewModelScope.launch {
             onDone(runCatching {
-                val engine = engineDeferred.await()
+                // HSK levels: Chinese only.
+                val engine = engineDeferred.await() as? ZhEngine ?: throw IllegalStateException("Уровни HSK есть только у китайского")
                 val words = withContext(Dispatchers.Default) { levelWords(engine, system, level) }
                 val tag = levelTag(system, level)
                 val added = knownDao.setLevelMarks(words.map { KnownWord(it, tag) })
@@ -172,8 +173,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val _open = MutableStateFlow<OpenBook?>(null)
     val open: StateFlow<OpenBook?> = _open.asStateFlow()
 
-    private val _engine = MutableStateFlow<ZhEngine?>(null)
-    val engine: StateFlow<ZhEngine?> = _engine.asStateFlow()
+    private val _engine = MutableStateFlow<com.hanreader.app.lang.LanguageModule?>(null)
+    val engine: StateFlow<com.hanreader.app.lang.LanguageModule?> = _engine.asStateFlow()
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
