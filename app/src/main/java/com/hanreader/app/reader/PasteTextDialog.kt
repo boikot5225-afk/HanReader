@@ -30,7 +30,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.hanreader.app.LexiconIcons
 import com.hanreader.app.WordFont
-import com.hanreader.app.zh.isHan
 
 /**
  * Chinese text to read: pasted here, shared from another app or selected there («Читать в
@@ -41,7 +40,7 @@ fun PasteTextDialog(initial: String, busy: Boolean, error: String?, onDismiss: (
     val clipboard = LocalClipboardManager.current
     var text by remember { mutableStateOf(initial) }
     var title by remember { mutableStateOf("") }
-    val hasChinese = text.any { it.isHan() }
+    val hasChinese = text.any { com.hanreader.app.lang.Languages.current.isWordChar(it) }
     Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).imePadding()) {
             Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -72,7 +71,7 @@ fun PasteTextDialog(initial: String, busy: Boolean, error: String?, onDismiss: (
                     )
                 }
                 if (text.isNotBlank() && !hasChinese) {
-                    Text("В тексте нет китайских иероглифов.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Text(com.hanreader.app.lang.Languages.current.noWordsMessage + ".", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 Button(

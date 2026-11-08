@@ -2,6 +2,7 @@ package com.hanreader.app.reader
 
 import com.hanreader.app.BookWord
 import com.hanreader.app.zh.TokenKind
+import com.hanreader.app.lang.LanguageModule
 import kotlin.math.ln
 
 /** The reader's level on the HSK 3.0 scale (1..7, 7 = 7–9), and whether it was worked out automatically. */
@@ -43,7 +44,7 @@ object Recommendations {
         saved: Set<String>,
         names: Set<String>,
         bookWords: Map<String, BookWord>,
-        engine: ZhEngine,
+        engine: LanguageModule,
         level: ReaderLevel,
         limit: Int
     ): List<Recommendation> {
@@ -58,7 +59,7 @@ object Recommendations {
         return counts.entries.asSequence()
             .filter { (w, _) ->
                 w !in saved && w !in names && !known.isKnown(w) &&
-                    bookWords[w]?.ignored != true && VocabularyStats.studyable(w, engine.dictionary) &&
+                    bookWords[w]?.ignored != true && engine.studyable(w) &&
                     !VocabularyStats.isName(w, engine)
             }
             .map { (w, inChapter) ->
@@ -72,18 +73,8 @@ object Recommendations {
             .toList()
     }
 
-    /** HSK 3.0 level of a word; for words outside the lists, a level guessed from general frequency. */
-    fun wordLevel(word: String, engine: ZhEngine): Int {
-        engine.hsk.hsk3(word).takeIf { it > 0 }?.let { return it }
-        val f = engine.dictionary.freq(word)
-        return when {
-            f >= 20_000 -> 2
-            f >= 5_000 -> 4
-            f >= 1_000 -> 6
-            f >= 200 -> 7
-            else -> 8
-        }
-    }
+    /** The level of a word (Chinese: HSK 3.0, words outside the lists guessed from frequency); 0 without levels. */
+    fun wordLevel(word: String, engine: LanguageModule): Int = engine.levels?.estimate(word) ?: 0
 
     /** i+1: a word one level up scores highest; gaps below the level still help; far above fades out. */
     fun closeness(wordLevel: Int, readerLevel: Int): Double = when (wordLevel - readerLevel) {

@@ -6,6 +6,7 @@ import com.hanreader.app.epub.BookSource
 import com.hanreader.app.zh.TokenKind
 import com.hanreader.app.zh.ZhDictionary
 import com.hanreader.app.zh.ZhSegmenter
+import com.hanreader.app.lang.LanguageModule
 
 /** Word counts of a whole book: the result of the one-time analysis. */
 data class BookAnalysis(val words: List<BookWord>, val tokens: Int)
@@ -177,20 +178,14 @@ object VocabularyStats {
         return !(e.pinyin.firstOrNull()?.isUpperCase() ?: false)
     }
 
-    /** A proper name outside the HSK lists: in the names lexicon, or a CC-CEDICT reading with a capital. */
-    fun isName(word: String, engine: ZhEngine): Boolean {
-        if (engine.hsk.hsk3(word) > 0 || engine.hsk.hsk2(word) > 0) return false
-        if (engine.nameKind(word) != null) return true
-        return engine.dictionary.lookup(word)?.pinyin?.firstOrNull()?.isUpperCase() == true
-    }
+    /** A proper name from the language's data (Chinese: names lexicon or a capitalised reading, outside HSK). */
+    fun isName(word: String, engine: LanguageModule): Boolean = engine.isName(word)
 
-    fun candidate(word: String, count: Int, firstChapter: Int, engine: ZhEngine): StudyCandidate {
-        val e = engine.dictionary.lookup(word)
-        return StudyCandidate(word, count, e?.pinyin.orEmpty(), engine.cardTranslation(word).orEmpty(), firstChapter)
-    }
+    fun candidate(word: String, count: Int, firstChapter: Int, engine: LanguageModule): StudyCandidate =
+        StudyCandidate(word, count, engine.reading(word).orEmpty(), engine.cardTranslation(word).orEmpty(), firstChapter)
 
     /** Share of the book's word occurrences known now (names and «Не учить» left out), percent. */
-    fun knownPercent(words: List<BookWord>, tokens: Int, known: Set<String>, engine: ZhEngine): Int {
+    fun knownPercent(words: List<BookWord>, tokens: Int, known: Set<String>, engine: LanguageModule): Int {
         val matcher = KnownMatcher(known, engine)
         val counted = words.filter { !it.ignored && !isName(it.word, engine) }
         val base = counted.sumOf { it.count }.coerceAtMost(tokens).coerceAtLeast(1)
@@ -202,7 +197,7 @@ object VocabularyStats {
         tokens: Int,
         known: Set<String>,
         saved: Set<String>,
-        engine: ZhEngine,
+        engine: LanguageModule,
         limit: Int = 50
     ): BookStats {
         val matcher = KnownMatcher(known, engine)
@@ -214,13 +209,13 @@ object VocabularyStats {
         for (w in counted) {
             if (matcher.isKnown(w.word)) knownTokens += w.count else unknownDistinct++
         }
-        val levels = HskSystem.HSK3.levels.map { level ->
-            val listed = engine.hsk.wordsUpTo(HskSystem.HSK3, level).toHashSet()
-            val covered = KnownMatcher(listed + KnownExpansion.expand(listed, engine.dictionary), engine)
+        val scale = engine.levels
+        val levels = scale?.all.orEmpty().map { level ->
+            val covered = KnownMatcher(scale!!.knownAt(level), engine)
             LevelCoverage(level, percent(counted.sumOf { if (covered.isKnown(it.word)) it.count else 0 }, base))
         }
         val candidates = words.asSequence()
-            .filter { !it.ignored && !matcher.isKnown(it.word) && it.word !in saved && studyable(it.word, engine.dictionary) && !isName(it.word, engine) }
+            .filter { !it.ignored && !matcher.isKnown(it.word) && it.word !in saved && engine.studyable(it.word) && !isName(it.word, engine) }
             .sortedByDescending { it.count }
             .take(limit)
             .map { candidate(it.word, it.count, it.firstChapter, engine) }
@@ -234,7 +229,7 @@ object VocabularyStats {
         known: Set<String>,
         saved: Set<String>,
         ignored: Set<String>,
-        engine: ZhEngine,
+        engine: LanguageModule,
         limit: Int = 50
     ): List<StudyCandidate> {
         val matcher = KnownMatcher(known, engine)
@@ -247,7 +242,7 @@ object VocabularyStats {
             }
         }
         return counts.entries.asSequence()
-            .filter { (w, _) -> !matcher.isKnown(w) && w !in saved && w !in ignored && studyable(w, engine.dictionary) && !isName(w, engine) }
+            .filter { (w, _) -> !matcher.isKnown(w) && w !in saved && w !in ignored && engine.studyable(w) && !isName(w, engine) }
             .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
             .take(limit)
             .map { (w, n) -> candidate(w, n, chapter.index, engine) }
@@ -255,12 +250,12 @@ object VocabularyStats {
     }
 
     /** Indexes of tokens that belong to a known name of the book ([names]: the book's ignored words). */
-    fun nameTokens(block: ReaderBlock.Text, names: Set<String>, engine: ZhEngine): Set<Int> {
+    fun nameTokens(block: ReaderBlock.Text, names: Set<String>, engine: LanguageModule): Set<Int> {
         val out = HashSet<Int>()
-        for (r in NameRuns.runs(block.tokens, { it.text }, { it.kind == TokenKind.HAN }, engine.dictionary)) {
+        for (r in engine.nameCandidates(block.tokens)) {
             if (r.joinToString("") { block.tokens[it].text } in names) out.addAll(r)
         }
-        for (r in DotNames.runs(block.tokens, { it.text }, { it.kind == TokenKind.HAN }, engine.dictionary)) out.addAll(r)
+        for (r in engine.sureNames(block.tokens)) out.addAll(r)
         return out
     }
 

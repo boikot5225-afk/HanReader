@@ -7,13 +7,18 @@ import com.hanreader.app.reader.ReaderBlock
 import com.hanreader.app.zh.TokenKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.hanreader.app.reader.BookSearch
+import com.hanreader.app.reader.KnownMatcher
+import com.hanreader.app.reader.VocabularyStats
+import kotlinx.coroutines.runBlocking
 
 /** The socket: the chapter builder works with any language module, not only Chinese. */
 class LanguageModuleTest {
     /** A minimal module for a language written with spaces: words are runs of letters. */
     private object Spaced : LanguageModule {
-        override val info = LanguageInfo("es-ES", "Испанский", null, null, ".!?…\n", "Нет испанского голоса")
+        override val info = LanguageInfo("es-ES", "Испанский", null, null, ".!?…\n", "Нет испанского голоса", "В тексте нет испанских слов", { it.isLetter() })
         private val word = Regex("\\p{L}+")
 
         override fun chapter(paragraphs: List<String>, options: TextOptions): (String) -> PreparedText = { text ->
@@ -41,5 +46,23 @@ class LanguageModuleTest {
     fun chineseIsTheCurrentLanguage() {
         assertEquals("zh-CN", Languages.current.tag)
         assertEquals("zh-CN", com.hanreader.app.reader.STUDY_LANGUAGE)
+    }
+
+    @Test
+    fun neutralDefaultsWork() {
+        val book = TxtBook("Hola mundo. Hola amigo.".toByteArray(), "x")
+        // The book's dictionary through the default analysis.
+        val analysis = Spaced.analyze(1L, book)
+        assertEquals(4, analysis.tokens)
+        assertEquals(2, analysis.words.first { it.word == "Hola" }.count)
+        // Statistics without levels: no level coverage, words still counted.
+        val stats = VocabularyStats.book(analysis.words, analysis.tokens, setOf("Hola"), emptySet(), Spaced)
+        assertTrue(stats.levels.isEmpty())
+        assertEquals(50, stats.knownPercent)
+        assertTrue(KnownMatcher(setOf("mundo"), Spaced).isKnown("mundo"))
+        // Text search through the module.
+        val hits = ArrayList<Int>()
+        runBlocking { BookSearch.search(book, "hola", Spaced, { _, _ -> }) { hits += it.start } }
+        assertEquals(2, hits.size)
     }
 }

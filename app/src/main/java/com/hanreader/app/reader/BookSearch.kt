@@ -4,6 +4,7 @@ import com.hanreader.app.epub.EpubBlock
 import com.hanreader.app.epub.BookSource
 import com.hanreader.app.zh.TokenKind
 import com.hanreader.app.zh.isHan
+import com.hanreader.app.lang.LanguageModule
 import java.text.Normalizer
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.ensureActive
@@ -42,14 +43,15 @@ object BookSearch {
     suspend fun search(
         epub: BookSource,
         query: String,
-        engine: ZhEngine,
+        engine: LanguageModule,
         onProgress: (Int, Int) -> Unit,
         onHit: (SearchHit) -> Unit
     ) {
         val q = query.trim()
         if (q.isEmpty()) return
-        val pinyin = isPinyinQuery(q)
-        val key = if (pinyin) toneless(q) else engine.script.toSimplified(q)
+        // A reading (Chinese: pinyin) or text; text is matched in the module's search form (simplified).
+        val pinyin = engine.isReadingQuery(q)
+        val key = if (pinyin) q else engine.searchForm(q)
         if (key.isEmpty()) return
         var hits = 0
         for (c in epub.chapters) {
@@ -57,8 +59,8 @@ object BookSearch {
                 coroutineContext.ensureActive()
                 if (b !is EpubBlock.Text) continue
                 // Matched in simplified form: a traditional book is found with simplified input and back.
-                val simple = engine.script.toSimplified(b.text)
-                val ranges = if (pinyin) pinyinMatches(simple, key, engine) else textMatches(simple, key)
+                val simple = engine.searchForm(b.text)
+                val ranges = if (pinyin) engine.readingMatches(simple, key) else textMatches(simple, key)
                 for (r in ranges) {
                     onHit(hit(c.index, c.title, bi, b.text, r.first, r.last + 1))
                     if (++hits >= MAX_HITS) return

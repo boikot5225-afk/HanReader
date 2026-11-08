@@ -17,6 +17,7 @@ import com.hanreader.app.lang.LanguageModule
 import com.hanreader.app.lang.Languages
 import com.hanreader.app.lang.PreparedText
 import com.hanreader.app.lang.TextOptions
+import com.hanreader.app.lang.WordLevels
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -259,6 +260,105 @@ class ZhEngine(
         }
     }
 
+    override fun reading(word: String): String? = dictionary.lookup(word)?.pinyin
+
+    override fun studyable(word: String): Boolean = VocabularyStats.studyable(word, dictionary)
+
+    /** A proper name outside the HSK lists: in the names lexicon, or a CC-CEDICT reading with a capital. */
+    override fun isName(word: String): Boolean {
+        if (hsk.hsk3(word) > 0 || hsk.hsk2(word) > 0) return false
+        if (nameKind(word) != null) return true
+        return dictionary.lookup(word)?.pinyin?.firstOrNull()?.isUpperCase() == true
+    }
+
+    override fun nameCandidates(tokens: List<RToken>): List<IntRange> =
+        NameRuns.runs(tokens, { it.text }, { it.kind == TokenKind.HAN }, dictionary)
+
+    override fun sureNames(tokens: List<RToken>): List<IntRange> =
+        DotNames.runs(tokens, { it.text }, { it.kind == TokenKind.HAN }, dictionary)
+
+    /** HSK 3.0 (1..7, 7 = 7–9). HSK 2.0, chosen in the library, is mapped onto it. */
+    override val levels: WordLevels = object : WordLevels {
+        override val name = "HSK"
+        override val all = HskSystem.HSK3.levels
+        override fun title(level: Int) = HskSystem.HSK3.levelTitle(level)
+        override fun of(word: String) = hsk.hsk3(word)
+
+        /** Words outside the lists: a level guessed from general frequency. */
+        override fun estimate(word: String): Int {
+            hsk.hsk3(word).takeIf { it > 0 }?.let { return it }
+            val f = dictionary.freq(word)
+            return when {
+                f >= 20_000 -> 2
+                f >= 5_000 -> 4
+                f >= 1_000 -> 6
+                f >= 200 -> 7
+                else -> 8
+            }
+        }
+
+        override fun knownAt(level: Int): Set<String> {
+            val listed = hsk.wordsUpTo(HskSystem.HSK3, level).toHashSet()
+            return listed + KnownExpansion.expand(listed, dictionary)
+        }
+    }
+
+    /**
+     * Jieba's lexicon has many transparent compounds that HSK lists never include (一个人, 看着,
+     * 走进, 打电话); a token outside the HSK lists is known when it splits into known words and
+     * either has no dictionary meaning of its own (a Jieba-only phrase) or is a known word plus a
+     * particle or direction/result complement (看 + 着, 走 + 进). Idioms and other CC-CEDICT words
+     * whose meaning is not the sum of parts are never split.
+     */
+    override fun knownByParts(word: String, known: Set<String>): Boolean {
+        if (hsk.hsk3(word) > 0 || hsk.hsk2(word) > 0) return false // a listed word must be learned as such
+        val defined = dictionary.lookup(word)?.hasDefinition == true
+        if (!defined) return splits(word, known)
+        if (word.length > 4) return false
+        // known head + one or two complement characters (看着, 走进, 拿出来)
+        for (tail in 1..2) {
+            if (word.length - tail < 1) continue
+            val head = word.substring(0, word.length - tail)
+            val rest = word.substring(word.length - tail)
+            if (head in known && rest.all { it in COMPLEMENTS } && rest.all { it.toString() in known }) return true
+        }
+        return false
+    }
+
+    /** True if [word] is a sequence of at least two known words. */
+    private fun splits(word: String, known: Set<String>): Boolean {
+        val n = word.length
+        val ok = BooleanArray(n + 1).also { it[0] = true }
+        val parts = IntArray(n + 1)
+        for (i in 0 until n) {
+            if (!ok[i]) continue
+            for (j in i + 1..n) {
+                if (j - i == n) continue // the whole word is not a split
+                if (word.substring(i, j) in known) {
+                    ok[j] = true
+                    parts[j] = maxOf(parts[j], parts[i] + 1)
+                }
+            }
+        }
+        return ok[n] && parts[n] >= 2
+    }
+
+    override fun expandKnown(base: Collection<String>): Set<String> = KnownExpansion.expand(base, dictionary)
+
+    /** Matched in simplified form: a traditional book is found with simplified input and back. */
+    override fun searchForm(text: String): String = script.toSimplified(text)
+
+    override fun isReadingQuery(query: String): Boolean = BookSearch.isPinyinQuery(query)
+
+    override fun readingMatches(text: String, query: String): List<IntRange> {
+        val key = BookSearch.toneless(query)
+        return if (key.isEmpty()) emptyList() else BookSearch.pinyinMatches(text, key, this)
+    }
+
+    /** Also finds the book's transliterated names and names next to a middle dot. */
+    override fun analyze(bookId: Long, book: BookSource, onProgress: (Int, Int) -> Unit): BookAnalysis =
+        BookAnalyzer.analyze(bookId, book, segmenter, dictionary, script, onProgress)
+
     /** Word pinyin without spaces ("Zhōngguó"); for words without a CEDICT entry, built from characters. */
     fun pinyinOf(token: ZhToken): String {
         if (token.kind != TokenKind.HAN) return ""
@@ -288,6 +388,9 @@ class ZhEngine(
         word.mapNotNull { dictionary.lookup(it.toString())?.takeIf { e -> e.hasDefinition } }
 
     companion object {
+        /** Aspect/structural particles and the common direction and result complements. */
+        private const val COMPLEMENTS = "了着过的地得们来去上下进出回起开到完好见住走掉成"
+
         fun parseNames(lines: Sequence<String>): Map<String, Char> {
             val map = HashMap<String, Char>(80_000)
             for (line in lines) {
@@ -480,7 +583,7 @@ data class KnownCoverage(val total: Int, val known: Int, val unknownDistinct: In
             chapter: ChapterContent,
             matcher: KnownMatcher,
             names: Set<String> = emptySet(),
-            engine: ZhEngine? = null
+            engine: LanguageModule? = null
         ): KnownCoverage {
             var total = 0
             var k = 0
@@ -527,13 +630,10 @@ object KnownExpansion {
 }
 
 /**
- * Decides whether a token counts as known. Jieba's lexicon has many transparent compounds that
- * HSK lists never include (一个人, 看着, 走进, 打电话); a token outside the HSK lists is known
- * when it splits into known words and either has no dictionary meaning of its own (a Jieba-only
- * phrase) or is a known word plus a particle or direction/result complement (看 + 着, 走 + 进).
- * Idioms and other CC-CEDICT words whose meaning is not the sum of parts are never split.
+ * Decides whether a token counts as known: in the known set, or following from known words as
+ * the language module says ([LanguageModule.knownByParts]; Chinese: 一个人, 看着, 走进).
  */
-class KnownMatcher(private val known: Set<String>, private val engine: ZhEngine?) {
+class KnownMatcher(private val known: Set<String>, private val engine: LanguageModule?) {
     private val cache = HashMap<String, Boolean>()
     private val unknown: Set<String> = (known as? KnownWords)?.unknown ?: emptySet()
 
@@ -542,40 +642,7 @@ class KnownMatcher(private val known: Set<String>, private val engine: ZhEngine?
         if (word in known) return true
         val e = engine ?: return false
         if (word.length < 2) return false
-        return cache.getOrPut(word) { composable(word, e) }
-    }
-
-    private fun composable(word: String, e: ZhEngine): Boolean {
-        if (e.hsk.hsk3(word) > 0 || e.hsk.hsk2(word) > 0) return false // a listed word must be learned as such
-        val defined = e.dictionary.lookup(word)?.hasDefinition == true
-        if (!defined) return splits(word)
-        if (word.length > 4) return false
-        // known head + one or two complement characters (看着, 走进, 拿出来)
-        for (tail in 1..2) {
-            if (word.length - tail < 1) continue
-            val head = word.substring(0, word.length - tail)
-            val rest = word.substring(word.length - tail)
-            if (head in known && rest.all { it in COMPLEMENTS } && rest.all { it.toString() in known }) return true
-        }
-        return false
-    }
-
-    /** True if [word] is a sequence of at least two known words. */
-    private fun splits(word: String): Boolean {
-        val n = word.length
-        val ok = BooleanArray(n + 1).also { it[0] = true }
-        val parts = IntArray(n + 1)
-        for (i in 0 until n) {
-            if (!ok[i]) continue
-            for (j in i + 1..n) {
-                if (j - i == n) continue // the whole word is not a split
-                if (word.substring(i, j) in known) {
-                    ok[j] = true
-                    parts[j] = maxOf(parts[j], parts[i] + 1)
-                }
-            }
-        }
-        return ok[n] && parts[n] >= 2
+        return cache.getOrPut(word) { e.knownByParts(word, known) }
     }
 
     /** Words of a chapter treated as known: the set the renderer hides pinyin for. */
@@ -586,10 +653,5 @@ class KnownMatcher(private val known: Set<String>, private val engine: ZhEngine?
             for (t in b.tokens) if (t.kind == TokenKind.HAN && isKnown(t.text)) out += t.text
         }
         return out
-    }
-
-    companion object {
-        /** Aspect/structural particles and the common direction and result complements. */
-        private const val COMPLEMENTS = "了着过的地得们来去上下进出回起开到完好见住走掉成"
     }
 }

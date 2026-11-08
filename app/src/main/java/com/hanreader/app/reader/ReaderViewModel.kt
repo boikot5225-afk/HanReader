@@ -17,7 +17,6 @@ import com.hanreader.app.epub.BookFiles
 import com.hanreader.app.epub.BookFormat
 import com.hanreader.app.epub.BookSource
 import com.hanreader.app.epub.EpubException
-import com.hanreader.app.zh.isHan
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -151,7 +150,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         val listed = engine.hsk.wordsUpTo(system, level).toHashSet()
         val other = if (system == HskSystem.HSK2) HskSystem.HSK3 else HskSystem.HSK2
         listed += engine.hsk.wordsUpTo(other, HskLevels.equivalent(system, level))
-        return listed + KnownExpansion.expand(listed, engine.dictionary)
+        return listed + engine.expandKnown(listed)
     }
 
     /** Marks every word up to [level] of [system] as known (0 removes the level marks). Manual marks stay. */
@@ -242,7 +241,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             onDone(runCatching<Long> {
                 withContext(Dispatchers.IO) {
                     val clean = PastedText.tidy(text)
-                    if (clean.none { it.isHan() }) throw EpubException("В тексте нет китайских иероглифов")
+                    if (clean.none { com.hanreader.app.lang.Languages.current.isWordChar(it) }) throw EpubException(com.hanreader.app.lang.Languages.current.noWordsMessage)
                     val stamp = System.currentTimeMillis()
                     val temp = File(booksDir, "import-$stamp.tmp")
                     temp.writeText(clean, Charsets.UTF_8)
@@ -485,7 +484,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun namesToKeepWhole(bookId: Long): Set<String> {
         val own = userNameDao.all().map { it.word }
         val found = books.ignoredWords(bookId)
-        return (own + found).filterTo(HashSet()) { it.length in 2..8 && it.all { c -> c.isHan() } }
+        return (own + found).filterTo(HashSet()) { it.length in 2..8 && it.all { c -> com.hanreader.app.lang.Languages.current.isWordChar(c) } }
     }
 
     /** Marks or unmarks [word] as a name; the chapter is rebuilt so the name stays whole. */
@@ -671,7 +670,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 val engine = engineCore.await()
                 val result = withContext(Dispatchers.Default) {
                     BookFiles.open(File(booksDir, entity.fileName)).use { epub ->
-                        BookAnalyzer.analyze(bookId, epub, engine.segmenter, engine.dictionary, script = engine.script) { done, total ->
+                        engine.analyze(bookId, epub) { done, total ->
                             _analysis.value = _analysis.value + (bookId to done.toFloat() / total)
                         }
                     }
@@ -715,7 +714,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                                 withContext(Dispatchers.Default) { ChapterBuilder.build(source, w.firstChapter, engine, namesToKeepWhole(book.id)) }
                             }
                         val sentence = VocabularyStats.firstSentence(c, w.word) ?: w.word
-                        val reading = engine.lookup(w.word)?.pinyin ?: w.pinyin
+                        val reading = engine.reading(w.word) ?: w.pinyin
                         val translation = engine.cardTranslation(w.word) ?: w.gloss
                         val isNew = cards.saveFromReader(
                             STUDY_LANGUAGE,
