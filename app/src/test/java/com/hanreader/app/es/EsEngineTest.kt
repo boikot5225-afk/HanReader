@@ -177,6 +177,14 @@ class EsEngineTest {
         assertEquals("El Sr. Ortega vivía en EE. UU. desde hacía 1.500 días.", ChapterBuilder.sentence(b.text, at, at + 6))
     }
 
+    @Test
+    fun bookNamesFromCapitalLetters() {
+        val text = "Rocosas es una cordillera. Vive cerca de las Rocosas con Supermax. La casa real. El Real Madrid ganó."
+        val a = engine.analyze(1L, TxtBook(text.toByteArray(), "x"))
+        val names = a.words.filter { it.ignored }.map { it.word }.toSet()
+        assertEquals(setOf("Rocosas", "Supermax", "Madrid"), names)
+    }
+
     companion object {
         fun load(): EsEngine {
             val dir = File("src/main/assets/es")

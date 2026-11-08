@@ -272,23 +272,48 @@ class EsEngine(
         return a.first().entry.isName
     }
 
-    /** Words counted by dictionary form (habló and hablaban as hablar); unknown words as written. */
+    /**
+     * Words counted by dictionary form (habló and hablaban as hablar); unknown words as written.
+     * The book's names: words written with a capital inside a sentence and never in lower case
+     * (Rocosas, Supermax) are stored as the book's names (ignored words), so they are names at the
+     * start of a sentence too.
+     */
     override fun analyze(bookId: Long, book: com.hanreader.app.epub.BookSource, onProgress: (Int, Int) -> Unit): com.hanreader.app.reader.BookAnalysis {
         val counts = HashMap<String, IntArray>()
+        val capitalised = HashMap<String, IntArray>() // inside a sentence: [count, firstChapter]
+        val lower = HashSet<String>()
         var tokens = 0
         for (c in book.chapters) {
             for (b in book.blocks(c.index)) {
                 val text = (b as? com.hanreader.app.epub.EpubBlock.Text)?.text ?: continue
-                for (t in tokenize(text)) {
+                val tk = tokenize(text)
+                val names = sureNames(tk).mapTo(HashSet()) { it.first }
+                for ((i, t) in tk.withIndex()) {
                     if (t.kind != TokenKind.HAN) continue
                     tokens++
+                    if (t.text[0].isLowerCase()) lower += t.text
+                    if (i in names) {
+                        capitalised.getOrPut(t.text) { intArrayOf(0, c.index) }[0]++
+                        continue
+                    }
                     val key = analyses(t.text).firstOrNull()?.entry?.lemma ?: t.text
                     counts.getOrPut(key) { intArrayOf(0, c.index) }[0]++
                 }
             }
             onProgress(c.index + 1, book.chapters.size)
         }
-        return com.hanreader.app.reader.BookAnalysis(counts.map { (w, e) -> com.hanreader.app.BookWord(bookId, w, e[0], e[1]) }, tokens)
+        val words = counts.map { (w, e) -> com.hanreader.app.BookWord(bookId, w, e[0], e[1]) }
+        val names = capitalised.filterKeys { it.lowercase() !in lower }
+            .map { (w, e) -> com.hanreader.app.BookWord(bookId, w, e[0], e[1], ignored = true) }
+        // A word seen capitalised mid-sentence but also in lower case (Real, but also «real») is an ordinary word.
+        val ordinary = capitalised.filterKeys { it.lowercase() in lower }
+        val merged = words.toMutableList()
+        for ((w, e) in ordinary) {
+            val key = analyses(w).firstOrNull()?.entry?.lemma ?: w.lowercase()
+            val i = merged.indexOfFirst { it.word == key }
+            if (i >= 0) merged[i] = merged[i].copy(count = merged[i].count + e[0]) else merged += com.hanreader.app.BookWord(bookId, key, e[0], e[1])
+        }
+        return com.hanreader.app.reader.BookAnalysis(merged + names.filter { n -> merged.none { it.word == n.word } }, tokens)
     }
 
     /** A form counts as known when its dictionary word is known (habló, if hablar is known). */

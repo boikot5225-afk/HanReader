@@ -87,8 +87,8 @@ object DotNames {
 }
 
 object BookAnalyzer {
-    /** Bumped when the analysis finds more (2: names next to a middle dot). Older books are re-analysed. */
-    const val VERSION = 2
+    /** Bumped when the analysis finds more (2: names next to a middle dot; 3: Spanish names by capital letter). Older books are re-analysed. */
+    const val VERSION = 3
 
     /**
      * Segments every chapter once and counts Han words. Name runs repeated in the book are stored

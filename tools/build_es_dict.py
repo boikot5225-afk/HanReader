@@ -60,6 +60,38 @@ FORM_FIRST = {
     "ha", "he", "has", "han", "había", "habían", "habías", "sé", "va", "vas", "ve", "ves", "dicho", "sido",
     "estado", "visto", "puesto", "río", "haya", "hayas", "hayan", "hayamos",
 }
+# Where a sense is used, and its register: «(Мексика, разг.) work».
+REGIONS = {
+    "Spain": "Испания", "Mexico": "Мексика", "Latin-America": "Лат. Америка", "Rioplatense": "Ла-Плата",
+    "Argentina": "Аргентина", "Uruguay": "Уругвай", "Chile": "Чили", "Colombia": "Колумбия", "Peru": "Перу",
+    "Venezuela": "Венесуэла", "Cuba": "Куба", "Central-America": "Центр. Америка", "Caribbean": "Карибы",
+    "Canary-Islands": "Канары", "Andalusia": "Андалусия", "Philippines": "Филиппины", "US": "США",
+    "Puerto-Rico": "Пуэрто-Рико", "Dominican-Republic": "Доминикана", "Ecuador": "Эквадор", "Bolivia": "Боливия",
+    "Paraguay": "Парагвай", "Guatemala": "Гватемала", "Honduras": "Гондурас", "Nicaragua": "Никарагуа",
+    "El-Salvador": "Сальвадор", "Costa-Rica": "Коста-Рика", "Panama": "Панама", "South-America": "Юж. Америка",
+}
+LATIN_AMERICA = set(REGIONS) - {"Spain", "Canary-Islands", "Andalusia", "Philippines", "US"}
+REGISTER = {"colloquial": "разг.", "familiar": "разг.", "slang": "сленг", "vulgar": "груб.", "derogatory": "пренебр.",
+            "dated": "устар.", "informal": "разг.", "offensive": "оскорб."}
+
+
+def label(tags):
+    """«Мексика, разг.» for a sense's tags; empty for a sense used everywhere in a neutral style."""
+    t = set(tags)
+    regions = [r for r in REGIONS if r in t]
+    # Three or more Latin American countries: «Лат. Америка», with the others kept (Испания, Филиппины).
+    latin = [r for r in regions if r in LATIN_AMERICA]
+    if len(latin) >= 3:
+        regions = ["Latin-America"] + [r for r in regions if r not in LATIN_AMERICA]
+    regions = regions[:3]
+    words = [REGIONS[r] for r in regions]
+    reg = []
+    for k, v in REGISTER.items():
+        if k in t and v not in reg:
+            reg.append(v)
+    return ", ".join(words + reg)
+
+
 SKIP_TAGS = {"obsolete", "archaic", "rare", "proscribed", "misspelling", "nonstandard"}
 
 
@@ -135,6 +167,7 @@ def main(ru_path, en_path, out_dir):
     en = {}       # lemma -> [senses]
     pos = {}      # lemma -> part of speech
     forms = {}    # form -> {lemma: description}
+    regional = set()  # words with a sense used only in some countries or in a marked style
 
     def set_pos(w, p):
         # A common word first: «al» is a contraction before it is an initialism (имя); an infinitive
@@ -180,8 +213,12 @@ def main(ru_path, en_path, out_dir):
             if "form-of" in tags or SKIP_TAGS & set(tags):
                 continue
             lemma_entry = True
+            lab = label(tags)
             for g in s.get("glosses", []):
                 g = clean(g)
+                if lab:
+                    g = f"({lab}) {g}"
+                    regional.add(w)
                 if g and g not in en.setdefault(w, []):
                     en[w].append(g)
         if lemma_entry:
@@ -202,8 +239,10 @@ def main(ru_path, en_path, out_dir):
                 ru[w] = senses
                 source[w] = "a"
     short = {}
-    refined_path = os.path.join(data, "ru_refined.jsonl")
-    if os.path.exists(refined_path):
+    # Later files win: the regional pass (labels in the Russian senses) over the general edit.
+    for refined_path in (os.path.join(data, "ru_refined.jsonl"), os.path.join(data, "ru_regional.jsonl")):
+        if not os.path.exists(refined_path):
+            continue
         for line in open(refined_path, encoding="utf-8"):
             if not line.strip():
                 continue
@@ -213,6 +252,8 @@ def main(ru_path, en_path, out_dir):
                 ru[it["w"]] = senses
                 source[it["w"]] = "r"
                 short[it["w"]] = it["short"].strip()
+    with open(os.path.join(data, "regional_words.txt"), "w", encoding="utf-8") as f:
+        f.write("\n".join(sorted(regional)) + "\n")
 
     lemmas = sorted(set(ru) | set(en), key=lambda x: x.encode("utf-8"))
     rank = frequency_ranks(os.path.join(data, "es_50k.txt"), set(lemmas), forms, ru)
