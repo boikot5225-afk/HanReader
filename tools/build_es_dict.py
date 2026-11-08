@@ -12,7 +12,8 @@ dict.tsv   lemma \t part of speech \t Russian senses \t English senses \t Russia
            rank: 1 = most frequent, empty = not in the frequency list; main meaning: 1-3 words, edited pass only)
 forms.tsv  form \t lemma:n|lemma:n   (forms that differ from the lemma; n = line of grammar.tsv, 0 = none)
 grammar.tsv  one description of a form per line: «3 л. ед. ч., претерит»
-Verbs with attached pronouns (dámelo) and voseo forms are left out: the app strips the pronouns itself.
+Verbs with attached pronouns (dámelo) are left out: the app strips the pronouns itself. Voseo forms
+(sos, tenés, andás: Argentina, Uruguay) are kept and marked.
 Both lower-case, sorted by UTF-8 bytes (the app binary-searches them).
 
 Also read from data/es (committed):
@@ -57,7 +58,7 @@ MANUAL_RU = {
 FORM_FIRST = {
     "es", "era", "eras", "eran", "son", "soy", "eres", "sea", "sean", "seas", "fue", "fui", "fuera", "fueron",
     "ha", "he", "has", "han", "había", "habían", "habías", "sé", "va", "vas", "ve", "ves", "dicho", "sido",
-    "estado", "visto", "puesto", "río",
+    "estado", "visto", "puesto", "río", "haya", "hayas", "hayan", "hayamos",
 }
 SKIP_TAGS = {"obsolete", "archaic", "rare", "proscribed", "misspelling", "nonstandard"}
 
@@ -69,9 +70,21 @@ def clean(text):
     return text
 
 
+REFLEXIVE = {("1 л.", "ед. ч."): "me", ("2 л.", "ед. ч."): "te", ("3 л.", "ед. ч."): "se",
+             ("1 л.", "мн. ч."): "nos", ("2 л.", "мн. ч."): "os", ("3 л.", "мн. ч."): "se"}
+
+
 def describe(tags):
     t = set(tags)
     parts = []
+    # An infinitive or gerund has no person of its own: a person here is the reflexive pronoun
+    # attached to it (levantarme, levantándote) - «инфинитив + me», not «1 л. ед. ч., инфинитив».
+    if "infinitive" in t or "gerund" in t:
+        form = "инфинитив" if "infinitive" in t else "герундий"
+        person = next((v for k, v in PERSON.items() if k in t), None)
+        number = next((v for k, v in NUMBER.items() if k in t), None)
+        pron = REFLEXIVE.get((person, number)) if person and number else None
+        return f"{form} + {pron}" if pron else form
     person = next((v for k, v in PERSON.items() if k in t), None)
     number = next((v for k, v in NUMBER.items() if k in t and not any(x.startswith("object-") and x.endswith(k) for x in t)), None)
     if "object-singular" in t or "object-plural" in t or "object-first-person" in t:
@@ -159,7 +172,7 @@ def main(ru_path, en_path, out_dir):
         for s in e.get("senses", []):
             tags = s.get("tags", [])
             if s.get("form_of"):
-                if SKIP_TAGS & set(tags) or "with-voseo" in tags or any(t.startswith("object-") for t in tags):
+                if SKIP_TAGS & set(tags) or any(t.startswith("object-") for t in tags):
                     continue
                 for f in s["form_of"]:
                     add_form(w, f.get("word", ""), describe(tags))

@@ -132,6 +132,34 @@ class EsEngineTest {
         assertEquals(listOf("Alcatraz", "Rocosas", "Supermax"), names)
     }
 
+    /** The cases of an outside review of the Spanish module. */
+    @Test
+    fun reviewCases() {
+        fun ctx(text: String, word: String) = engine.inContext(engine.tokenize(text)).first { it.text == word }.pinyin
+        assertEquals("comer", ctx("No como carne.", "como"))
+        assertEquals("comer", ctx("Yo como arroz.", "como"))
+        assertEquals("", ctx("Como tú, no lo sé.", "Como"))
+        assertEquals("ir", ctx("Fue a Madrid.", "Fue"))
+        assertEquals("ser", engine.lemma("fue"))
+        assertEquals("haber", engine.lemma("haya"))
+        assertEquals("hablar", engine.lemma("hablándome"))
+        assertEquals("decir", engine.lemma("diciéndoselo"))
+        assertEquals("ser", engine.lemma("sos"))
+        assertEquals("andar", engine.lemma("andás"))
+        assertEquals("tener", engine.lemma("tenés"))
+        // An infinitive has no person: «инфинитив + me».
+        assertEquals("инфинитив + me", engine.analyses("levantarme").first().grammar)
+    }
+
+    @Test
+    fun inflectedPhrases() {
+        val text = "Me di cuenta de que lo echo de menos."
+        val t = engine.tokenize(text)
+        fun key(w: String) = engine.phraseAt(t, text, t.indexOfFirst { it.text == w })?.let { engine.phraseKey(t, text, it.first, it.last) }
+        assertEquals("darse cuenta", key("cuenta"))
+        assertEquals("echar de menos", key("menos"))
+    }
+
     companion object {
         fun load(): EsEngine {
             val dir = File("src/main/assets/es")

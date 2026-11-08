@@ -1250,7 +1250,11 @@ private fun WordSheet(
     val zh = engine as? ZhEngine
     // Spanish: the reading chosen from the context (se alza: alzar) goes first.
     val es = remember(word) {
-        val all = (engine as? com.hanreader.app.es.EsEngine)?.analyses(word).orEmpty()
+        val e = engine as? com.hanreader.app.es.EsEngine
+        // Several words: a dictionary phrase, also inflected («me di cuenta» -> darse cuenta).
+        val all = if (e == null) emptyList()
+            else (if (selection.first != selection.last) e.phraseKey(tokens, block.text, selection.first, selection.last)?.let { e.analyses(it) } else null)
+                ?: e.analyses(word)
         val inContext = if (selection.first == selection.last) first.pinyin else ""
         if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.lemma == inContext) 0 else 1 }
     }
@@ -1402,7 +1406,7 @@ private fun WordSheet(
                 if (selection.first != selection.last) null
                 else (engine as? com.hanreader.app.es.EsEngine)?.let { e ->
                     e.phraseAt(tokens, block.text, selection.first)?.let { r ->
-                        val p = block.text.substring(tokens[r.first].start, tokens[r.last].end)
+                        val p = e.phraseKey(tokens, block.text, r.first, r.last) ?: block.text.substring(tokens[r.first].start, tokens[r.last].end)
                         Triple(r, p, e.cardTranslation(p))
                     }
                 }

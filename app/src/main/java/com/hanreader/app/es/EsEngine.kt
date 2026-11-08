@@ -80,31 +80,33 @@ class EsEngine(
         return sorted
     }
 
-    /** dámelo → dar, «+ местоим.»: up to two attached pronouns, the stress mark they forced dropped. */
+    /** dámelo → dar, «повел. + me lo»: up to two attached pronouns, the stress mark they forced dropped. */
     private fun withoutPronouns(w: String): List<EsAnalysis> {
         for (p1 in PRONOUNS) {
             if (!w.endsWith(p1) || w.length - p1.length < 2) continue
             val one = w.dropLast(p1.length)
-            verb(one)?.let { return listOf(it) }
+            verb(one, p1)?.let { return listOf(it) }
             for (p2 in PRONOUNS) {
                 if (!one.endsWith(p2) || one.length - p2.length < 2) continue
-                verb(one.dropLast(p2.length))?.let { return listOf(it) }
+                verb(one.dropLast(p2.length), "$p2 $p1")?.let { return listOf(it) }
             }
         }
         return emptyList()
     }
 
     /** A verb form (infinitive, gerund, imperative) under [stem], with or without its stress mark. */
-    private fun verb(stem: String): EsAnalysis? {
+    private fun verb(stem: String, pronouns: String): EsAnalysis? {
+        val plus = "+ $pronouns"
         for (s in listOf(stem, unaccent(stem)).distinct()) {
-            entry(s)?.takeIf { it.pos == "гл." }?.let { return EsAnalysis(stem, it, "+ местоим.") }
-            forms.get(s)?.firstOrNull()?.split('|')?.forEach { item ->
+            // A form first (hablando -> hablar), even if the form has an entry of its own.
+            forms.get(s)?.firstOrNull()?.removePrefix("!")?.split('|')?.forEach { item ->
                 val lemma = item.substringBefore(':')
                 entry(lemma)?.takeIf { it.pos == "гл." }?.let { e ->
                     val g = item.substringAfter(':', "0").toIntOrNull()?.let { grammar.getOrNull(it) }.orEmpty()
-                    return EsAnalysis(stem, e, listOf(g, "+ местоим.").filter { it.isNotEmpty() }.joinToString(", "))
+                    return EsAnalysis(stem, e, if (g.isEmpty()) plus else "$g $plus")
                 }
             }
+            entry(s)?.takeIf { it.pos == "гл." }?.let { return EsAnalysis(stem, it, "инфинитив $plus") }
         }
         return null
     }
@@ -123,11 +125,17 @@ class EsEngine(
         }
         val left = generateSequence(index) { step(it, -1) }.take(4).toList()
         val right = generateSequence(index) { step(it, 1) }.take(4).toList()
+        // The longest phrase; a reflexive one after a reflexive pronoun wins over a longer plain one
+        // (me di cuenta de: darse cuenta, not dar cuenta de «отчитываться»).
         var best: IntRange? = null
+        var bestScore = 0
         for (a in left) for (b in right) {
             val words = (b - a) / 2 + 1
-            if (words < 2 || words > 4 || (best != null && words <= (best.last - best.first) / 2 + 1)) continue
-            if (dict.contains(text.substring(tokens[a].start, tokens[b].end).lowercase())) best = a..b
+            if (words < 2 || words > 4) continue
+            val key = phraseKey(tokens, text, a, b) ?: continue
+            val reflexiveKey = reflexiveBefore(tokens, a) && key.substringBefore(' ').endsWith("se")
+            val score = words + if (reflexiveKey) 10 else 0
+            if (score > bestScore) { best = a..b; bestScore = score }
         }
         return best
     }
@@ -140,23 +148,55 @@ class EsEngine(
     }
 
     /**
-     * Readings the neighbours decide, kept in [RToken.pinyin] (never drawn for Spanish): after a
-     * pronoun that goes with a verb (se, me, te, nos, os, le, les) a word that can be a verb is the
-     * verb: «se alza» is alzar, not the noun alza.
+     * Readings the neighbours decide, kept in [RToken.pinyin] (never drawn for Spanish):
+     * - after a pronoun that goes with a verb (se, me, te…), a subject pronoun (yo, tú, él…) or «no»,
+     *   a word that can be a verb is the verb: «se alza» alzar, «no como» comer (not «как»);
+     * - a form of both ser and ir before «a»/«al» is ir: «fue a Madrid», but «fue profesor» stays ser.
      */
     fun inContext(tokens: List<RToken>): List<RToken> {
-        var prevWord: String? = null
-        return tokens.map { t ->
-            if (t.kind == TokenKind.SPACE) return@map t
-            if (t.kind != TokenKind.HAN) { prevWord = null; return@map t }
-            val before = prevWord
-            prevWord = t.text.lowercase()
-            if (before == null || before !in VERB_PRONOUNS) return@map t
+        val words = tokens.indices.filter { tokens[it].kind == TokenKind.HAN }
+        val out = tokens.toMutableList()
+        for ((k, i) in words.withIndex()) {
+            val t = tokens[i]
+            // Neighbours only within the clause: punctuation between them breaks the link.
+            fun linked(a: Int, b: Int) = (a + 1 until b).all { tokens[it].kind == TokenKind.SPACE }
+            val before = words.getOrNull(k - 1)?.takeIf { linked(it, i) }?.let { tokens[it].text.lowercase() }
+            val after = words.getOrNull(k + 1)?.takeIf { linked(i, it) }?.let { tokens[it].text.lowercase() }
             val a = analyses(t.text)
-            if (a.isEmpty() || a.first().entry.pos == "гл.") return@map t
-            val verb = a.firstOrNull { it.entry.pos == "гл." } ?: return@map t
-            t.copy(pinyin = verb.entry.lemma)
+            if (a.size < 2) continue
+            val choice = when {
+                after in setOf("a", "al") && a.any { it.entry.lemma == "ir" } && a.any { it.entry.lemma == "ser" } -> "ir"
+                before != null && (before in VERB_PRONOUNS || before in SUBJECT_PRONOUNS || before == "no") && a.first().entry.pos != "гл." ->
+                    a.firstOrNull { it.entry.pos == "гл." }?.entry?.lemma
+                else -> null
+            }
+            if (choice != null && choice != a.first().entry.lemma) out[i] = t.copy(pinyin = choice)
         }
+        return out
+    }
+
+    /**
+     * The dictionary phrase written by tokens [a]..[b] (words separated by single spaces), also when
+     * its first word is inflected or it is reflexive: «me di cuenta» is darse cuenta, «echo de menos»
+     * echar de menos. Null if the dictionary has no such phrase.
+     */
+    private fun reflexiveBefore(tokens: List<RToken>, a: Int): Boolean =
+        tokens.getOrNull(a - 1)?.text == " " && tokens.getOrNull(a - 2)?.text?.lowercase() in REFLEXIVE
+
+    fun phraseKey(tokens: List<RToken>, text: String, a: Int, b: Int): String? {
+        if (b <= a || tokens.getOrNull(a)?.kind != TokenKind.HAN || tokens.getOrNull(b)?.kind != TokenKind.HAN) return null
+        for (j in a + 1..b) if (tokens[j].kind == TokenKind.SPACE && tokens[j].text != " ") return null
+        val surface = text.substring(tokens[a].start, tokens[b].end).lowercase()
+        if (dict.contains(surface)) return surface
+        val rest = text.substring(tokens[a].end, tokens[b].end).lowercase()
+        val reflexive = reflexiveBefore(tokens, a)
+        for (an in analyses(tokens[a].text)) {
+            val lemma = an.entry.lemma
+            // A reflexive pronoun before the verb: the reflexive phrase first (me di cuenta: darse cuenta).
+            if ((reflexive || an.grammar.contains("+")) && dict.contains(lemma + "se" + rest)) return lemma + "se" + rest
+            if (dict.contains(lemma + rest)) return lemma + rest
+        }
+        return null
     }
 
     /** The reading of [word] with dictionary form [reading] (chosen from the context), else the first. */
@@ -299,6 +339,9 @@ class EsEngine(
 
         /** Pronouns that stand before a verb: the next word is read as a verb if it can be one. */
         private val VERB_PRONOUNS = setOf("se", "me", "te", "nos", "os", "le", "les")
+        private val SUBJECT_PRONOUNS = setOf("yo", "tú", "él", "ella", "usted", "nosotros", "nosotras", "vosotros", "vosotras", "ellos", "ellas", "ustedes", "vos")
+        /** Reflexive pronouns: «me di cuenta» reads as darse cuenta. */
+        private val REFLEXIVE = setOf("me", "te", "se", "nos", "os")
 
         fun load(dict: java.io.InputStream, forms: java.io.InputStream, grammar: java.io.InputStream): EsEngine {
             val t = System.nanoTime()
