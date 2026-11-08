@@ -42,7 +42,10 @@ boikot5225@gmail.com · Telegram @SainJust
 0+
 
 ## Политика конфиденциальности
-PRIVACY.md в репозитории (ссылку см. в инструкции к релизу)
+https://boikot5225-afk.github.io/HanReader/privacy.html
+
+## Сайт
+https://boikot5225-afk.github.io/HanReader
 
 ## Скриншоты (телефон, вертикально) — снимать на демо-книге store/demo-book.epub
 1. Страница книги: пиньинь над словами, тема «Бумага»

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>汉读 HanReader — читалка китайских книг с пиньинем</title>
+<meta name="description" content="Android-приложение для чтения книг на китайском: пиньинь над словами, перевод по нажатию, карточки для запоминания слов. Без интернета, рекламы и регистрации.">
+<meta property="og:title" content="汉读 HanReader — читай китайские книги с пиньинем">
+<meta property="og:description" content="Пиньинь над словами, перевод по нажатию, слова в карточки вместе с предложением из книги.">
+<meta property="og:image" content="https://boikot5225-afk.github.io/HanReader/img/1-page.jpg">
+<link rel="icon" href="img/favicon.png">
+<style>
+  :root {
+    --bg: #0e0e0e; --surface: #181818; --border: #2a2a2a;
+    --text: #f2ede4; --muted: #a39d93; --accent: #e8564a; --gold: #e7ad4e;
+    --paper: #efe9df; --ink: #141414;
+    --han: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.55 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  header.top { display: flex; align-items: center; gap: 12px; padding: 18px 0; }
+  header.top img { width: 40px; height: 40px; border-radius: 10px; }
+  header.top .name { font-family: var(--han); font-size: 24px; }
+  header.top .name span { font-family: inherit; font-size: 18px; color: var(--muted); margin-left: 6px; }
+  header.top nav { margin-left: auto; display: flex; gap: 18px; font-size: 15px; }
+  header.top nav a { color: var(--muted); text-decoration: none; }
+  .hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center; padding: 40px 0 56px; }
+  .ruby { font-family: var(--han); font-size: 15px; color: var(--gold); letter-spacing: .02em; margin-bottom: 4px; }
+  h1 { font-family: var(--han); font-weight: 600; font-size: clamp(34px, 6vw, 56px); line-height: 1.15; margin: 0 0 18px; }
+  h1 u { text-decoration: none; border-bottom: 3px solid var(--accent); }
+  .lead { font-size: 19px; color: var(--muted); margin: 0 0 28px; max-width: 34em; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 22px; border-radius: 999px; font-weight: 600; text-decoration: none; font-size: 16px; }
+  .btn.primary { background: var(--paper); color: var(--ink); }
+  .btn.ghost { border: 1px solid var(--border); color: var(--text); }
+  .btn.disabled { border: 1px dashed var(--border); color: var(--muted); cursor: default; }
+  .note { font-size: 14px; color: var(--muted); margin-top: 12px; }
+  .phone { justify-self: center; width: min(320px, 80vw); border-radius: 28px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  .phone img { display: block; width: 100%; height: auto; }
+  section { padding: 48px 0; border-top: 1px solid var(--border); }
+  h2 { font-size: 28px; margin: 0 0 24px; }
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 22px; }
+  .card h3 { margin: 0 0 10px; font-size: 18px; }
+  .card ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .card li { margin: 6px 0; }
+  .shots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .shots figure { margin: 0; }
+  .shots img { width: 100%; height: auto; border-radius: 18px; border: 1px solid var(--border); display: block; }
+  .shots figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; text-align: center; }
+  .steps { counter-reset: s; list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+  .steps li { counter-increment: s; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 18px 14px 56px; position: relative; }
+  .steps li::before { content: counter(s); position: absolute; left: 18px; top: 13px; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 14px; }
+  .contacts { display: flex; flex-wrap: wrap; gap: 12px; }
+  footer { padding: 32px 0 48px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
+  footer a { color: var(--muted); }
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; padding-top: 16px; }
+    .features { grid-template-columns: 1fr; }
+    .shots { grid-template-columns: repeat(2, 1fr); }
+    header.top nav { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <img src="img/icon-192.png" alt="">
+    <div class="name">汉读<span>HanReader</span></div>
+    <nav>
+      <a href="#features">Возможности</a>
+      <a href="#install">Установка</a>
+      <a href="#contacts">Связь</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div>
+      <div class="ruby">dú zhōngwén shū</div>
+      <h1>Читай китайские книги — <u>понимая</u> каждое слово</h1>
+      <p class="lead">Над словами — пиньинь, перевод — по одному нажатию, незнакомые слова — в карточки вместе с предложением из книги. Без интернета, рекламы и регистрации.</p>
+      <div class="buttons">
+        <span class="btn disabled" title="Приложение на модерации">Скоро в RuStore</span>
+        <a class="btn primary" href="https://github.com/boikot5225-afk/HanReader/releases/download/beta/HanReader-beta.apk">Скачать бету (APK)</a>
+      </div>
+      <p class="note">Android 8 и новее · бесплатно · <a href="https://github.com/boikot5225-afk/HanReader/releases/tag/beta">что нового в бете</a></p>
+    </div>
+    <div class="phone"><img src="img/1-page.jpg" alt="Страница книги с пиньинем над словами и подчёркнутыми незнакомыми словами" width="540" height="960"></div>
+  </div>
+
+  <section id="features">
+    <h2>Что умеет</h2>
+    <div class="features">
+      <div class="card">
+        <h3>Читать</h3>
+        <ul>
+          <li>EPUB, FB2, TXT, DOCX, DOC; открытие книг из Telegram и файлового менеджера</li>
+          <li>Страницы или прокрутка, тёмные и светлые темы, китайские шрифты</li>
+          <li>Упрощённые и традиционные иероглифы</li>
+          <li>Закладки, поиск по иероглифам и пиньиню, выделения и заметки</li>
+          <li>Чтение вслух с подсветкой предложения</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Понимать</h3>
+        <ul>
+          <li>Текст делится на слова, а не на отдельные иероглифы</li>
+          <li>Пиньинь над всеми словами, только над незнакомыми или выключен; цвета тонов</li>
+          <li>Перевод на русский и английский по нажатию, с учётом чтения иероглифа</li>
+          <li>Отметь свой уровень HSK — незнакомые слова подчеркнутся, а нужные сейчас подскажутся</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Запоминать</h3>
+        <ul>
+          <li>Слово попадает в карточки вместе с предложением из книги</li>
+          <li>Интервальные повторения и тренировка письма</li>
+          <li>Статистика: минуты чтения, серия дней, как растёт понимание книги</li>
+          <li>Полная резервная копия в один файл</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Как это выглядит</h2>
+    <div class="shots">
+      <figure><img src="img/1-page.jpg" alt="Страница с пиньинем" loading="lazy" width="540" height="960"><figcaption>Пиньинь над словами</figcaption></figure>
+      <figure><img src="img/2-menu.jpg" alt="Меню читалки" loading="lazy" width="540" height="960"><figcaption>Меню: разделы, чтение вслух, доля знакомых слов</figcaption></figure>
+      <figure><img src="img/3-library.jpg" alt="Библиотека" loading="lazy" width="540" height="960"><figcaption>Библиотека и знакомые слова</figcaption></figure>
+      <figure><img src="img/4-today.jpg" alt="Повторение карточек" loading="lazy" width="540" height="960"><figcaption>Карточки на сегодня</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Как установить бету</h2>
+    <ol class="steps">
+      <li>Скачай <a href="https://github.com/boikot5225-afk/HanReader/releases/download/beta/HanReader-beta.apk">HanReader-beta.apk</a> на телефон.</li>
+      <li>Открой файл. Android попросит разрешить установку из этого источника (браузера или Telegram) — разреши.</li>
+      <li>Добавь книгу: EPUB, FB2, TXT или документ Word. Новые бета-версии ставятся поверх, данные сохраняются.</li>
+    </ol>
+  </section>
+
+  <section id="contacts">
+    <h2>Связь</h2>
+    <p class="lead">Нашёл ошибку, есть идея или вопрос — напиши. Если приложение закрылось с ошибкой, при следующем запуске оно предложит отправить отчёт.</p>
+    <div class="contacts">
+      <a class="btn ghost" href="mailto:boikot5225@gmail.com?subject=HanReader">boikot5225@gmail.com</a>
+      <a class="btn ghost" href="https://t.me/SainJust">Telegram @SainJust</a>
+    </div>
+  </section>
+
+  <footer>
+    <p>HanReader не собирает личные данные — <a href="privacy.html">политика конфиденциальности</a>. Исходный код и источники данных: <a href="https://github.com/boikot5225-afk/HanReader">GitHub</a>.</p>
+    <p>Словари: CC-CEDICT и русский Викисловарь (CC BY-SA 4.0), Jieba, pypinyin, списки HSK, OpenCC. На скриншотах — «阿Q正传» Лу Синя (общественное достояние).</p>
+  </footer>
+</div>
+</body>
+</html>

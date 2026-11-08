@@ -163,7 +163,7 @@ fun AboutDialog(onClose: () -> Unit) {
                 Overline("Связь с разработчиком", Modifier.padding(top = 4.dp))
                 ContactRows()
                 Text(
-                    "Исходный код и данные: github.com/boikot5225-afk/HanReader",
+                    "Сайт: boikot5225-afk.github.io/HanReader · исходный код и данные: github.com/boikot5225-afk/HanReader",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 LinkRow("Политика конфиденциальности", onClick = { shown = "Политика конфиденциальности" to "privacy_ru.md" })

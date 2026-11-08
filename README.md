@@ -5,7 +5,8 @@
 
 - **Скачать тестовую версию:** [HanReader-beta.apk](https://github.com/boikot5225-afk/HanReader/releases/download/beta/HanReader-beta.apk) · [что нового и как установить](https://github.com/boikot5225-afk/HanReader/releases/tag/beta)
 - **Связь:** boikot5225@gmail.com · Telegram [@SainJust](https://t.me/SainJust)
-- **Конфиденциальность:** [PRIVACY.md](PRIVACY.md) — приложение не собирает личные данные
+- **Сайт:** https://boikot5225-afk.github.io/HanReader
+- **Конфиденциальность:** [политика](https://boikot5225-afk.github.io/HanReader/privacy.html) — приложение не собирает личные данные
 
 ---
 
