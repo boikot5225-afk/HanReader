@@ -160,6 +160,23 @@ class EsEngineTest {
         assertEquals("echar de menos", key("menos"))
     }
 
+    @Test
+    fun abbreviationsDoNotEndSentences() {
+        val was = com.hanreader.app.lang.Languages.current
+        com.hanreader.app.lang.Languages.current = com.hanreader.app.lang.Languages.SPANISH
+        try { abbreviations() } finally { com.hanreader.app.lang.Languages.current = was }
+    }
+
+    private fun abbreviations() {
+        val text = "El Sr. Ortega vivía en EE. UU. desde hacía 1.500 días. Luego volvió."
+        val chapter = ChapterBuilder.build(TxtBook(text.toByteArray(), "x"), 0, engine)
+        val spoken = com.hanreader.app.reader.Sentences.of(chapter).map { it.text }
+        assertEquals(listOf("El Sr. Ortega vivía en EE. UU. desde hacía 1.500 días.", "Luego volvió."), spoken)
+        val b = chapter.blocks.filterIsInstance<ReaderBlock.Text>().first()
+        val at = b.text.indexOf("Ortega")
+        assertEquals("El Sr. Ortega vivía en EE. UU. desde hacía 1.500 días.", ChapterBuilder.sentence(b.text, at, at + 6))
+    }
+
     companion object {
         fun load(): EsEngine {
             val dir = File("src/main/assets/es")

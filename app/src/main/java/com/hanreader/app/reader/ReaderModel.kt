@@ -552,15 +552,16 @@ object ChapterBuilder {
         return ChapterContent(index, book.chapters[index].title, blocks, (System.nanoTime() - t) / 1_000_000, chars)
     }
 
-    private val SENTENCE_END = Languages.current.sentenceEnd
+    private val SENTENCE_END get() = Languages.current.sentenceEnd
     private const val MAX_SENTENCE = 140
 
     /** The sentence around [start, end) in a paragraph, trimmed to a readable length. */
     fun sentence(text: String, start: Int, end: Int): String {
         var s = start
-        while (s > 0 && text[s - 1] !in SENTENCE_END) s--
+        // A full stop after an abbreviation (Sr. Ortega) does not end the sentence.
+        while (s > 0 && !(text[s - 1] in SENTENCE_END && Sentences.ends(text, s - 1))) s--
         var e = end
-        while (e < text.length && text[e] !in SENTENCE_END) e++
+        while (e < text.length && !(text[e] in SENTENCE_END && Sentences.ends(text, e))) e++
         if (e < text.length) e++
         // Keep a closing quote that belongs to the sentence.
         while (e < text.length && text[e] in "”’」』\"")  e++

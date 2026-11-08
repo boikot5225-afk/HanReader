@@ -196,7 +196,7 @@ object Languages {
 
     /** Chinese until [init] reads the setting (tests never call it). */
     @Volatile var current: LanguageInfo = CHINESE
-        private set
+        internal set
 
     private const val PREFS = "language"
     private const val KEY = "studyLanguage"

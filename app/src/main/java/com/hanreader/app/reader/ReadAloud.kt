@@ -16,7 +16,7 @@ import com.hanreader.app.zh.TokenKind
 data class Spoken(val chapter: Int, val block: Int, val start: Int, val end: Int, val text: String)
 
 object Sentences {
-    private val END = com.hanreader.app.lang.Languages.current.sentenceEnd.replace("\n", "")
+    private val END get() = com.hanreader.app.lang.Languages.current.sentenceEnd.replace("\n", "")
     private const val CLOSING = "”’」』\")）"
 
     /** The chapter's sentences in reading order; headings count as one sentence, empty ones are skipped. */
@@ -29,7 +29,7 @@ object Sentences {
             var i = 0
             while (i < text.length) {
                 val c = text[i]
-                if (c in END || c == '\n') {
+                if ((c in END && ends(text, i)) || c == '\n') {
                     var e = i + 1
                     while (e < text.length && (text[e] in END || text[e] in CLOSING)) e++
                     add(out, chapter.index, bi, text, s, e)
@@ -40,6 +40,30 @@ object Sentences {
             add(out, chapter.index, bi, text, s, text.length)
         }
         return out
+    }
+
+    /** Abbreviations whose full stop does not end a sentence (Sr. Ortega, EE. UU., pág. 3). */
+    private val ABBREVIATIONS = setOf(
+        "sr", "sra", "srta", "sres", "dr", "dra", "ud", "uds", "vd", "vds", "d", "dña", "ee", "uu", "etc", "pág", "págs",
+        "núm", "nº", "vol", "cap", "art", "av", "avda", "ed", "eds", "fig", "ibíd", "cf", "aprox", "tel", "st", "mr", "mrs", "ms"
+    )
+
+    /**
+     * Whether the mark at [i] ends a sentence. A full stop does not after an abbreviation or an
+     * initial (J. R. R.), between digits (1.500), or when the text goes on in lower case.
+     */
+    internal fun ends(text: String, i: Int): Boolean {
+        if (text[i] != '.') return true
+        if (i > 0 && i + 1 < text.length && text[i - 1].isDigit() && text[i + 1].isDigit()) return false
+        var w = i
+        while (w > 0 && text[w - 1].isLetter()) w--
+        val word = text.substring(w, i)
+        if (word.lowercase() in ABBREVIATIONS) return false
+        if (word.length == 1 && word[0].isUpperCase()) return false
+        var n = i + 1
+        while (n < text.length && (text[n].isWhitespace() || text[n] in CLOSING)) n++
+        if (n < text.length && text[n].isLowerCase()) return false
+        return true
     }
 
     private fun add(out: MutableList<Spoken>, chapter: Int, block: Int, text: String, from: Int, to: Int) {
