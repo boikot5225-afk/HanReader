@@ -1336,7 +1336,7 @@ private fun WordSheet(
                 russian.forEachIndexed { i, sense ->
                     Text("${i + 1}. $sense", style = MaterialTheme.typography.bodyLarge)
                 }
-                (zh?.russianSource(word)?.label ?: if (es.isNotEmpty()) "Викисловарь" else null)?.let { src ->
+                (zh?.russianSource(word)?.label ?: es.firstOrNull()?.let { if (it.entry.machine) "машинный перевод Викисловаря" else "Викисловарь" })?.let { src ->
                     Text(
                         "Русский · $src",
                         style = MaterialTheme.typography.labelSmall,

@@ -15,7 +15,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /** A dictionary word: [ru] from the Russian Wiktionary, [en] from the English one. */
-data class EsEntry(val lemma: String, val pos: String, val ru: List<String>, val en: List<String>) {
+data class EsEntry(
+    val lemma: String,
+    val pos: String,
+    val ru: List<String>,
+    val en: List<String>,
+    /** The Russian meaning is a machine translation of the English one (not the Russian Wiktionary). */
+    val machine: Boolean = false,
+    /** Frequency rank in Spanish subtitles: 1 = most frequent, 0 = not in the list. */
+    val rank: Int = 0
+) {
     val isName: Boolean get() = pos == "имя"
 }
 
@@ -42,22 +51,28 @@ class EsEngine(
     fun entry(lemma: String): EsEntry? {
         val f = dict.get(lemma) ?: return null
         fun senses(i: Int) = f.getOrNull(i).orEmpty().split(" ; ").map { it.trim() }.filter { it.isNotEmpty() }
-        return EsEntry(lemma, f.getOrNull(0).orEmpty(), senses(1), senses(2))
+        return EsEntry(lemma, f.getOrNull(0).orEmpty(), senses(1), senses(2), machine = f.getOrNull(3) == "a", rank = f.getOrNull(4)?.toIntOrNull() ?: 0)
     }
 
     /** Every dictionary reading of [word], the most useful first (a word with a Russian meaning first). */
     fun analyses(word: String): List<EsAnalysis> {
         val w = word.lowercase()
         synchronized(cache) { cache[w] }?.let { return it }
-        val out = ArrayList<EsAnalysis>(2)
-        entry(w)?.let { out += EsAnalysis(w, it, "") }
-        forms.get(w)?.firstOrNull()?.split('|')?.forEach { item ->
+        val self = entry(w)?.let { EsAnalysis(w, it, "") }
+        val asForm = ArrayList<EsAnalysis>(2)
+        // "!": a frequent verb form that is also a rare word (era: ser before «эра»).
+        val f = forms.get(w)?.firstOrNull().orEmpty()
+        val formFirst = f.startsWith("!")
+        f.removePrefix("!").split('|').filter { it.isNotEmpty() }.forEach { item ->
             val lemma = item.substringBefore(':')
             val g = item.substringAfter(':', "0").toIntOrNull()?.let { grammar.getOrNull(it) }.orEmpty()
-            if (out.none { it.entry.lemma == lemma }) entry(lemma)?.let { out += EsAnalysis(w, it, g) }
+            if (lemma != w && asForm.none { it.entry.lemma == lemma }) entry(lemma)?.let { asForm += EsAnalysis(w, it, g) }
         }
+        val out = ArrayList<EsAnalysis>(3)
+        if (formFirst) { out += asForm; self?.let { out += it } } else { self?.let { out += it }; out += asForm }
         if (out.isEmpty()) out += withoutPronouns(w)
-        val sorted = out.sortedBy { if (it.entry.ru.isNotEmpty()) 0 else 1 }
+        // A reading with a Russian meaning first, unless the order was set on purpose ("!").
+        val sorted = if (formFirst) out else out.sortedBy { if (it.entry.ru.isNotEmpty()) 0 else 1 }
         synchronized(cache) { cache[w] = sorted }
         return sorted
     }

@@ -6,3 +6,11 @@ Spanish dictionary (es/dict.tsv, es/forms.tsv, es/grammar.tsv), built by tools/b
 Wiktionary text: Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0), authors: Wiktionary contributors.
 https://creativecommons.org/licenses/by-sa/4.0/
 The derived files are distributed under the same licence.
+
+Word frequency (the rank column of es/dict.tsv): FrequencyWords by Hermit Dave,
+https://github.com/hermitdave/FrequencyWords (content/2018/es/es_50k.txt), built from OpenSubtitles 2018;
+content licensed CC BY-SA 4.0.
+
+Russian meanings marked as machine translation: English Wiktionary meanings translated into Russian
+with the DeepSeek API (tools/translate_es_ru.py, data/es/ru_ai.jsonl), not checked by a lexicographer;
+distributed under CC BY-SA 4.0 as a derivative of Wiktionary.

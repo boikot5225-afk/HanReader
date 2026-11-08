@@ -6,14 +6,22 @@ assets/licenses/ES_WIKTIONARY_NOTICE.txt):
   ru.jsonl  Spanish words of the Russian Wiktionary (https://kaikki.org/ruwiktionary/Испанский/)
   en.jsonl  Spanish words of the English Wiktionary (https://kaikki.org/dictionary/Spanish/)
 
-dict.tsv   lemma \t part of speech \t Russian senses \t English senses   (senses joined by " ; ")
+dict.tsv   lemma \t part of speech \t Russian senses \t English senses \t Russian source \t frequency rank
+           (senses joined by " ; "; source: w = Russian Wiktionary, a = machine translation (ru_ai.jsonl);
+           rank: 1 = most frequent, empty = not in the frequency list)
 forms.tsv  form \t lemma:n|lemma:n   (forms that differ from the lemma; n = line of grammar.tsv, 0 = none)
 grammar.tsv  one description of a form per line: «3 л. ед. ч., претерит»
 Verbs with attached pronouns (dámelo) and voseo forms are left out: the app strips the pronouns itself.
 Both lower-case, sorted by UTF-8 bytes (the app binary-searches them).
 
+Also read from data/es (committed):
+  es_50k.txt    word frequencies of Spanish subtitles (FrequencyWords, OpenSubtitles 2018, CC BY-SA 4.0)
+  ru_ai.jsonl   Russian meanings by machine translation (tools/translate_es_ru.py), for words the
+                Russian Wiktionary lacks
+
 Usage: python3 tools/build_es_dict.py <ru.jsonl> <en.jsonl> <out_dir>
 """
+import os
 import json
 import re
 import sys
@@ -39,6 +47,15 @@ MOOD = [("subjunctive", "субх."), ("imperative", "повел."), ("gerund", 
 MANUAL_RU = {
     "del": ["de + el: из, от, о (перед словом мужского рода)"],
     "al": ["a + el: к, в, на (перед словом мужского рода)"],
+}
+# Frequent verb forms that are also rare words of their own (era «эра», son «мелодия», ha, sé «да»):
+# in text they are almost always the verb, so the verb reading comes first (forms.tsv marks them with
+# "!") and their frequency goes to the verb. Words like como («как», also a form of comer) are not
+# here: the word itself comes first.
+FORM_FIRST = {
+    "es", "era", "eras", "eran", "son", "soy", "eres", "sea", "sean", "seas", "fue", "fui", "fuera", "fueron",
+    "ha", "he", "has", "han", "había", "habían", "habías", "sé", "va", "vas", "ve", "ves", "dicho", "sido",
+    "estado", "visto", "puesto", "río",
 }
 SKIP_TAGS = {"obsolete", "archaic", "rare", "proscribed", "misspelling", "nonstandard"}
 
@@ -77,6 +94,27 @@ def describe(tags):
     return ", ".join(parts)
 
 
+def frequency_ranks(path, lemmas, forms, ru):
+    """Rank of each dictionary word by the summed frequency of its forms (hablo, habló -> hablar)."""
+    counts = {}
+    for line in open(path, encoding="utf-8"):
+        parts = line.split()
+        if len(parts) != 2 or not parts[1].isdigit():
+            continue
+        w, c = parts[0].lower(), int(parts[1])
+        if w in lemmas and not (w in FORM_FIRST and w in forms):
+            target = w
+        elif w in forms:
+            cands = sorted((l for l in forms[w] if l in lemmas), key=lambda l: l not in ru)
+            target = cands[0] if cands else None
+        else:
+            target = None
+        if target:
+            counts[target] = counts.get(target, 0) + c
+    ordered = sorted(counts, key=lambda w: -counts[w])
+    return {w: i + 1 for i, w in enumerate(ordered)}
+
+
 def main(ru_path, en_path, out_dir):
     ru = {}       # lemma -> [senses]
     en = {}       # lemma -> [senses]
@@ -84,8 +122,9 @@ def main(ru_path, en_path, out_dir):
     forms = {}    # form -> {lemma: description}
 
     def set_pos(w, p):
-        # A common word first: «al» is a contraction before it is an initialism (имя).
-        if p in POS and (w not in pos or (pos[w] == "имя" and POS[p] != "имя")):
+        # A common word first: «al» is a contraction before it is an initialism (имя); an infinitive
+        # that is also a noun (poder, querer) is a verb.
+        if p in POS and (w not in pos or (pos[w] == "имя" and POS[p] != "имя") or (POS[p] == "гл." and pos[w] == "сущ.")):
             pos[w] = POS[p]
 
     def add_form(form, lemma, desc):
@@ -107,8 +146,7 @@ def main(ru_path, en_path, out_dir):
                 if g and "?" not in g and g not in ru.setdefault(w, []):
                     ru[w].append(g)
         set_pos(w, e.get("pos"))
-        for f in e.get("forms", []):
-            add_form(f.get("form", ""), w, "")
+        # Its inflection tables are not used: verb tables hold bare endings ("o", "es" for abrir).
 
     for line in open(en_path, encoding="utf-8"):
         e = json.loads(line)
@@ -136,8 +174,21 @@ def main(ru_path, en_path, out_dir):
 
     for w, senses in MANUAL_RU.items():
         ru[w] = senses + [x for x in ru.get(w, []) if x not in senses]
+    source = {w: "w" for w in ru if ru[w]}
+    data = os.path.join(os.path.dirname(__file__), "..", "data", "es")
+    ai_path = os.path.join(data, "ru_ai.jsonl")
+    if os.path.exists(ai_path):
+        for line in open(ai_path, encoding="utf-8"):
+            if not line.strip():
+                continue
+            it = json.loads(line)
+            w, senses = it["w"], [x.strip() for x in it["ru"].split(";") if x.strip()]
+            if senses and not ru.get(w):
+                ru[w] = senses
+                source[w] = "a"
 
     lemmas = sorted(set(ru) | set(en), key=lambda x: x.encode("utf-8"))
+    rank = frequency_ranks(os.path.join(data, "es_50k.txt"), set(lemmas), forms, ru)
     with open(f"{out_dir}/dict.tsv", "w", encoding="utf-8") as f:
         n = 0
         for w in lemmas:
@@ -145,7 +196,7 @@ def main(ru_path, en_path, out_dir):
             g = en.get(w, [])[:MAX_SENSES]
             if not r and not g:
                 continue
-            f.write(f"{w}\t{pos.get(w, '')}\t{' ; '.join(r)}\t{' ; '.join(g)}\n")
+            f.write(f"{w}\t{pos.get(w, '')}\t{' ; '.join(r)}\t{' ; '.join(g)}\t{source.get(w, '')}\t{rank.get(w, '')}\n")
             n += 1
     known = set(lemmas)
     grammar = [""]
@@ -166,13 +217,13 @@ def main(ru_path, en_path, out_dir):
                             resolved.setdefault(l2, d or d2)
             items = sorted(resolved.items(), key=lambda kv: (kv[0] not in ru, kv[0] not in known))
             items = [(l, d) for l, d in items if l in known][:3]
-            if not items or form in ru:
+            if not items:
                 continue
             for _, d in items:
                 if d not in index:
                     index[d] = len(grammar)
                     grammar.append(d)
-            f.write(form + "\t" + "|".join(f"{l}:{index[d]}" for l, d in items) + "\n")
+            f.write(form + "\t" + ("!" if form in FORM_FIRST else "") + "|".join(f"{l}:{index[d]}" for l, d in items) + "\n")
             m += 1
     with open(f"{out_dir}/grammar.tsv", "w", encoding="utf-8") as f:
         f.write("\n".join(grammar) + "\n")
