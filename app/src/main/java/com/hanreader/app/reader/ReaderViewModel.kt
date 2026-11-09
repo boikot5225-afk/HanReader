@@ -98,9 +98,11 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Everything the reader treats as known: marked words plus cards learned in reviews (30+ days). */
     val knownWords: StateFlow<Set<String>> = combine(knownDao.observeWords(), knownDao.observeUnknown(), studyCards) { marked, unknown, list ->
-        val no = unknown.toHashSet()
+        // The marks of every language share one table: only the current language's words count here.
+        val own = com.hanreader.app.lang.Languages.current.ownsWord
+        val no = unknown.filterTo(HashSet()) { own(it) }
         val words = HashSet<String>(marked.size + list.size).apply {
-            addAll(marked)
+            marked.filterTo(this) { own(it) }
             list.filter { it.isLearned() }.forEach { add(it.word) }
             removeAll(no)
         }

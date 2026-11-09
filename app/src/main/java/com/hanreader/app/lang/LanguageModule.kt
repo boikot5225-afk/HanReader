@@ -40,7 +40,12 @@ data class LanguageInfo(
     /** The usual encoding of old .txt files that are not UTF-8. */
     val legacyCharset: String,
     /** Where a word may be broken across lines (offsets of the break); null: words are never broken. */
-    val hyphenate: ((String) -> List<Int>)? = null
+    val hyphenate: ((String) -> List<Int>)? = null,
+    /**
+     * Whether a stored word (a «Знаю» mark, a level mark) belongs to this language: the marks of
+     * all languages share one table, each language counts and uses only its own.
+     */
+    val ownsWord: (String) -> Boolean = { true }
 ) {
     val locale: Locale get() = Locale.forLanguageTag(tag)
 }
@@ -176,7 +181,8 @@ object Languages {
         voiceMissing = "Нет китайского голоса. Установи его: Настройки Android → Синтез речи",
         noWordsMessage = "В тексте нет китайских иероглифов",
         isWordChar = { it.isHan() },
-        legacyCharset = "GB18030"
+        legacyCharset = "GB18030",
+        ownsWord = { w -> w.any { it.isHan() } }
     )
 
     val SPANISH = LanguageInfo(
@@ -189,7 +195,8 @@ object Languages {
         noWordsMessage = "В тексте нет испанских слов",
         isWordChar = { it.isLetter() },
         legacyCharset = "windows-1252",
-        hyphenate = com.hanreader.app.es.EsHyphenator::points
+        hyphenate = com.hanreader.app.es.EsHyphenator::points,
+        ownsWord = { w -> w.isNotEmpty() && w.all { !it.isLetter() || Character.UnicodeScript.of(it.code) == Character.UnicodeScript.LATIN } && w.any { it.isLetter() } }
     )
 
     val ALL = listOf(CHINESE, SPANISH)

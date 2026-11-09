@@ -12,4 +12,16 @@ class BookLanguagesTest {
         // A Chinese book with an English name in it is still Chinese.
         assertEquals(Languages.CHINESE, BookLanguages.detect(TxtBook("他在 New York 住了三年，每天都去公园散步。".toByteArray(), "x")))
     }
+
+    @Test
+    fun eachLanguageOwnsItsWords() {
+        val zh = Languages.CHINESE.ownsWord
+        val es = Languages.SPANISH.ownsWord
+        assertEquals(true, zh("你好"))
+        assertEquals(false, zh("hablar"))
+        assertEquals(true, es("canción"))
+        assertEquals(true, es("darse cuenta"))
+        assertEquals(false, es("你好"))
+        assertEquals(false, es("1990"))
+    }
 }
