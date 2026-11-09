@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     # Neural voice server built into the app (the reader can change it in «Голос»); the key is a secret.
     env:
-      HANREADER_VOICE_URL: https://voice.saintjust.space
+      HANREADER_VOICE_URL: https://tts.saintjust.space
       HANREADER_VOICE_TOKEN: ${{ secrets.HANREADER_VOICE_KEY }}
     permissions:
       # write: to publish the beta APK as a release asset.
