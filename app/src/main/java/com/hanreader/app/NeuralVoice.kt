@@ -82,14 +82,14 @@ class NeuralVoice private constructor(context: Context) {
         const val DEFAULT_VOICE = "zf_xiaoxiao"
         /** Kokoro v1.0 Mandarin voices: id to a name for the menu. */
         val VOICES = listOf(
-            "zf_xiaoxiao" to "Сяосяо · женский",
-            "zf_xiaoyi" to "Сяои · женский",
-            "zf_xiaobei" to "Сяобэй · женский",
-            "zf_xiaoni" to "Сяони · женский",
-            "zm_yunxi" to "Юньси · мужской",
-            "zm_yunjian" to "Юньцзянь · мужской",
-            "zm_yunxia" to "Юнься · мужской",
-            "zm_yunyang" to "Юньян · мужской"
+            "zf_xiaoxiao" to "Сяосяо ♀",
+            "zf_xiaoyi" to "Сяои ♀",
+            "zf_xiaobei" to "Сяобэй ♀",
+            "zf_xiaoni" to "Сяони ♀",
+            "zm_yunxi" to "Юньси ♂",
+            "zm_yunjian" to "Юньцзянь ♂",
+            "zm_yunxia" to "Юнься ♂",
+            "zm_yunyang" to "Юньян ♂"
         )
         private const val MAX_CACHE_BYTES = 100L * 1024 * 1024
         private const val TIMEOUT_MS = 30_000
@@ -121,7 +121,7 @@ class NeuralVoice private constructor(context: Context) {
                 if (token.isNotEmpty()) c.setRequestProperty("Authorization", "Bearer $token")
                 c.outputStream.use { it.write(body.toByteArray()) }
                 val code = c.responseCode
-                if (code != 200) throw IOException("HTTP $code")
+                if (code != 200) throw VoiceHttpException(code)
                 c.inputStream.use { input -> out.outputStream().use { input.copyTo(it) } }
                 if (!looksLikeAudio(out)) { out.delete(); throw IOException("not audio") }
             } finally {
@@ -165,6 +165,19 @@ class NeuralVoice private constructor(context: Context) {
             }
         }
     }
+}
+
+/** The voice server answered [code] instead of audio. */
+class VoiceHttpException(val code: Int) : IOException("HTTP $code")
+
+/** What went wrong with the voice server, for the reader. */
+fun voiceError(e: Throwable): String = when {
+    e is VoiceHttpException && (e.code == 401 || e.code == 403) -> "сервер не принял ключ доступа — проверь ключ в «Адрес сервера»"
+    e is VoiceHttpException && e.code == 429 -> "слишком много запросов, попробуй через минуту"
+    e is VoiceHttpException -> "ошибка сервера (${e.code})"
+    e is java.net.UnknownHostException -> "нет интернета или адрес сервера неверный"
+    e is java.net.SocketTimeoutException -> "сервер долго не отвечает"
+    else -> "ошибка сети"
 }
 
 /** Plays one audio file at a time. */

@@ -70,9 +70,14 @@ class NeuralVoiceTest {
         assertEquals(null, lastAuth)
     }
 
-    @Test(expected = IOException::class)
-    fun errorStatusFails() {
-        NeuralVoice.synthesize(serve(401, "{\"detail\":\"no\"}".toByteArray()), "", "zf_xiaoxiao", "好", 1f, File(dir, "c.audio"))
+    @Test
+    fun aRefusedKeyIsReportedAsSuch() {
+        val e = runCatching {
+            NeuralVoice.synthesize(serve(401, "{\"detail\":\"no\"}".toByteArray()), "", "zf_xiaoxiao", "好", 1f, File(dir, "c.audio"))
+        }.exceptionOrNull()
+        assertTrue(e is VoiceHttpException && e.code == 401)
+        assertTrue(voiceError(e!!).contains("ключ"))
+        assertTrue(voiceError(IOException("x")).isNotEmpty())
     }
 
     @Test

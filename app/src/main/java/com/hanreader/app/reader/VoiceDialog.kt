@@ -3,6 +3,8 @@ package com.hanreader.app.reader
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
@@ -10,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -60,7 +63,10 @@ fun VoiceDialog(onDismiss: () -> Unit) {
                     voice.fetch(SAMPLE, 1.0f) { r ->
                         r.fold(
                             onSuccess = { f -> status = ""; player.play(f, onDone = {}, onError = { status = "Не удалось воспроизвести" }) },
-                            onFailure = { e -> status = "Сервер не ответил: ${e.message ?: "ошибка сети"}" }
+                            onFailure = { e ->
+                                status = "Не получилось: " + com.hanreader.app.voiceError(e)
+                                if (e is com.hanreader.app.VoiceHttpException && e.code in listOf(401, 403)) showServer = true
+                            }
                         )
                     }
                 })
@@ -71,6 +77,7 @@ fun VoiceDialog(onDismiss: () -> Unit) {
 }
 
 /** The dialog's content: phone or neural voice, the voice, the server. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun VoiceChoices(
     neural: Boolean, onNeural: (Boolean) -> Unit,
@@ -85,8 +92,12 @@ internal fun VoiceChoices(
         Choice("Нейросетевой голос", "Единый живой голос; нужен интернет", neural) { onNeural(true) }
         if (neural) {
             Text("Голос", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            NeuralVoice.VOICES.forEach { (id, name) -> Choice(name, null, chosen == id) { onChosen(id) } }
-            TextButton(onClick = onListen, enabled = url.isNotBlank()) { Text("Послушать") }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NeuralVoice.VOICES.forEach { (id, name) ->
+                    FilterChip(selected = chosen == id, onClick = { onChosen(id) }, label = { Text(name) })
+                }
+            }
+            TextButton(onClick = onListen, enabled = url.isNotBlank()) { Text("▶ Послушать") }
             if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             Text(
                 "Для озвучки текст предложения отправляется на сервер HanReader. Больше ничего не передаётся; " +

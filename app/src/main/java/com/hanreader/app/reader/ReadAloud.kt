@@ -210,17 +210,17 @@ class ReadAloud(context: Context) : TextToSpeech.OnInitListener {
                 onSuccess = { file ->
                     audio.play(file, onDone = {
                         if (gen == generation && playing) { index++; speakCurrent() }
-                    }, onError = { serverDown() })
+                    }, onError = { serverDown(null) })
                 },
-                onFailure = { serverDown() }
+                onFailure = { serverDown(it) }
             )
         }
         for (k in 1..2) sentences.getOrNull(index + k)?.let { neural.prefetch(it.text, speed) }
     }
 
-    private fun serverDown() {
+    private fun serverDown(e: Throwable?) {
         serverFailed = true
-        message = "Сервер голоса недоступен — читает голос телефона"
+        message = "Нейросетевой голос: " + (e?.let { com.hanreader.app.voiceError(it) } ?: "не удалось воспроизвести") + ". Читает голос телефона"
         if (playing) speakCurrent()
     }
 
