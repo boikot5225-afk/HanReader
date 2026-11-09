@@ -24,4 +24,17 @@ class BookLanguagesTest {
         assertEquals(false, es("你好"))
         assertEquals(false, es("1990"))
     }
+
+    @Test
+    fun daysAreKeptPerLanguage() {
+        val rows = listOf(com.hanreader.app.DailyActivity(20261109, readMillis = 1), com.hanreader.app.DailyActivity(1_020_261_109, readMillis = 2))
+        assertEquals(listOf(20261109), LanguageDays.own(rows).map { it.day })
+        assertEquals(20261109, LanguageDays.key(20261109))
+        val was = Languages.current
+        Languages.current = Languages.SPANISH
+        try {
+            assertEquals(1_020_261_109, LanguageDays.key(20261109))
+            assertEquals(listOf(20261109 to 2L), LanguageDays.own(rows).map { it.day to it.readMillis })
+        } finally { Languages.current = was }
+    }
 }

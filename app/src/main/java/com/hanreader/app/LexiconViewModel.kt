@@ -240,14 +240,14 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
     fun markAlreadyKnown(card: WordCard, mode: ReviewMode) {
         viewModelScope.launch {
             dao.update(ReviewSchedule.markAlreadyKnown(card, mode, System.currentTimeMillis()))
-            statsDao.addReview(com.hanreader.app.reader.ReadingStats.today())
+            statsDao.addReview(com.hanreader.app.lang.LanguageDays.key(com.hanreader.app.reader.ReadingStats.today()))
         }
     }
 
     fun rate(card: WordCard, remembered: Boolean, mode: ReviewMode) {
         viewModelScope.launch {
             dao.update(ReviewSchedule.rate(card, remembered, System.currentTimeMillis(), mode))
-            statsDao.addReview(com.hanreader.app.reader.ReadingStats.today())
+            statsDao.addReview(com.hanreader.app.lang.LanguageDays.key(com.hanreader.app.reader.ReadingStats.today()))
         }
     }
 

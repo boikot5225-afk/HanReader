@@ -51,3 +51,23 @@ object BookLanguages {
         return if (letters > 0 && han * 3 >= letters) Languages.CHINESE else Languages.SPANISH
     }
 }
+
+/**
+ * Reading time, pages and reviews by day are kept per language in the same table (no schema
+ * change): Chinese days under the date itself (20261109, as before), another language's days under
+ * the date plus its offset (Spanish: 1 020 261 109). Statistics show the current language's days.
+ */
+object LanguageDays {
+    private const val OFFSET = 1_000_000_000
+
+    private fun index(l: LanguageInfo = Languages.current): Int = Languages.ALL.indexOf(l).coerceAtLeast(0)
+
+    /** The stored key of [day] for the current language. */
+    fun key(day: Int): Int = day + index() * OFFSET
+
+    /** The current language's rows, with plain dates. */
+    fun own(rows: List<com.hanreader.app.DailyActivity>): List<com.hanreader.app.DailyActivity> {
+        val i = index()
+        return rows.filter { it.day / OFFSET == i }.map { it.copy(day = it.day - i * OFFSET) }
+    }
+}

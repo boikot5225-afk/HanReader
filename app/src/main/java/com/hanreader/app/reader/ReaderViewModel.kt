@@ -648,7 +648,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Days of reading and reviews, for the statistics screen. */
-    val activity = statsDao.observeDays()
+    /** Reading and reviews by day of the language being read (see [com.hanreader.app.lang.LanguageDays]). */
+    val activity = statsDao.observeDays().map { com.hanreader.app.lang.LanguageDays.own(it) }
     val bookProgress = statsDao.observeProgress()
     /** All cards (new words per day, learned). */
     val allCards: StateFlow<List<com.hanreader.app.WordCard>> = studyCards
@@ -658,7 +659,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun recordPage(chars: Int, millis: Long) {
         if (millis >= 2_000 && chars > 0) {
             viewModelScope.launch {
-                statsDao.addReading(ReadingStats.today(), millis.coerceAtMost(ReadingStats.MAX_PAGE_MILLIS), chars)
+                statsDao.addReading(com.hanreader.app.lang.LanguageDays.key(ReadingStats.today()), millis.coerceAtMost(ReadingStats.MAX_PAGE_MILLIS), chars)
             }
         }
         if (chars < 20 || millis < 3_000 || millis > 5 * 60_000) return
