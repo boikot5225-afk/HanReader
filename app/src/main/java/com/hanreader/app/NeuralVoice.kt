@@ -109,7 +109,7 @@ class NeuralVoice private constructor(context: Context) {
          * Throws on a network error, an error status or an answer that is not audio.
          */
         fun synthesize(baseUrl: String, token: String, voice: String, text: String, speed: Float, out: File) {
-            val body = "{\"model\":\"kokoro\",\"input\":${json(text)},\"voice\":${json(voice)}," +
+            val body = "{\"model\":\"kokoro\",\"input\":${json(text)},\"voice\":${json(voice)},\"response_format\":\"wav\"," +
                 "\"speed\":${"%.2f".format(java.util.Locale.ROOT, speed)}}"
             val c = URL("$baseUrl/v1/audio/speech").openConnection() as HttpURLConnection
             try {
