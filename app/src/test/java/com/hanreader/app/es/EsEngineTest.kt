@@ -160,6 +160,30 @@ class EsEngineTest {
         assertEquals("echar de menos", key("menos"))
     }
 
+    /** The reader's screenshot: «trajeron cola» is the idiom, «había adoptado» the verb adoptar. */
+    @Test
+    fun idiomsAndPerfectTensesInContext() {
+        val text = "Las elecciones trajeron cola, y el cártel había adoptado otra forma."
+        val t = engine.inContext(engine.tokenize(text), text)
+        fun at(w: String) = t.first { it.text == w }
+        assertEquals("traer cola", at("trajeron").pinyin)
+        assertEquals(EsEngine.IN_PHRASE, at("cola").pinyin)
+        assertEquals("иметь последствия", engine.glossShort("trajeron", "traer cola"))
+        assertEquals(null, engine.glossShort("cola", EsEngine.IN_PHRASE))
+        assertEquals("adoptar", at("adoptado").pinyin)
+    }
+
+    @Test
+    fun ordinaryWordPairsAreNotPhrases() {
+        val text = "La casa de la vida de una de esas personas."
+        val t = engine.inContext(engine.tokenize(text), text)
+        assertTrue(t.none { ' ' in it.pinyin || it.pinyin == EsEngine.IN_PHRASE })
+        assertFalse(engine.usefulPhrase("de la"))
+        assertFalse(engine.usefulPhrase("la vida"))
+        assertTrue(engine.usefulPhrase("sin embargo"))
+        assertTrue(engine.usefulPhrase("por qué"))
+    }
+
     @Test
     fun abbreviationsDoNotEndSentences() {
         val was = com.hanreader.app.lang.Languages.current

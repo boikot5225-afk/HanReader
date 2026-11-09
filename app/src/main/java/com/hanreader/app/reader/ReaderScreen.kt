@@ -238,7 +238,22 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             for (w in words) (userMeanings[w] ?: eng.glossShort(w))?.let { put(w, it) }
             // A single character gets the meaning of each reading it has on these pages (慢慢地 de, 土地 dì).
             chapter?.blocks?.forEach { b ->
-                (b as? ReaderBlock.Text)?.tokens?.forEach { t ->
+                val tokens = (b as? ReaderBlock.Text)?.tokens ?: return@forEach
+                // Spanish phrases (trajeron cola): the meaning of the phrase over its first word when any of
+                // its words is to be hinted; the other words of the phrase get no hint of their own.
+                if (zhless) for ((i, t) in tokens.withIndex()) {
+                    if (t.kind != TokenKind.HAN || ' ' !in t.pinyin) continue
+                    var j = i
+                    var hinted = false
+                    while (j < tokens.size && (j == i || tokens[j].kind != TokenKind.HAN || tokens[j].pinyin == com.hanreader.app.es.EsEngine.IN_PHRASE)) {
+                        if (tokens[j].kind == TokenKind.HAN && tokens[j].text in words) hinted = true
+                        j++
+                    }
+                    if (!hinted) continue
+                    eng.glossShort(t.text, t.pinyin)?.let { put(t.text + "|" + t.pinyin, it) }
+                    for (k in i + 1 until j) if (tokens[k].kind == TokenKind.HAN) put(tokens[k].text + "|" + tokens[k].pinyin, "")
+                }
+                tokens.forEach { t ->
                     // Spanish: a word read in context (se alza: alzar, not alza) carries that reading too.
                     if ((t.text.length == 1 || zhless) && t.text in words && t.pinyin.isNotEmpty() && t.text !in userMeanings) {
                         val key = t.text + "|" + t.pinyin

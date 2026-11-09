@@ -268,8 +268,11 @@ internal fun layout(
  * cut with an ellipsis. Word widths never change, so lines break exactly as without translations.
  */
 /** The translation of a token: "text|reading" first (a character read as on the page), then the word. */
-internal fun glossOf(glossFor: Map<String, String>, t: RToken): String? =
-    (if (t.pinyin.isNotEmpty()) glossFor[t.text + "|" + t.pinyin] else null) ?: glossFor[t.text]
+internal fun glossOf(glossFor: Map<String, String>, t: RToken): String? {
+    // An empty hint for a reading: no hint at all (a word inside a phrase whose first word carries it).
+    if (t.pinyin.isNotEmpty()) glossFor[t.text + "|" + t.pinyin]?.let { return it.ifEmpty { null } }
+    return glossFor[t.text]
+}
 
 private fun placeGlosses(
     items: List<Placed>,
@@ -573,7 +576,7 @@ internal fun fadingGlosses(chapter: ChapterContent, glossFor: Map<String, String
     chapter.blocks.forEachIndexed { bi, b ->
         val keep = HashSet<Int>()
         (b as? ReaderBlock.Text)?.tokens?.forEachIndexed { ti, t ->
-            if (t.kind == TokenKind.HAN && glossOf(glossFor, t) != null && (bi < fromBlock || seen.merge(t.text, 1, Int::plus)!! <= repeats)) keep += ti
+            if (t.kind == TokenKind.HAN && glossOf(glossFor, t) != null && (bi < fromBlock || seen.merge(if (' ' in t.pinyin) t.pinyin else t.text, 1, Int::plus)!! <= repeats)) keep += ti
         }
         out[bi] = keep
     }

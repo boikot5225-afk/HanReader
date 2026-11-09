@@ -169,7 +169,7 @@ class EsEngine(
         for (a in left) for (b in right) {
             val words = (b - a) / 2 + 1
             if (words < 2 || words > 4) continue
-            val key = phraseKey(tokens, text, a, b) ?: continue
+            val key = phraseKey(tokens, text, a, b)?.takeIf { usefulPhrase(it) } ?: continue
             val reflexiveKey = reflexiveBefore(tokens, a) && key.substringBefore(' ').endsWith("se")
             val score = words + if (reflexiveKey) 10 else 0
             if (score > bestScore) { best = a..b; bestScore = score }
@@ -181,16 +181,20 @@ class EsEngine(
     override fun lemma(word: String): String = analyses(word).firstOrNull()?.entry?.lemma ?: word.lowercase()
 
     override fun chapter(paragraphs: List<String>, options: TextOptions): (String) -> PreparedText = { text ->
-        PreparedText(text, text, inContext(tokenize(text)))
+        PreparedText(text, text, inContext(tokenize(text), text))
     }
 
     /**
      * Readings the neighbours decide, kept in [RToken.pinyin] (never drawn for Spanish):
      * - after a pronoun that goes with a verb (se, me, te…), a subject pronoun (yo, tú, él…) or «no»,
      *   a word that can be a verb is the verb: «se alza» alzar, «no como» comer (not «как»);
-     * - a form of both ser and ir before «a»/«al» is ir: «fue a Madrid», but «fue profesor» stays ser.
+     * - a form of both ser and ir before «a»/«al» is ir: «fue a Madrid», but «fue profesor» stays ser;
+     * - after a form of haber a participle is the verb: «había adoptado» adoptar, not «приёмный».
+     * With [text], dictionary phrases are marked too: the first word carries the phrase
+     * («trajeron cola»: "traer cola"), the following ones [IN_PHRASE], so the hint over the text is
+     * the meaning of the whole phrase, not of each word.
      */
-    fun inContext(tokens: List<RToken>): List<RToken> {
+    fun inContext(tokens: List<RToken>, text: String? = null): List<RToken> {
         val words = tokens.indices.filter { tokens[it].kind == TokenKind.HAN }
         val out = tokens.toMutableList()
         for ((k, i) in words.withIndex()) {
@@ -203,23 +207,54 @@ class EsEngine(
             if (a.size < 2) continue
             val choice = when {
                 after in setOf("a", "al") && a.any { it.entry.lemma == "ir" } && a.any { it.entry.lemma == "ser" } -> "ir"
-                before != null && (before in VERB_PRONOUNS || before in SUBJECT_PRONOUNS || before == "no") && a.first().entry.pos != "гл." ->
+                before != null && (before in VERB_PRONOUNS || before in SUBJECT_PRONOUNS || before == "no" || before in HABER) && a.first().entry.pos != "гл." ->
                     a.firstOrNull { it.entry.pos == "гл." }?.entry?.lemma
                 else -> null
             }
             if (choice != null && choice != a.first().entry.lemma) out[i] = t.copy(pinyin = choice)
         }
+        if (text != null) {
+            var k = 0
+            while (k < words.size) {
+                val i = words[k]
+                val r = phraseAt(tokens, text, i)
+                if (r == null || r.first != i) { k++; continue }
+                val key = phraseKey(tokens, text, r.first, r.last) ?: run { k++; continue }
+                out[i] = out[i].copy(pinyin = key)
+                for (j in r.first + 1..r.last) if (tokens[j].kind == TokenKind.HAN) out[j] = out[j].copy(pinyin = IN_PHRASE)
+                while (k < words.size && words[k] <= r.last) k++
+            }
+        }
         return out
     }
+
+    /**
+     * Whether a dictionary phrase is worth showing as one: Wiktionary also lists ordinary word
+     * pairs with a rare sense («de la» «предлог родительного падежа», «la vida» «проституция»).
+     * Left out: phrases ending in an article or possessive (de la, que su), starting with one
+     * (la vida, una de), made only of small words unless a known idiom (por qué, sobre todo), and
+     * ser / estar / hacer + preposition.
+     */
+    fun usefulPhrase(key: String): Boolean {
+        if (key in PHRASE_IDIOMS) return true
+        if (key in PHRASE_NOISE) return false
+        val w = key.split(' ')
+        if (w.size < 2) return false
+        if (w.last() in DETERMINERS) return false
+        if (w.first() in DETERMINERS) return false
+        if (w.all { it in SMALL_WORDS }) return false
+        if (w.size == 2 && w[0] in setOf("ser", "estar", "hacer", "es", "era", "fue") && w[1] in SMALL_WORDS) return false
+        return true
+    }
+
+    private fun reflexiveBefore(tokens: List<RToken>, a: Int): Boolean =
+        tokens.getOrNull(a - 1)?.text == " " && tokens.getOrNull(a - 2)?.text?.lowercase() in REFLEXIVE
 
     /**
      * The dictionary phrase written by tokens [a]..[b] (words separated by single spaces), also when
      * its first word is inflected or it is reflexive: «me di cuenta» is darse cuenta, «echo de menos»
      * echar de menos. Null if the dictionary has no such phrase.
      */
-    private fun reflexiveBefore(tokens: List<RToken>, a: Int): Boolean =
-        tokens.getOrNull(a - 1)?.text == " " && tokens.getOrNull(a - 2)?.text?.lowercase() in REFLEXIVE
-
     fun phraseKey(tokens: List<RToken>, text: String, a: Int, b: Int): String? {
         if (b <= a || tokens.getOrNull(a)?.kind != TokenKind.HAN || tokens.getOrNull(b)?.kind != TokenKind.HAN) return null
         for (j in a + 1..b) if (tokens[j].kind == TokenKind.SPACE && tokens[j].text != " ") return null
@@ -271,7 +306,10 @@ class EsEngine(
     fun senses(e: EsEntry): List<String> = e.ru.sortedBy { variant.rank(it) }
 
     override fun glossShort(word: String, reading: String?): String? {
-        val e = pick(word, reading)?.entry ?: return null
+        if (reading == IN_PHRASE) return null
+        // The first word of a phrase: the meaning of the phrase (trajeron cola: «вызвать последствия»).
+        val e = (if (reading != null && ' ' in reading) entry(reading) else null)
+            ?: pick(word, reading)?.entry ?: return null
         // A sense of the chosen variant wins over the general main meaning (carro: «автомобиль» in Latin America).
         e.ru.firstOrNull { variant.rank(it) == 0 }?.let { s -> shortSense(s)?.let { return it } }
         if (e.short.isNotEmpty()) return e.short
@@ -442,6 +480,27 @@ class EsEngine(
         /** Pronouns that stand before a verb: the next word is read as a verb if it can be one. */
         private val VERB_PRONOUNS = setOf("se", "me", "te", "nos", "os", "le", "les")
         private val SUBJECT_PRONOUNS = setOf("yo", "tú", "él", "ella", "usted", "nosotros", "nosotras", "vosotros", "vosotras", "ellos", "ellas", "ustedes", "vos")
+        /** [RToken.pinyin] of a word inside a phrase after its first word: no hint of its own. */
+        const val IN_PHRASE = "~"
+        /** Forms of haber: a participle after one is a verb (había adoptado). */
+        private val HABER = setOf("he", "has", "ha", "hemos", "habéis", "han", "había", "habías", "habíamos", "habíais", "habían",
+            "hube", "hubo", "hubimos", "hubieron", "habré", "habrá", "habremos", "habrán", "habría", "habrías", "habríamos", "habrían",
+            "haya", "hayas", "hayamos", "hayan", "hubiera", "hubieras", "hubiéramos", "hubieran", "hubiese", "hubiesen", "haber", "habiendo")
+        /** Articles, possessives and demonstratives: a phrase does not start or end with one. */
+        private val DETERMINERS = setOf("el", "la", "los", "las", "lo", "un", "una", "unos", "unas", "su", "sus", "mi", "mis",
+            "tu", "tus", "este", "esta", "estos", "estas", "ese", "esa", "esos", "esas", "aquel", "aquella", "nuestro", "nuestra")
+        /** The most frequent small words: a phrase of only these is ordinary text unless a known idiom. */
+        private val SMALL_WORDS = DETERMINERS + setOf("de", "a", "al", "del", "en", "y", "e", "o", "u", "que", "se", "si", "no", "ya",
+            "más", "menos", "por", "para", "con", "sin", "sobre", "como", "todo", "toda", "todos", "todas", "es", "eso", "esto",
+            "así", "hasta", "mientras", "qué", "cual", "cuál", "ni", "le", "les", "me", "te", "nos", "mismo", "misma", "puede", "tan", "muy")
+        /** Idioms made of small words. */
+        private val PHRASE_IDIOMS = setOf("por qué", "para que", "ya que", "así que", "sobre todo", "por eso", "es que", "es más",
+            "al menos", "como si", "así como", "mientras que", "hasta que", "sin embargo", "ya no", "si no", "por lo tanto",
+            "a menos que", "lo que", "a la vez", "a lo mejor", "por lo menos", "a lo largo de", "por lo general", "con todo")
+        /** Dictionary phrases that in running text are nearly always the plain words. */
+        private val PHRASE_NOISE = setOf("al día", "de la casa", "caso de", "en masa", "de más", "y todo", "de todo", "por todo",
+            "más que", "se puede", "y si", "ser como", "hacer de", "los más", "lo mismo", "la vida", "una de", "de esta")
+
         /** Reflexive pronouns: «me di cuenta» reads as darse cuenta. */
         private val REFLEXIVE = setOf("me", "te", "se", "nos", "os")
 
