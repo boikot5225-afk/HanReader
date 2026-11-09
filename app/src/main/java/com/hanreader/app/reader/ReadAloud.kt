@@ -135,6 +135,9 @@ class ReadAloud(context: Context) : TextToSpeech.OnInitListener {
 
     fun resume() {
         if (!active) return
+        // Play again tries the neural voice again after a failure.
+        serverFailed = false
+        message = ""
         playing = true
         speakCurrent()
     }
@@ -198,7 +201,7 @@ class ReadAloud(context: Context) : TextToSpeech.OnInitListener {
         }
     }
 
-    /** The sentence in the server's voice; the next two are fetched meanwhile. On failure the phone reads. */
+    /** The sentence in the server's voice; the next one is fetched while it plays. On failure the phone reads. */
     private fun speakNeural(s: Spoken) {
         tts?.stop()
         audio.stop()
@@ -208,6 +211,8 @@ class ReadAloud(context: Context) : TextToSpeech.OnInitListener {
             if (gen != generation || !playing) return@fetch
             result.fold(
                 onSuccess = { file ->
+                    // The next sentence is made while this one plays.
+                    sentences.getOrNull(index + 1)?.let { neural.prefetch(it.text, speed) }
                     audio.play(file, onDone = {
                         if (gen == generation && playing) { index++; speakCurrent() }
                     }, onError = { serverDown(null) })
@@ -215,7 +220,6 @@ class ReadAloud(context: Context) : TextToSpeech.OnInitListener {
                 onFailure = { serverDown(it) }
             )
         }
-        for (k in 1..2) sentences.getOrNull(index + k)?.let { neural.prefetch(it.text, speed) }
     }
 
     private fun serverDown(e: Throwable?) {

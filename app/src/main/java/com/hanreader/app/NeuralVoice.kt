@@ -24,7 +24,8 @@ import java.util.concurrent.Executors
 class NeuralVoice private constructor(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("neural_voice", Context.MODE_PRIVATE)
     private val cacheDir = File(context.applicationContext.cacheDir, "voice")
-    private val executor: ExecutorService = Executors.newFixedThreadPool(2)
+    // One request at a time: the server synthesises on its CPU, parallel requests only slow the one being waited for.
+    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val pending = HashMap<String, MutableList<(Result<File>) -> Unit>>()
 
@@ -92,7 +93,9 @@ class NeuralVoice private constructor(context: Context) {
             "zm_yunyang" to "Юньян ♂"
         )
         private const val MAX_CACHE_BYTES = 100L * 1024 * 1024
-        private const val TIMEOUT_MS = 30_000
+        private const val CONNECT_TIMEOUT_MS = 15_000
+        // The server loads its model on the first request after a restart: that one can take a minute.
+        private const val READ_TIMEOUT_MS = 90_000
 
         @Volatile private var instance: NeuralVoice? = null
         fun get(context: Context): NeuralVoice =
@@ -114,8 +117,8 @@ class NeuralVoice private constructor(context: Context) {
             val c = URL("$baseUrl/v1/audio/speech").openConnection() as HttpURLConnection
             try {
                 c.requestMethod = "POST"
-                c.connectTimeout = TIMEOUT_MS
-                c.readTimeout = TIMEOUT_MS
+                c.connectTimeout = CONNECT_TIMEOUT_MS
+                c.readTimeout = READ_TIMEOUT_MS
                 c.doOutput = true
                 c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 if (token.isNotEmpty()) c.setRequestProperty("Authorization", "Bearer $token")
