@@ -9,6 +9,9 @@ import java.util.Locale
 
 class Speaker(context: Context) : TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
+    private val neural = NeuralVoice.get(context)
+    private val audio = AudioPlayer()
+    private var request = 0
     var ready by mutableStateOf(false)
         private set
     var message by mutableStateOf("")
@@ -41,6 +44,25 @@ class Speaker(context: Context) : TextToSpeech.OnInitListener {
     }
 
     fun speak(text: String, tag: String) {
+        // Chinese in the server's voice when it is on; the phone's voice if the server fails.
+        if (neural.available && tag.startsWith("zh")) {
+            tts?.stop()
+            audio.stop()
+            val id = ++request
+            message = ""
+            neural.fetch(text, 1.0f) { result ->
+                if (id != request) return@fetch
+                result.fold(
+                    onSuccess = { audio.play(it, onDone = {}, onError = { speakWithPhone(text, tag) }) },
+                    onFailure = { speakWithPhone(text, tag) }
+                )
+            }
+            return
+        }
+        speakWithPhone(text, tag)
+    }
+
+    private fun speakWithPhone(text: String, tag: String) {
         val engine = prepare(tag) ?: return
         if (engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "lexicon-manual") ==
             TextToSpeech.ERROR
@@ -69,9 +91,11 @@ class Speaker(context: Context) : TextToSpeech.OnInitListener {
         }
     }
 
-    fun stop() { tts?.stop() }
+    fun stop() { request++; tts?.stop(); audio.stop() }
 
     fun close() {
+        request++
+        audio.stop()
         tts?.stop()
         tts?.shutdown()
         tts = null

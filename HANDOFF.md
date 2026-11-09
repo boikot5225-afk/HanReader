@@ -1,6 +1,6 @@
 # HanReader — передача дел следующей сессии
 
-Состояние на 8 ноября 2026, версия **0.18.0** (versionCode 38), ветка `ccr-954eeb21-p65jbl`.
+Состояние на 8 ноября 2026, версия **0.19.0** (versionCode 39), ветка `ccr-954eeb21-p65jbl`.
 
 ## Владелец и договорённости
 
@@ -14,7 +14,7 @@
 
 ## Что это за приложение
 
-Android-читалка китайских книг (Kotlin, Jetpack Compose, Room), выросла из Lexicon. Всё офлайн, без разрешения на интернет.
+Android-читалка китайских книг (Kotlin, Jetpack Compose, Room), выросла из Lexicon. Всё офлайн; разрешение INTERNET есть только ради нейросетевого голоса (по умолчанию выключен).
 Основное: EPUB/FB2/TXT/DOCX/DOC, вставка текста и «Поделиться»/меню выделения; свой движок: сегментация Jieba-подобная (`zh/ZhSegmenter.kt`), пиньинь над словами на Canvas (`reader/RubyText.kt`), разбивка на страницы (`reader/Pagination.kt`); словари CC-CEDICT + русский Викисловарь + машинный перевод DeepSeek (`assets/zh/ru_ai.tsv`, `ru_chars.tsv` — значения иероглифов по чтениям); HSK-уровни, «Знаю/Не знаю», рекомендации i+1, подсказки над словами (угасают после 3 встреч), карточки SRS, выделения и заметки, чтение вслух (TTS по предложениям), статистика (серия, минуты, прочитано знаков, понимание книг), оценка сложности книги, цвета тонов, упрощённые/традиционные (OpenCC), свои значения слов, ручное разделение склеенных слов, подсказки грамматики (43 конструкции, `zh/Grammar.kt`, в карточке слова-маркера), полная резервная копия ZIP, отчёты о сбоях (локально, отправка вручную), экран «О приложении» с лицензиями.
 
 База Room: **версия 13** (схемы в `app/schemas`, `MigrationTest` поднимает базу с версии 4).
@@ -24,7 +24,7 @@ Android-читалка китайских книг (Kotlin, Jetpack Compose, Roo
 - Окружение «HanReader Android»: доступ к dl.google.com, kaikki.org (если сессия стартовала в «Default» — переключить через switch_environment); секрет для api.deepseek.com сохранён в настройках среды (ключ в командах — заглушка `proxy-injected`).
 - Android SDK: `/opt/android-sdk` (`local.properties`, не в git). В новой машине его нет: скачать commandlinetools с dl.google.com, `sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"`.
 - Maven Central отвечает 429: `~/.gradle/init.d/mirror.gradle` подменяет repo.maven.apache.org / repo1.maven.org на `https://maven-central.storage-download.googleapis.com/maven2/`; `~/.gradle/gradle.properties` — `robolectricRepoUrl` на то же зеркало. Первый прогон — без `--offline`.
-- Тесты: `gradle :app:testDebugUnitTest --offline -q` (160 тестов, 6 пропускаются: замеры на книгах и скриншоты для магазина). Robolectric; скриншоты UI рисуются через `decorView.draw`.
+- Тесты: `gradle :app:testDebugUnitTest --offline -q` (167 тестов, 6 пропускаются: замеры на книгах и скриншоты для магазина). Robolectric; скриншоты UI рисуются через `decorView.draw`.
 - APK: `gradle clean :app:assembleDebug --offline -q` (всегда `clean`).
 
 ## GitHub (boikot5225-afk/HanReader, публичный)
@@ -33,6 +33,13 @@ Android-читалка китайских книг (Kotlin, Jetpack Compose, Roo
 - `.github/workflows/emulator.yml`: дымовой тест `app/src/androidTest/SmokeTest.kt` на эмуляторах Android 8 / 11 / 14 (планшет). Свайпы в тестах — не от края (системный «Назад»).
 - Сайт: GitHub Pages из `docs/` (`index.html`, `privacy.html` собирается `tools/build_site.py` из `PRIVACY.md`). Адрес https://boikot5225-afk.github.io/HanReader/ — владелец должен включить Pages (Settings → Pages → ветка `ccr-954eeb21-p65jbl`, папка `/docs`); проверить, включён ли.
 - Ключ подписи из облака удалён, есть только у владельца и в секретах GitHub. Релизный APK для RuStore — артефакт `hanreader-signed-release-apk` последней сборки.
+
+## Сервер владельца (FastVPS)
+
+- Ubuntu 24.04 + FASTPANEL, 3 vCPU / 6 ГБ / 60 ГБ, IP 45.67.129.73 (из облачной сессии недоступен — команды выполняет владелец и присылает скриншоты).
+- Docker: `selfhost-tts-stt-1` (FastAPI, Kokoro TTS v1.0 + misaki[zh] и faster-whisper; 127.0.0.1:8080; `/v1/audio/speech`, `/v1/audio/transcriptions`, `/health`; лимит памяти 3 ГБ), плюс чужие для HanReader сервисы владельца (mtproto-proxy, mao-jewelry-orders, lenfer-wms-proxy, amnezia-awg2) — не трогать.
+- Нейросетевой голос в приложении (0.19.0) ждёт публичный HTTPS-адрес к 127.0.0.1:8080 (обратный прокси с сертификатом и ключом доступа). Адрес вписывается в меню «Голос» или в сборку через `HANREADER_VOICE_URL` / секрет `HANREADER_VOICE_TOKEN`.
+- Идеи дальше: проверка произношения через Whisper (STT уже есть на сервере), ИИ-разбор предложения (S1).
 
 ## Магазин
 

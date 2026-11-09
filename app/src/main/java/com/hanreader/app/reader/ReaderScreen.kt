@@ -1508,6 +1508,8 @@ internal fun KnownToggle(known: Boolean, onKnown: (Boolean) -> Unit, modifier: M
 /** The read-aloud player over the text: previous / pause-play / next sentence, speed, stop. */
 @Composable
 private fun ReadAloudBar(r: ReadAloud, modifier: Modifier = Modifier) {
+    var voiceMenu by remember { mutableStateOf(false) }
+    if (voiceMenu) VoiceDialog(onDismiss = { voiceMenu = false })
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -1524,6 +1526,7 @@ private fun ReadAloudBar(r: ReadAloud, modifier: Modifier = Modifier) {
                 }
                 IconButton(onClick = r::next) { Icon(LexiconIcons.SkipForward, contentDescription = "Следующее предложение") }
                 Spacer(Modifier.weight(1f))
+                TextButton(onClick = { voiceMenu = true }) { Text("Голос") }
                 TextButton(onClick = {
                     val i = ReadAloud.RATES.indexOfFirst { it >= r.rate - 0.01f }.let { if (it < 0) 0 else it }
                     r.changeRate(ReadAloud.RATES[(i + 1) % ReadAloud.RATES.size])

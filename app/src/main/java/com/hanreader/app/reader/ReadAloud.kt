@@ -10,6 +10,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.hanreader.app.AudioPlayer
+import com.hanreader.app.NeuralVoice
 import com.hanreader.app.zh.TokenKind
 import java.util.Locale
 
@@ -60,7 +62,8 @@ object Sentences {
 }
 
 /**
- * Reads a chapter aloud with Android's speech synthesis, one sentence at a time, so the screen
+ * Reads a chapter aloud with Android's speech synthesis or the neural voice of the server
+ * ([NeuralVoice], when turned on), one sentence at a time, so the screen
  * always knows which sentence (and, with engines that report it, which word) is being spoken.
  * A sentence finished moves on to the next; the chapter's end asks the screen for the next one.
  */
@@ -69,6 +72,10 @@ class ReadAloud(context: Context) : TextToSpeech.OnInitListener {
     private val prefs = context.applicationContext.getSharedPreferences("read_aloud", Context.MODE_PRIVATE)
     private val main = Handler(Looper.getMainLooper())
     private var tts: TextToSpeech? = TextToSpeech(context.applicationContext, this)
+    private val neural = NeuralVoice.get(context)
+    private val audio = AudioPlayer()
+    // The server failed in this session: the phone's voice reads until the reader starts again.
+    private var serverFailed = false
     private var ready = false
     private var pendingSpeak = false
 
@@ -111,6 +118,7 @@ class ReadAloud(context: Context) : TextToSpeech.OnInitListener {
     fun start(chapter: ChapterContent, block: Int, char: Int) {
         sentences = Sentences.of(chapter)
         index = Sentences.startAt(sentences, block, char)
+        serverFailed = false
         active = true
         playing = true
         message = ""
@@ -121,6 +129,7 @@ class ReadAloud(context: Context) : TextToSpeech.OnInitListener {
         playing = false
         generation++
         tts?.stop()
+        audio.stop()
         word = null
     }
 
@@ -146,6 +155,7 @@ class ReadAloud(context: Context) : TextToSpeech.OnInitListener {
         word = null
         generation++
         tts?.stop()
+        audio.stop()
     }
 
     /** Speech rate, 0.5..2 (1 = the engine's normal speed); takes effect from the next sentence. */
@@ -171,6 +181,7 @@ class ReadAloud(context: Context) : TextToSpeech.OnInitListener {
         }
         current = s
         word = null
+        if (neural.available && !serverFailed) { speakNeural(s); return }
         val engine = tts ?: return
         if (!ready) { pendingSpeak = true; return }
         val lang = engine.setLanguage(Locale.SIMPLIFIED_CHINESE)
@@ -185,6 +196,32 @@ class ReadAloud(context: Context) : TextToSpeech.OnInitListener {
             message = "Ошибка озвучки"
             pause()
         }
+    }
+
+    /** The sentence in the server's voice; the next two are fetched meanwhile. On failure the phone reads. */
+    private fun speakNeural(s: Spoken) {
+        tts?.stop()
+        audio.stop()
+        val gen = ++generation
+        val speed = rate
+        neural.fetch(s.text, speed) { result ->
+            if (gen != generation || !playing) return@fetch
+            result.fold(
+                onSuccess = { file ->
+                    audio.play(file, onDone = {
+                        if (gen == generation && playing) { index++; speakCurrent() }
+                    }, onError = { serverDown() })
+                },
+                onFailure = { serverDown() }
+            )
+        }
+        for (k in 1..2) sentences.getOrNull(index + k)?.let { neural.prefetch(it.text, speed) }
+    }
+
+    private fun serverDown() {
+        serverFailed = true
+        message = "Сервер голоса недоступен — читает голос телефона"
+        if (playing) speakCurrent()
     }
 
     /** The id of the utterance now expected ("ra-<generation>-<index>"); older ids are ignored. */

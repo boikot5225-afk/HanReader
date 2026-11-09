@@ -11,17 +11,23 @@ android {
         applicationId = "com.hanreader.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 38
-        versionName = "0.18.0"
+        versionCode = 39
+        versionName = "0.19.0"
         // Instrumented tests (app/src/androidTest) on emulators in CI.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Default neural voice server (reader can change it in the voice menu): gradle property,
+        // else environment variable, else none. HANREADER_VOICE_TOKEN is a CI secret.
+        fun setting(name: String) = (providers.gradleProperty(name).orNull ?: providers.environmentVariable(name).orNull ?: "")
+            .replace("\\", "").replace("\"", "")
+        buildConfigField("String", "VOICE_URL", "\"${setting("HANREADER_VOICE_URL")}\"")
+        buildConfigField("String", "VOICE_TOKEN", "\"${setting("HANREADER_VOICE_TOKEN")}\"")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     // zh/lexicon.dat is gzip data: store it as is. (A ".gz" asset would be silently unpacked by the build.)
     androidResources { noCompress += "dat" }
     testOptions {

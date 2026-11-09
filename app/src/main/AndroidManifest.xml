@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Only for the neural voice, when the reader turns it on: the text to speak goes to the voice server. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <queries>
         <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>
         <!-- Translator apps that take selected text («Открыть в переводчике»). -->
