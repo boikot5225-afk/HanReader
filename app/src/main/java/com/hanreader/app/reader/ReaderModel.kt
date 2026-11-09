@@ -508,9 +508,18 @@ data class RToken(
     val syllables: List<String> = emptyList()
 )
 
+/** A footnote mark in a paragraph: characters [start, end) and the note's text. */
+data class ReaderNote(val start: Int, val end: Int, val text: String)
+
 sealed interface ReaderBlock {
-    /** [text]: simplified (dictionary, search, cards); [shown]: as drawn, same length. */
-    data class Text(val text: String, val heading: Boolean, val tokens: List<RToken>, val shown: String = text) : ReaderBlock
+    /** [text]: simplified (dictionary, search, cards); [shown]: as drawn, same length; [notes]: footnote marks. */
+    data class Text(
+        val text: String,
+        val heading: Boolean,
+        val tokens: List<RToken>,
+        val shown: String = text,
+        val notes: List<ReaderNote> = emptyList()
+    ) : ReaderBlock
     data class Image(val path: String) : ReaderBlock
 }
 
@@ -546,7 +555,8 @@ object ChapterBuilder {
                 is EpubBlock.Text -> {
                     chars += b.text.length
                     val p = prepare(b.text)
-                    ReaderBlock.Text(p.text, b.heading, p.tokens, p.shown)
+                    val notes = b.notes.mapNotNull { n -> book.note(index, n.ref)?.let { ReaderNote(n.start, n.end, it) } }
+                    ReaderBlock.Text(p.text, b.heading, p.tokens, p.shown, notes)
                 }
             }
         }

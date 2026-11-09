@@ -18,9 +18,16 @@ data class TocEntry(val title: String, val chapterIndex: Int, val depth: Int)
 
 /** What the reader renders: paragraphs, headings and images. Styling from the book is dropped. */
 sealed interface EpubBlock {
-    data class Text(val text: String, val heading: Boolean) : EpubBlock
+    /** [notes]: footnote marks inside [text] (the «4» of «Villa4»), resolved by [BookSource.note]. */
+    data class Text(val text: String, val heading: Boolean, val notes: List<EpubNote> = emptyList()) : EpubBlock
     data class Image(val path: String) : EpubBlock
 }
+
+/**
+ * A footnote mark: characters [start, end) of a paragraph, and where its text is: "a:path#id" for
+ * a link, "n:4" for a bare superscript number (the notes are then in a «Notas» / «Notes» section).
+ */
+data class EpubNote(val start: Int, val end: Int, val ref: String)
 
 class EpubException(message: String) : Exception(message)
 
@@ -92,6 +99,75 @@ class EpubBook(file: File) : BookSource {
         return out
     }
 
+    private val noteDocs = HashMap<String, Document>()
+
+    /**
+     * A footnote's text. A link: the element it points to (or the paragraph holding it). A bare
+     * number: the line «4. …» of the book's notes section («Notas», «Notes», «Примечания»), in the
+     * part for this chapter («Capítulo 4: Cárteles» for the chapter «4. Cárteles»).
+     */
+    override fun note(chapterIndex: Int, ref: String): String? = runCatching {
+        when {
+            ref.startsWith("a:") -> {
+                val target = ref.removePrefix("a:")
+                val path = target.substringBefore('#').let { if (it == CURRENT) chapters[chapterIndex].path else it }
+                val id = target.substringAfter('#')
+                val doc = synchronized(noteDocs) { noteDocs.getOrPut(path) { Jsoup.parse(text(path) ?: return@runCatching null) } }
+                val el = doc.getElementById(id) ?: doc.selectFirst("a[name=$id]") ?: return@runCatching null
+                var block: Element = el
+                while (block.text().trim().length < 4 && block.parent() != null && block.parent() != doc.body()) block = block.parent()!!
+                if (block.normalName() in setOf("a", "sup", "span", "em", "i", "b")) {
+                    block = block.parents().firstOrNull { it.normalName() in BLOCKS } ?: block
+                }
+                block.text().trim().take(4000).ifEmpty { null }
+            }
+            ref.startsWith("n:") -> numberedNote(chapterIndex, ref.removePrefix("n:"))
+            else -> null
+        }
+    }.getOrNull()
+
+    private class NoteGroup(val title: String, val notes: Map<String, String>)
+
+    /** The book's notes section, by part: the part's heading and its numbered notes. Built once. */
+    private val noteGroups: List<NoteGroup> by lazy {
+        val groups = ArrayList<NoteGroup>()
+        for (c in chapters) {
+            val texts = blocks(c.index).filterIsInstance<EpubBlock.Text>()
+            val first = texts.firstOrNull()?.text?.trim()?.lowercase().orEmpty()
+            val isNotes = first in NOTE_TITLES || NOTE_FILE.containsMatchIn(c.path.substringAfterLast('/'))
+            if (!isNotes) continue
+            var title = ""
+            var notes = LinkedHashMap<String, String>()
+            fun close() { if (notes.isNotEmpty()) groups += NoteGroup(title, notes) }
+            for (t in texts) {
+                for (line in t.text.lines()) {
+                    val l = line.trim()
+                    val m = NOTE_LINE.matchEntire(l)
+                    when {
+                        m != null -> notes.putIfAbsent(m.groupValues[1], m.groupValues[2].trim())
+                        PART_LINE.containsMatchIn(l) && l.length < 120 -> { close(); title = l; notes = LinkedHashMap() }
+                    }
+                }
+            }
+            close()
+        }
+        groups
+    }
+
+    private fun numberedNote(chapterIndex: Int, number: String): String? {
+        val groups = noteGroups
+        if (groups.isEmpty()) return null
+        if (groups.size == 1) return groups[0].notes[number]
+        val chapterTitle = chapters[chapterIndex].title
+        fun core(t: String) = t.substringAfter(':').lowercase().replace(Regex("^[\\s\\d.)\\-–—]+"), "")
+            .replace(Regex("^(cap[ií]tulo|chapter|глава)\\s*\\S*\\s*"), "").trim()
+        fun num(t: String) = Regex("\\d{1,3}").find(t)?.value
+        val c = core(chapterTitle)
+        val byTitle = groups.firstOrNull { g -> val gc = core(g.title); c.isNotEmpty() && gc.isNotEmpty() && (gc == c || gc.contains(c) || c.contains(gc)) }
+        val byNumber = num(chapterTitle)?.let { n -> groups.firstOrNull { num(it.title) == n } }
+        return (byTitle ?: byNumber)?.notes?.get(number)
+    }
+
     override fun cover(): ByteArray? {
         coverPath?.let { p -> bytes(p)?.let { return it } }
         // Fallback: the first image of the first chapters.
@@ -153,6 +229,10 @@ class EpubBook(file: File) : BookSource {
                     when {
                         tag in SKIP -> Unit
                         tag == "br" -> buffer.append('\n')
+                        noteRef(node) != null -> {
+                            if (buffer.isEmpty()) bufferHeading = heading
+                            buffer.append(MARK_START).append(noteRef(node)).append(MARK_TEXT).append(node.text().trim()).append(MARK_END)
+                        }
                         tag == "img" || tag == "image" -> {
                             val src = node.attr("src").ifEmpty { node.attr("xlink:href") }.ifEmpty { node.attr("href") }
                             if (src.isNotBlank()) {
@@ -178,13 +258,55 @@ class EpubBook(file: File) : BookSource {
             buffer.append(text)
         }
 
+        /** A footnote mark: a link to a note, or a bare superscript number; null for other elements. */
+        private fun noteRef(el: Element): String? {
+            val tag = el.normalName()
+            val text = el.text().trim()
+            if (tag == "a") {
+                val href = el.attr("href").ifEmpty { el.attr("xlink:href") }
+                if (!href.contains('#')) return null
+                val noteref = el.attr("epub:type").contains("noteref") || el.attr("role").contains("noteref")
+                val short = text.length in 1..4 && (el.selectFirst("sup") != null || NOTE_TEXT.matches(text))
+                if (!noteref && !short) return null
+                val path = href.substringBefore('#').let { if (it.isEmpty()) "" else resolve(base, it) }
+                return "a:" + path.ifEmpty { CURRENT } + "#" + href.substringAfter('#')
+            }
+            if (tag == "sup" && el.selectFirst("a") == null) {
+                val n = NOTE_NUMBER.matchEntire(text)?.groupValues?.get(1) ?: return null
+                return "n:$n"
+            }
+            return null
+        }
+
         fun flush() {
-            val text = buffer.toString()
+            val raw = buffer.toString()
                 .lines()
                 .joinToString("\n") { it.replace(SPACES, " ").trim(' ', '　', ' ') }
                 .trim()
             buffer.setLength(0)
-            if (text.isNotEmpty()) out += EpubBlock.Text(text, bufferHeading)
+            // Footnote marks travel through the text as MARK_START ref MARK_TEXT shown MARK_END.
+            val notes = ArrayList<EpubNote>()
+            val text = StringBuilder(raw.length)
+            var i = 0
+            while (i < raw.length) {
+                val c = raw[i]
+                if (c == MARK_START) {
+                    val t = raw.indexOf(MARK_TEXT, i)
+                    val e = raw.indexOf(MARK_END, i)
+                    if (t > i && e > t) {
+                        val shown = raw.substring(t + 1, e)
+                        val start = text.length
+                        text.append(shown)
+                        if (shown.isNotEmpty()) notes += EpubNote(start, text.length, raw.substring(i + 1, t))
+                        i = e + 1
+                        continue
+                    }
+                }
+                text.append(c)
+                i++
+            }
+            val clean = text.toString()
+            if (clean.isNotBlank()) out += EpubBlock.Text(clean, bufferHeading, notes)
         }
     }
 
@@ -197,6 +319,20 @@ class EpubBook(file: File) : BookSource {
             "nav", "hr", "body", "main", "center"
         )
         private val SPACES = Regex("[ \\t\\r\\u00A0]+")
+        /** The first line of a notes section. */
+        private val NOTE_TITLES = setOf("notas", "notes", "примечания", "сноски", "комментарии", "notas del autor", "endnotes", "注释", "注", "尾注")
+        private val NOTE_FILE = Regex("(?i)nota|note|footnote|endnote|primech")
+        /** «4. text», «4) text». */
+        private val NOTE_LINE = Regex("(\\d{1,3})[.)]\\s+(.+)")
+        /** The heading of a part of the notes: «Capítulo 4: Cárteles», «Chapter 2», «Глава 3», «第三章». */
+        private val PART_LINE = Regex("(?i)^(cap[ií]tulo|chapter|глава|parte|part)\\b|^第.{1,6}[章回]")
+        private const val MARK_START = '\uE000'
+        private const val MARK_TEXT = '\uE001'
+        private const val MARK_END = '\uE002'
+        /** A link inside the same file. */
+        const val CURRENT = "."
+        private val NOTE_TEXT = Regex("[\\[(]?(\\d{1,3}|[*†‡a-z])[\\])]?")
+        private val NOTE_NUMBER = Regex("[\\[(]?(\\d{1,3})[\\])]?")
 
         private fun xml(text: String): Document = Jsoup.parse(text, "", Parser.xmlParser())
 

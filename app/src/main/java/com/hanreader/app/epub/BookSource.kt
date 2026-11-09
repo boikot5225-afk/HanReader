@@ -23,6 +23,8 @@ interface BookSource : Closeable {
     fun bytes(path: String): ByteArray?
     /** The cover image, or null (the library then draws one). */
     fun cover(): ByteArray?
+    /** The text of a footnote mark [ref] (see [EpubNote]) found in chapter [chapterIndex], or null. */
+    fun note(chapterIndex: Int, ref: String): String? = null
 }
 
 enum class BookFormat(val extension: String) { EPUB("epub"), FB2("fb2"), FB2_ZIP("fb2.zip"), TXT("txt"), DOCX("docx"), DOC("doc") }
