@@ -1,6 +1,9 @@
 Russian meanings (zh/ru_ai.tsv): machine translation of CC-CEDICT English meanings into Russian,
-made once with the DeepSeek API (November 2026) by tools/translate_cedict_ru.py; not reviewed by a lexicographer.
-Source: CC-CEDICT, MDBG, https://www.mdbg.net/chinese/dictionary?page=cc-cedict
+made once with the DeepSeek API (November 2026) by tools/translate_cedict_ru.py; extended with names,
+idioms and words of the English Wiktionary (tools/translate_zh_ru.py) and checked entry by entry by a
+second model pass (tools/verify_ru_wiktionary.py); not reviewed by a lexicographer.
+Sources: CC-CEDICT, MDBG, https://www.mdbg.net/chinese/dictionary?page=cc-cedict;
+English Wiktionary via https://kaikki.org/dictionary/Chinese/ (CC BY-SA 4.0)
 Licence of the derived file: Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0),
 https://creativecommons.org/licenses/by-sa/4.0/
 
