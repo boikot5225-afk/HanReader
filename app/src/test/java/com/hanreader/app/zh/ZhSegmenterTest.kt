@@ -27,6 +27,19 @@ class ZhSegmenterTest {
         assertEquals("Zhōng guó", e!!.pinyin)
     }
 
+    /** Chengyu and sayings from the English Wiktionary are whole words with a reading per character. */
+    @Test
+    fun wiktionarySayingsAreWholeWords() {
+        assertEquals(listOf("他们", "一决胜负"), words("他们一决胜负"))
+        assertEquals(listOf("你", "别", "跟", "他", "一个鼻孔出气"), words("你别跟他一个鼻孔出气"))
+        assertEquals(listOf("一方水土养一方人"), words("一方水土养一方人"))
+        val e = dict.lookup("一决胜负")!!
+        assertTrue(e.gloss.startsWith("(idiom)"))
+        assertEquals(4, e.pinyin.split(' ').size)
+        // A word the segmenter knew without a meaning now has one.
+        assertTrue(dict.lookup("一举成名")!!.hasDefinition)
+    }
+
     /** The binary lexicon holds exactly what the source TSV (data/zh/lexicon.dat) holds. */
     @Test
     fun binaryLexiconMatchesTheSource() {

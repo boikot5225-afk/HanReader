@@ -1,0 +1,8 @@
+Chinese words, chengyu, proverbs and xiehouyu with their Mandarin readings and English meanings
+(added to zh/lexicon.bin, listed in data/zh/wikt_added.tsv of the source repository): English Wiktionary
+(en.wiktionary.org), via the wiktextract extract published at https://kaikki.org/dictionary/Chinese/
+(downloaded November 2026).
+Wiktionary text: Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0), authors: Wiktionary contributors.
+https://creativecommons.org/licenses/by-sa/4.0/
+The derived data, and the Russian machine translation made from it (zh/ru_ai.tsv), are distributed
+under the same licence.
