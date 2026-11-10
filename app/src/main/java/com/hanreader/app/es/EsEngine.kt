@@ -189,6 +189,8 @@ class EsEngine(
             if (words < 2 || words > 4) continue
             val key = phraseKey(tokens, text, a, b)?.takeIf { usefulPhrase(it) } ?: continue
             // «volver a» is «снова» only before an infinitive (volvió a llamar), not in «volvió a casa».
+            // A verb + preposition after an article is a noun + preposition: «el tratado de» «договор», not tratar de.
+            if (a > 1 && tokens[a - 1].text == " " && tokens[a - 2].text.lowercase() in NOUN_MARKERS && entry(key)?.pos == "гл.") continue
             if (key in BEFORE_INFINITIVE && !(tokens.getOrNull(b + 1)?.text == " " && isInfinitive(tokens.getOrNull(b + 2)?.text))) continue
             val reflexiveKey = reflexiveBefore(tokens, a) && key.substringBefore(' ').endsWith("se")
             val score = words + if (reflexiveKey) 10 else 0
@@ -232,11 +234,16 @@ class EsEngine(
             if (a.size < 2) continue
             val choice = when {
                 after in setOf("a", "al") && a.any { it.entry.lemma == "ir" } && a.any { it.entry.lemma == "ser" } -> "ir"
-                before != null && (before in VERB_PRONOUNS || before in SUBJECT_PRONOUNS || before == "no" || before in HABER) && a.first().entry.pos != "гл." ->
+                // After haber only a participle: «había una casa» stays «una».
+                before != null && before in HABER && a.first().entry.pos != "гл." ->
+                    a.firstOrNull { it.entry.pos == "гл." && "причастие" in it.grammar }?.entry?.key
+                before != null && (before in VERB_PRONOUNS || before in SUBJECT_PRONOUNS || before == "no") && a.first().entry.pos != "гл." ->
                     a.firstOrNull { it.entry.pos == "гл." }?.entry?.key
+                // A capitalised word inside a sentence is a name (el Caribe): its part of speech is not guessed.
+                t.text[0].isUpperCase() && k > 0 -> null
                 // After an article or a possessive, a verb or adverb that is also a noun is the noun: el poder «власть».
                 before != null && before in NOUN_MARKERS && a.first().entry.pos in setOf("гл.", "нар.") ->
-                    a.firstOrNull { it.entry.pos == "сущ." }?.entry?.key
+                    a.firstOrNull { it.entry.pos == "сущ." && it.entry.ru.firstOrNull()?.startsWith("буква") != true }?.entry?.key
                 // With no article or adjective before them, «mañana» is «завтра» and «tarde» «поздно»; «la mañana» is «утро».
                 t.text.lowercase() in BARE_ADVERBS && a.first().entry.pos == "сущ." && !(before != null && (before in NOUN_MARKERS ||
                     before in setOf("de", "esta", "esa", "aquella") || analyses(before).firstOrNull()?.entry?.pos in setOf("прил.", "числ."))) ->
@@ -247,7 +254,7 @@ class EsEngine(
                     a.firstOrNull { it.entry.pos == "прил." }?.entry?.key
                 // After an article, a numeral or an adjective, with no noun following, an adjective that is also a noun
                 // is the noun: «un joven llegó», «los ricos»; «el joven médico» stays an adjective.
-                before != null && a.first().entry.pos == "прил." && a.any { it.entry.pos == "сущ." } &&
+                before != null && a.first().entry.pos == "прил." && a.any { it.entry.pos == "сущ." } && t.text.lowercase() !in ORDINALS &&
                     (before in NOUN_MARKERS || analyses(before).let { b -> b.isNotEmpty() && b.all { it.entry.pos in setOf("прил.", "числ.") } }) &&
                     (after == null || analyses(after).firstOrNull()?.entry?.pos != "сущ.") ->
                     a.firstOrNull { it.entry.pos == "сущ." }?.entry?.key
@@ -276,12 +283,12 @@ class EsEngine(
             val v = (a.firstOrNull { it.entry.key == t.pinyin } ?: a.firstOrNull())?.takeIf { it.entry.pos == "гл." } ?: continue
             fun linked(x: Int, y: Int) = (x + 1 until y).all { tokens[it].kind == TokenKind.SPACE }
             val before = words.getOrNull(k - 1)?.takeIf { linked(it, i) }?.let { tokens[it].text.lowercase() }
+            val lemma = v.entry.lemma
             val after = words.getOrNull(k + 1)?.takeIf { linked(i, it) }?.let { tokens[it].text.lowercase() }
             // «se dice que», «se señaló que»: impersonal, the plain verb.
-            val reflexive = v.grammar.endsWith("+ se") || (before == "se" && after != "que") ||
+            val reflexive = lemma !in NOT_PRONOMINAL && (v.grammar.endsWith("+ se") || (before == "se" && after != "que") ||
                 (before == "me" && v.grammar.startsWith("1 л. ед. ч.")) || (before == "te" && v.grammar.startsWith("2 л. ед. ч.")) ||
-                (before == "nos" && v.grammar.startsWith("1 л. мн. ч."))
-            val lemma = v.entry.lemma
+                (before == "nos" && v.grammar.startsWith("1 л. мн. ч.")))
             val gap = words.getOrNull(k + 1)?.takeIf { linked(i, it) }
             val prep = words.getOrNull(k + 2)?.takeIf { gap != null && linked(gap, it) && tokens[gap].text.lowercase().let { g -> g.endsWith("mente") || g in GAP_ADVERBS } }
                 ?.let { tokens[it].text.lowercase() }?.takeIf { it in VERB_PREPOSITIONS }
@@ -558,6 +565,10 @@ class EsEngine(
         private val VERB_PREPOSITIONS = setOf("a", "de", "con", "en", "por", "para")
         /** Verb + preposition that mean something else only before an infinitive: «volvió a llamar» «снова», not «volvió a casa». */
         private val BEFORE_INFINITIVE = setOf("volver a", "echar a", "echarse a", "ponerse a", "acabar de", "llegar a", "acabar por", "terminar por")
+        /** Verbs whose forms after «se» are nearly always impersonal or passive (se está investigando, se tiene que). */
+        private val NOT_PRONOMINAL = setOf("estar", "tener", "haber", "ser", "poder", "deber")
+        /** Ordinals: «el segundo» is «второй», not «секунда». */
+        private val ORDINALS = setOf("primero", "primera", "segundo", "segunda", "tercero", "tercera", "último", "última")
         private val BARE_ADVERBS = setOf("mañana", "tarde")
         private val NOUN_MARKERS = setOf("el", "la", "los", "las", "una", "un", "del", "su", "sus", "mi", "mis", "tu", "tus", "este", "ese", "aquel",
             "estos", "esos", "nuestro", "nuestra", "nuestros", "nuestras", "unos", "unas", "cada", "ningún", "algún")

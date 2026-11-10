@@ -334,20 +334,19 @@ def main(ru_path, en_path, out_dir):
                 continue
             ru[w] = [x.strip() for x in it["ru"].split(";") if x.strip()]
             source[w], short[w], pos[w] = "a", it["short"], "гл."
-    # Idioms Wiktionary lacks (traer cola «иметь последствия»), written for HanReader; a Wiktionary
-    # entry with a Russian meaning wins.
+    # Idioms Wiktionary lacks (traer cola «иметь последствия») and corrections of the most frequent
+    # pronominal verbs and verb + preposition (se volvió «стал», pasar por «пройти через»), written
+    # for HanReader; they win over every other source.
     idioms_path = os.path.join(data, "idioms.tsv")
     if os.path.exists(idioms_path):
         for line in open(idioms_path, encoding="utf-8"):
             if line.startswith("#") or not line.strip():
                 continue
             w, p, senses, hint = line.rstrip("\n").split("\t")
-            if ru.get(w):
-                continue
             ru[w] = [x.strip() for x in senses.split(";") if x.strip()]
             source[w] = "a"
             short[w] = hint
-            pos.setdefault(w, p)
+            pos[w] = p
     with open(os.path.join(data, "regional_words.txt"), "w", encoding="utf-8") as f:
         f.write("\n".join(sorted(regional)) + "\n")
 

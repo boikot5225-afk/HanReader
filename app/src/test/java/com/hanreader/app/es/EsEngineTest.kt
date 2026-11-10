@@ -224,6 +224,14 @@ class EsEngineTest {
         // An adjective that is also a noun, with no noun after it.
         assertEquals("юноша", gloss("Un joven llegó tarde.", "joven"))
         assertEquals("молодой", gloss("El joven médico llegó.", "joven"))
+        // Checked over a whole book.
+        assertEquals("становиться", gloss("La situación se volvió peligrosa.", "volvió"))
+        assertEquals("находиться", gloss("Se estaba investigando.", "estaba"))
+        assertFalse(gloss("Firmaron el tratado de paz.", "tratado") == "пытаться")
+        assertFalse(gloss("El tratado de comercio.", "tratado") == "пытаться")
+        assertEquals("второй", gloss("Llegó el segundo.", "segundo"))
+        assertFalse(gloss("Había una casa.", "una") == "объединять")
+        assertEquals("пройти через", gloss("Han pasado por mucho.", "pasado"))
     }
 
     @Test
