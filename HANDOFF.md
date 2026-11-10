@@ -1,6 +1,6 @@
 # HanReader — передача дел следующей сессии
 
-Состояние на 8 ноября 2026, версия **0.19.0** (versionCode 39), ветка `ccr-954eeb21-p65jbl`.
+Состояние на 8 ноября 2026, версия **0.20.0** (versionCode 40), ветка `ccr-954eeb21-p65jbl`.
 
 ## Владелец и договорённости
 
@@ -46,6 +46,14 @@ Android-читалка китайских книг (Kotlin, Jetpack Compose, Roo
 - RuStore: приложение на модерации (APK, без PEPK). Материалы: `store/LISTING_ru.md`, `store/icon-512.png`, `store/screens/` (1080×1920).
 - После модерации: заменить «Скоро в RuStore» на сайте (`docs/index.html`) и в README настоящей ссылкой.
 - Возможная проблема: сообщения о запрете монетизации/публикации для физлиц и самозанятых в RuStore (проверить, если модерация откажет), правила проверки разработчиков Google с 30.09.2026.
+
+## Словарь (0.20.0)
+
+- lexicon.dat = CC-CEDICT + Jieba + английский Викисловарь (kaikki.org): `tools/extract_wikt_zh.py` → `tools/merge_wikt_zh.py` (значения 12,6 тыс. слов без значения, 1,6 тыс. новых идиом/пословиц; список — `data/zh/wikt_added.tsv`), затем `tools/build_lexicon_bin.py`. Пометки в английском: `(idiom)`, `(proverb)`, `(xiehouyu)` → метка в карточке (`idiomKind`).
+- ru_ai.tsv (133 тыс.): `tools/dict_worklist.py` → `tools/translate_zh_ru.py` (виды word / name / idiom) → `tools/update_ru_ai.py`; весь ru_ai проверен `tools/verify_ru_wiktionary.py --source ru_ai.tsv` (1,5 тыс. исправлений, в основном «вариант X» → значение). Для идиом приложение показывает ru_ai раньше Викисловаря.
+- Счётные слова: `zh/measure.tsv` (`tools/extract_measure_words.py`), строка «Счётное слово» в карточке.
+- Без русского остались ~50 связанных иероглифов (咐, 徨…): модель отвечает с иероглифами, фильтр отбрасывает.
+- Исходники для повторной сборки (kaikki Chinese .jsonl.gz, ~156 МБ) в репозиторий не кладутся — скачиваются с kaikki.org.
 
 ## Известные ограничения
 

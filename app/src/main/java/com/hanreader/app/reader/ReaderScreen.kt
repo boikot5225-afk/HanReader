@@ -1327,6 +1327,10 @@ private fun WordSheet(
                     }
                 }
             }
+            // A set expression: said before its meaning, since it is not read word by word.
+            idiomKind(entry?.gloss)?.let {
+                Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            }
             OwnMeaning(word, userMeaning, onUserMeaning)
             if (russian.isNotEmpty()) {
                 russian.forEachIndexed { i, sense ->
@@ -1339,6 +1343,11 @@ private fun WordSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+            val measureWords = remember(word) { engine.measureWords(word) }
+            if (measureWords.isNotEmpty()) {
+                Text("Счётное слово: " + measureWords.joinToString(" · "), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (otherReadings.isNotEmpty()) {
                 Text("Другие чтения", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1432,9 +1441,6 @@ private fun WordSheet(
                     Text(if (isSaved) "Добавить пример к карточке" else "Сохранить в карточки", style = MaterialTheme.typography.titleMedium)
                 }
             }
-            if (entry?.gloss?.contains("(idiom)") == true) {
-                Text("成语 · идиома", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
             val lexiconName = engine.nameKind(word)
             val isUserName = word in userNames
             if (lexiconName != null || isUserName) {
@@ -1466,6 +1472,15 @@ private fun WordSheet(
             speaker.message.takeIf { it.isNotEmpty() }?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }
+}
+
+/** The kind of set expression a dictionary meaning marks, CC-CEDICT style: chengyu, proverb, xiehouyu. */
+internal fun idiomKind(gloss: String?): String? = when {
+    gloss == null -> null
+    gloss.contains("(xiehouyu)") -> "歇后语 · иносказание: первая часть намекает на смысл второй"
+    gloss.contains("(proverb)") -> "谚语 · пословица"
+    gloss.contains("(idiom)") -> "成语 · идиома: смысл не складывается из слов"
+    else -> null
 }
 
 /** A grammar construction the tapped word belongs to: its pattern, what it means, an example. */

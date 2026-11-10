@@ -76,8 +76,16 @@ class ZhEngine(
     /** Simplified <-> traditional tables. */
     val script: ZhScript = ZhScript.NONE,
     /** Single characters by reading (assets/zh/ru_chars.tsv): 得 -> [dé: получить…, de: частица…], most frequent first. */
-    private val russianChars: Map<String, List<Pair<String, String>>> = emptyMap()
+    private val russianChars: Map<String, List<Pair<String, String>>> = emptyMap(),
+    /** Measure words of nouns (assets/zh/measure.tsv): 桌子 -> [张, 套]. */
+    private val measures: Map<String, List<String>> = emptyMap()
 ) {
+    /** The measure words of noun [word] with their readings ("张 zhāng"), most common first; empty if none known. */
+    fun measureWords(word: String): List<String> = measures[word].orEmpty().map { m ->
+        val py = dictionary.lookup(m)?.pinyin?.substringBefore(' ')?.lowercase().orEmpty()
+        if (py.isEmpty()) m else "$m $py"
+    }
+
     enum class NameKind(val title: String) { PERSON("человек"), PLACE("место"), ORGANISATION("организация") }
 
     /** Kind of a proper name from the names lexicon, or null for an ordinary word. */
@@ -90,13 +98,14 @@ class ZhEngine(
 
     enum class RussianSource(val label: String) {
         WIKTIONARY("Викисловарь"),
-        AI("машинный перевод CC-CEDICT"),
+        AI("машинный перевод CC-CEDICT и Викисловаря"),
         READING("машинный перевод CC-CEDICT, по чтению")
     }
 
     /** Where the Russian meaning of a word comes from, or null when there is none. */
     fun russianSource(word: String): RussianSource? = when {
         word in russianChars -> RussianSource.READING
+        word in russianAi && isSaying(word) -> RussianSource.AI
         word in russian -> RussianSource.WIKTIONARY
         word in russianAi -> RussianSource.AI
         else -> null
@@ -124,13 +133,20 @@ class ZhEngine(
     /**
      * Russian senses of a word. A single character takes the meanings of the reading on the page
      * ([reading], e.g. 得 de after a verb), since a character's Wiktionary page mixes all its
-     * readings. Words: the Russian Wiktionary first, then the CC-CEDICT translation.
+     * readings. Idioms and proverbs: the machine translation («смысл; букв.: …») first. Other words:
+     * the Russian Wiktionary first, then the machine translation.
      */
     fun russianSenses(word: String, reading: String? = null): List<String> {
         charEntry(word, reading)?.let { e -> return e.second.split(";").map { it.trim() }.filter { it.isNotEmpty() } }
+        // Idioms and proverbs: the machine translation gives the figurative sense and «букв.: …».
+        if (isSaying(word)) russianAi[word]?.let { v -> return v.split(";").map { it.trim() }.filter { it.isNotEmpty() } }
         russian[word]?.let { v -> return v.split(" ; ").map { it.trim() }.filter { it.isNotEmpty() } }
         return russianAi[word]?.split(";")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
     }
+
+    /** A chengyu, proverb or xiehouyu (marked in its English meaning, CC-CEDICT style). */
+    private fun isSaying(word: String): Boolean = word.length >= 3 &&
+        dictionary.lookup(word)?.gloss?.let { g -> "(idiom)" in g || "(proverb)" in g || "(xiehouyu)" in g } == true
 
     private fun toneless(p: String): String = java.text.Normalizer.normalize(p.lowercase(), java.text.Normalizer.Form.NFD)
         .filter { it in 'a'..'z' }.replace("v", "u")
@@ -274,6 +290,17 @@ class ZhEngine(
         private val REFERENCE = Regex("ключ \\d+|\\d+ черт|cangjie|метод ввода|четырёхугольник", RegexOption.IGNORE_CASE)
 
         /** assets/zh/ru_chars.tsv: character \t reading \t senses, readings in order of frequency. */
+        /** assets/zh/measure.tsv: noun \t measure words, comma-separated. */
+        fun parseMeasures(lines: Sequence<String>): Map<String, List<String>> {
+            val map = HashMap<String, List<String>>(4_000)
+            for (line in lines) {
+                if (line.startsWith("#")) continue
+                val tab = line.indexOf('\t')
+                if (tab > 0) map[line.substring(0, tab)] = line.substring(tab + 1).split(',').filter { it.isNotBlank() }
+            }
+            return map
+        }
+
         fun parseRussianChars(lines: Sequence<String>): Map<String, List<Pair<String, String>>> {
             val map = HashMap<String, MutableList<Pair<String, String>>>(8_000)
             for (line in lines) {
@@ -316,7 +343,8 @@ class ZhEngine(
                         val ruAi = app.assets.open("zh/ru_ai.tsv").bufferedReader().useLines { parseRussian(it) }
                         val names = app.assets.open("zh/names.tsv").bufferedReader().useLines { parseNames(it) }
                         val ruChars = runCatching { app.assets.open("zh/ru_chars.tsv").bufferedReader().useLines { parseRussianChars(it) } }.getOrDefault(emptyMap())
-                        f.complete(ZhEngine(dict, ms, hsk, ru, ruAi, names, script, ruChars))
+                        val measures = runCatching { app.assets.open("zh/measure.tsv").bufferedReader().useLines { parseMeasures(it) } }.getOrDefault(emptyMap())
+                        f.complete(ZhEngine(dict, ms, hsk, ru, ruAi, names, script, ruChars, measures))
                     } catch (e: Throwable) {
                         c.completeExceptionally(e)
                         f.completeExceptionally(e)

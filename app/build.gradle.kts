@@ -11,8 +11,8 @@ android {
         applicationId = "com.hanreader.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 39
-        versionName = "0.19.0"
+        versionCode = 40
+        versionName = "0.20.0"
         // Instrumented tests (app/src/androidTest) on emulators in CI.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Default neural voice server (reader can change it in the voice menu): gradle property,

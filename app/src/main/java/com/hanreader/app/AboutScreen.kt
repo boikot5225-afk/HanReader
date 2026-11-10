@@ -43,7 +43,8 @@ internal data class Credit(val what: String, val source: String, val license: St
 internal val CREDITS = listOf(
     Credit("Китайско-английский словарь", "CC-CEDICT, MDBG", "CC BY-SA 4.0", "CC-CEDICT_NOTICE.txt"),
     Credit("Русские значения", "Русский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "RU_WIKTIONARY_NOTICE.txt"),
-    Credit("Машинный перевод значений на русский", "производная от CC-CEDICT, перевод DeepSeek", "CC BY-SA 4.0", "RU_AI_NOTICE.txt"),
+    Credit("Идиомы, пословицы и слова", "Английский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "EN_WIKTIONARY_NOTICE.txt"),
+    Credit("Машинный перевод значений на русский", "производная от CC-CEDICT и Викисловаря, перевод DeepSeek", "CC BY-SA 4.0", "RU_AI_NOTICE.txt"),
     Credit("Разбивка текста на слова", "Jieba 0.42.1", "MIT", "JIEBA_NOTICE.txt"),
     Credit("Имена собственные", "разметка словаря Jieba", "MIT", "NAMES_NOTICE.txt"),
     Credit("Чтения пиньинь", "pypinyin 0.53.0", "MIT", "PYPINYIN_NOTICE.txt"),
