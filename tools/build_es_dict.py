@@ -317,7 +317,10 @@ def main(ru_path, en_path, out_dir):
                 continue
             ru[w] = [x.strip() for x in it["ru"].split(";") if x.strip()]
             source[w], short[w] = "a", it["short"]
-            pos.setdefault(w, it["pos"])
+            # A verb phrase starts with a dictionary verb (ir a la yugular; «cráter volcánico» does not).
+            first = w.split()[0]
+            verb = pos.get(first) == "гл." or (first.endswith("se") and pos.get(first[:-2]) == "гл.")
+            pos.setdefault(w, "гл." if verb else "выраж." if it["pos"] == "гл." else it["pos"])
     # Idioms Wiktionary lacks (traer cola «иметь последствия»), written for HanReader; a Wiktionary
     # entry with a Russian meaning wins.
     idioms_path = os.path.join(data, "idioms.tsv")

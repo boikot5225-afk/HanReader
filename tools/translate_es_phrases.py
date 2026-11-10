@@ -13,6 +13,7 @@ Output: data/es/ru_phrases.jsonl: {"w": phrase, "pos": "гл.", "short": "…", 
 build_es_dict.py takes it in for phrases that have no Russian meaning yet.
 
 Usage: python3 tools/translate_es_phrases.py phrases.jsonl --out data/es/ru_phrases.jsonl [--shard 0/4]
+       python3 tools/translate_es_phrases.py phrases.jsonl --out data/es/ru_phrases.jsonl --verify   # a second look
 """
 import argparse
 import json
@@ -40,6 +41,53 @@ SYSTEM = (
     "непонятно или это не выражение, а имя, фамилия или название, верни пустые short и ru. "
     "Пиши только по-русски. Ответ — только JSON-объект {\"items\":[{\"w\":выражение,\"short\":…,\"ru\":…}]} в том же порядке."
 )
+
+
+VERIFY = (
+    "Ты редактор испанско-русского словаря и хорошо знаешь испанскую фразеологию. Даны испанские устойчивые выражения "
+    "и их русские переводы, сделанные по толкованиям Викисловаря; толкования иногда ошибочны. Проверь каждый перевод по "
+    "тому, что выражение действительно значит в живом испанском (hablar entre dientes — «бормотать сквозь зубы», а не "
+    "«говорить напрямик»). Если перевод верен, верни его без изменений; если неверен или неточен — исправь. Пометы в "
+    "скобках сохраняй. Формат тот же: short — 1–4 слова без помет; ru — 1–3 значения через «; ». Пиши только по-русски. "
+    "Ответ — только JSON-объект {\"items\":[{\"w\":выражение,\"short\":…,\"ru\":…}]} в том же порядке."
+)
+
+
+def verify(path, model, batch=40):
+    """A second look at the translated phrases: [path] is rewritten with the corrected ones."""
+    key = os.environ.get("DEEPSEEK_API_KEY", "placeholder-inserted-by-proxy")
+    rows = [json.loads(l) for l in open(path, encoding="utf-8") if l.strip()]
+    todo = [r for r in rows if r["ru"] and not r.get("checked")]
+    changed = 0
+    for i in range(0, len(todo), batch):
+        part = todo[i: i + batch]
+        body = {
+            "model": model, "temperature": 0.1, "response_format": {"type": "json_object"}, "thinking": {"type": "disabled"},
+            "messages": [{"role": "system", "content": VERIFY},
+                         {"role": "user", "content": "Выражение\tперевод:\n" + "\n".join(f"{r['w']}\t{r['ru']}" for r in part)}],
+        }
+        req = urllib.request.Request(API, data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+                                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"})
+        try:
+            with urllib.request.urlopen(req, timeout=240) as resp:
+                items = json.loads(json.loads(resp.read().decode("utf-8"))["choices"][0]["message"]["content"]).get("items", [])
+        except (urllib.error.URLError, json.JSONDecodeError, KeyError, OSError) as e:
+            print(f"batch {i}: {e}", file=sys.stderr)
+            continue
+        by = {r["w"]: r for r in part}
+        for it in items:
+            r = by.get(str(it.get("w", "")).strip())
+            short = " ".join(str(it.get("short", "")).split()).strip(" ;")
+            ru = " ".join(str(it.get("ru", "")).split()).strip(" ;")
+            if r is None or not (short and ru and cyrillic(short) and cyrillic(ru)):
+                continue
+            if ru != r["ru"]:
+                changed += 1
+                print(f"{r['w']}: {r['ru']} -> {ru}", flush=True)
+            r["short"], r["ru"], r["checked"] = short, ru, True
+        with open(path, "w", encoding="utf-8") as out:
+            out.write("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
+    print(json.dumps({"checked": len(todo), "changed": changed}))
 
 
 def extract():
@@ -107,7 +155,10 @@ def main():
     ap.add_argument("--batch", type=int, default=30)
     ap.add_argument("--model", default="deepseek-flash")
     ap.add_argument("--shard", default="0/1")
+    ap.add_argument("--verify", action="store_true", help="check the translations in --out against the real meaning of the phrases")
     args = ap.parse_args()
+    if args.verify:
+        return verify(args.out, args.model)
     k, n = (int(x) for x in args.shard.split("/"))
     key = os.environ.get("DEEPSEEK_API_KEY", "placeholder-inserted-by-proxy")
     done = set()
