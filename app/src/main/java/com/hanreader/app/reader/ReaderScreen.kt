@@ -1295,14 +1295,20 @@ private fun WordSheet(
             else (if (selection.first != selection.last) e.phraseKey(tokens, block.text, selection.first, selection.last)?.let { e.analyses(it) } else null)
                 ?: e.analyses(word)
         val inContext = if (selection.first == selection.last) first.pinyin else ""
-        if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.key == inContext) 0 else 1 }
+        // A pronominal verb the context named (se limita: limitarse) goes before the plain verb.
+        val pronominal = if (e != null && inContext.endsWith("se") && ' ' !in inContext && all.none { it.entry.key == inContext })
+            all.firstOrNull { it.entry.lemma + "se" == inContext }?.let { v -> e.entry(inContext)?.let { com.hanreader.app.es.EsAnalysis(v.form, it, v.grammar) } }
+        else null
+        listOfNotNull(pronominal) + if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.key == inContext) 0 else 1 }
     }
+    // The plain verb of a pronominal one shown first (limitarse: limitar): what «Знаю» and the conjugation are about.
+    val esLemma = es.firstOrNull()?.entry?.lemma?.let { l -> l.removeSuffix("se").takeIf { b -> l.endsWith("se") && es.any { it.entry.lemma == b } } ?: l }
     val entry = remember(word) { zh?.lookup(word)?.takeIf { it.hasDefinition } }
     // A combination the dictionary lacks: its dictionary words (革命 + 党), else its characters.
     val composed = remember(word) { if (entry == null) zh?.compose(word) else null }
     val chars = remember(word) { if (entry == null) composed ?: zh?.characters(word).orEmpty() else emptyList() }
     // The word cards and «Знаю» are about: Spanish hablo → hablar; Chinese: the word itself.
-    val cardWord = remember(word) { if (zh != null) word else es.firstOrNull()?.entry?.lemma ?: engine.lemma(word) }
+    val cardWord = remember(word) { if (zh != null) word else esLemma ?: engine.lemma(word) }
     // One token: its reading in context (慢慢地 de, not the dictionary's dì).
     val reading = if (zh == null) "" else if (selection.first == selection.last && first.pinyin.isNotEmpty() && first.text.length == 1) first.pinyin
         else entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
@@ -1501,7 +1507,7 @@ private fun WordSheet(
                 }
                 // The whole conjugation of the verb, on demand (built from the forms table in the background).
                 if (es.first().entry.pos == "гл.") {
-                    val lemma = es.first().entry.lemma
+                    val lemma = esLemma ?: es.first().entry.lemma
                     var showConj by remember(lemma) { mutableStateOf(false) }
                     TextButton(onClick = { showConj = !showConj }, contentPadding = PaddingValues(0.dp)) {
                         Text(if (showConj) "Скрыть спряжение" else "Спряжение $lemma")

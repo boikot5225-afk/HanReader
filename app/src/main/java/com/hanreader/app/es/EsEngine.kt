@@ -188,12 +188,17 @@ class EsEngine(
             val words = (b - a) / 2 + 1
             if (words < 2 || words > 4) continue
             val key = phraseKey(tokens, text, a, b)?.takeIf { usefulPhrase(it) } ?: continue
+            // «volver a» is «снова» only before an infinitive (volvió a llamar), not in «volvió a casa».
+            if (key in BEFORE_INFINITIVE && !(tokens.getOrNull(b + 1)?.text == " " && isInfinitive(tokens.getOrNull(b + 2)?.text))) continue
             val reflexiveKey = reflexiveBefore(tokens, a) && key.substringBefore(' ').endsWith("se")
             val score = words + if (reflexiveKey) 10 else 0
             if (score > bestScore) { best = a..b; bestScore = score }
         }
         return best
     }
+
+    private fun isInfinitive(word: String?): Boolean =
+        word != null && analyses(word).any { it.entry.pos == "гл." && (it.grammar.startsWith("инфинитив") || it.entry.lemma == word.lowercase()) }
 
     /** The dictionary word of [word] (hablo → hablar); the word itself, lower-case, if unknown. */
     override fun lemma(word: String): String = analyses(word).firstOrNull()?.entry?.lemma ?: word.lowercase()
@@ -236,6 +241,16 @@ class EsEngine(
                 t.text.lowercase() in BARE_ADVERBS && a.first().entry.pos == "сущ." && !(before != null && (before in NOUN_MARKERS ||
                     before in setOf("de", "esta", "esa", "aquella") || analyses(before).firstOrNull()?.entry?.pos in setOf("прил.", "числ."))) ->
                     a.firstOrNull { it.entry.pos == "нар." }?.entry?.key
+                // After a word that is only a noun, a noun that is also an adjective is the adjective: «un oficial corrupto».
+                before != null && a.first().entry.pos == "сущ." && a.any { it.entry.pos == "прил." } && before !in NOUN_MARKERS &&
+                    analyses(before).let { b -> b.isNotEmpty() && b.all { it.entry.pos == "сущ." } } ->
+                    a.firstOrNull { it.entry.pos == "прил." }?.entry?.key
+                // After an article, a numeral or an adjective, with no noun following, an adjective that is also a noun
+                // is the noun: «un joven llegó», «los ricos»; «el joven médico» stays an adjective.
+                before != null && a.first().entry.pos == "прил." && a.any { it.entry.pos == "сущ." } &&
+                    (before in NOUN_MARKERS || analyses(before).let { b -> b.isNotEmpty() && b.all { it.entry.pos in setOf("прил.", "числ.") } }) &&
+                    (after == null || analyses(after).firstOrNull()?.entry?.pos != "сущ.") ->
+                    a.firstOrNull { it.entry.pos == "сущ." }?.entry?.key
                 else -> null
             }
             if (choice != null && choice != a.first().entry.key) out[i] = t.copy(pinyin = choice)
@@ -251,6 +266,32 @@ class EsEngine(
                 for (j in r.first + 1..r.last) if (tokens[j].kind == TokenKind.HAN) out[j] = out[j].copy(pinyin = IN_PHRASE)
                 while (k < words.size && words[k] <= r.last) k++
             }
+        }
+        // Verbs outside phrases: with a reflexive pronoun the pronominal verb (se limita: limitarse «ограничиваться»);
+        // with its preposition after an adverb, the verb with that preposition (contamos actualmente con: contar con).
+        for ((k, i) in words.withIndex()) {
+            val t = out[i]
+            if (t.pinyin == IN_PHRASE || ' ' in t.pinyin) continue
+            val a = analyses(t.text)
+            val v = (a.firstOrNull { it.entry.key == t.pinyin } ?: a.firstOrNull())?.takeIf { it.entry.pos == "гл." } ?: continue
+            fun linked(x: Int, y: Int) = (x + 1 until y).all { tokens[it].kind == TokenKind.SPACE }
+            val before = words.getOrNull(k - 1)?.takeIf { linked(it, i) }?.let { tokens[it].text.lowercase() }
+            val after = words.getOrNull(k + 1)?.takeIf { linked(i, it) }?.let { tokens[it].text.lowercase() }
+            // «se dice que», «se señaló que»: impersonal, the plain verb.
+            val reflexive = v.grammar.endsWith("+ se") || (before == "se" && after != "que") ||
+                (before == "me" && v.grammar.startsWith("1 л. ед. ч.")) || (before == "te" && v.grammar.startsWith("2 л. ед. ч.")) ||
+                (before == "nos" && v.grammar.startsWith("1 л. мн. ч."))
+            val lemma = v.entry.lemma
+            val gap = words.getOrNull(k + 1)?.takeIf { linked(i, it) }
+            val prep = words.getOrNull(k + 2)?.takeIf { gap != null && linked(gap, it) && tokens[gap].text.lowercase().let { g -> g.endsWith("mente") || g in GAP_ADVERBS } }
+                ?.let { tokens[it].text.lowercase() }?.takeIf { it in VERB_PREPOSITIONS }
+            val key = when {
+                prep != null && reflexive && dict.contains("${lemma}se $prep") -> "${lemma}se $prep"
+                prep != null && dict.contains("$lemma $prep") && "$lemma $prep" !in BEFORE_INFINITIVE -> "$lemma $prep"
+                reflexive && !lemma.endsWith("se") && entry(lemma + "se")?.ru?.isNotEmpty() == true -> lemma + "se"
+                else -> null
+            }
+            if (key != null) out[i] = t.copy(pinyin = key)
         }
         return out
     }
@@ -299,9 +340,14 @@ class EsEngine(
     }
 
     /** The reading of [word] with dictionary form [reading] (chosen from the context), else the first. */
-    private fun pick(word: String, reading: String?): EsAnalysis? {
+    /**
+     * The entry of [word] read as [reading]: one of its own readings by [EsEntry.key], else the dictionary
+     * word the context named (a phrase «traer cola», a pronominal verb «limitarse»), else the first reading.
+     */
+    private fun pick(word: String, reading: String?): EsEntry? {
         val a = analyses(word)
-        return (if (reading.isNullOrEmpty()) null else a.firstOrNull { it.entry.key == reading }) ?: a.firstOrNull()
+        if (reading.isNullOrEmpty() || reading == IN_PHRASE) return a.firstOrNull()?.entry
+        return a.firstOrNull { it.entry.key == reading }?.entry ?: entry(reading)?.takeIf { it.ru.isNotEmpty() } ?: a.firstOrNull()?.entry
     }
 
     fun tokenize(text: String): List<RToken> {
@@ -335,8 +381,7 @@ class EsEngine(
     override fun glossShort(word: String, reading: String?): String? {
         if (reading == IN_PHRASE) return null
         // The first word of a phrase: the meaning of the phrase (trajeron cola: «вызвать последствия»).
-        val e = (if (reading != null && ' ' in reading) entry(reading) else null)
-            ?: pick(word, reading)?.entry ?: return null
+        val e = pick(word, reading) ?: return null
         // A sense of the chosen variant wins over the general main meaning (carro: «автомобиль» in Latin America).
         e.ru.firstOrNull { variant.rank(it) == 0 }?.let { s -> shortSense(s)?.let { return it } }
         if (e.short.isNotEmpty()) return e.short
@@ -344,7 +389,7 @@ class EsEngine(
     }
 
     override fun cardTranslation(word: String, reading: String?): String? {
-        val e = pick(word, reading)?.entry ?: return null
+        val e = pick(word, reading) ?: return null
         return (senses(e).ifEmpty { e.en }).take(2).joinToString("; ").ifEmpty { null }
     }
 
@@ -508,6 +553,11 @@ class EsEngine(
         private val VERB_PRONOUNS = setOf("se", "me", "te", "nos", "os", "le", "les")
         private val SUBJECT_PRONOUNS = setOf("yo", "tú", "él", "ella", "usted", "nosotros", "nosotras", "vosotros", "vosotras", "ellos", "ellas", "ustedes", "vos")
         /** Words a noun follows, never a verb: after one «poder» is «власть». */
+        /** Adverbs that may stand between a verb and its preposition (contamos ya con). */
+        private val GAP_ADVERBS = setOf("ya", "también", "siempre", "aún", "todavía", "solo", "sólo", "nunca", "además", "hoy", "ahora", "más", "bien", "mucho", "apenas")
+        private val VERB_PREPOSITIONS = setOf("a", "de", "con", "en", "por", "para")
+        /** Verb + preposition that mean something else only before an infinitive: «volvió a llamar» «снова», not «volvió a casa». */
+        private val BEFORE_INFINITIVE = setOf("volver a", "echar a", "echarse a", "ponerse a", "acabar de", "llegar a", "acabar por", "terminar por")
         private val BARE_ADVERBS = setOf("mañana", "tarde")
         private val NOUN_MARKERS = setOf("el", "la", "los", "las", "una", "un", "del", "su", "sus", "mi", "mis", "tu", "tus", "este", "ese", "aquel",
             "estos", "esos", "nuestro", "nuestra", "nuestros", "nuestras", "unos", "unas", "cada", "ningún", "algún")

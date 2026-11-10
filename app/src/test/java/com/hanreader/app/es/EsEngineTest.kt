@@ -120,7 +120,7 @@ class EsEngineTest {
         assertEquals("casa", engine.lemma("casas"))
         // «se alza»: the verb alzar, not the noun alza.
         val t = engine.inContext(engine.tokenize("La prisión se alza en el desierto."))
-        assertEquals("alzar", t.first { it.text == "alza" }.pinyin)
+        assertEquals("alzarse", t.first { it.text == "alza" }.pinyin)
         assertEquals("", t.first { it.text == "prisión" }.pinyin)
         assertFalse(engine.glossShort("desierto")!!.startsWith("геогр"))
     }
@@ -198,6 +198,32 @@ class EsEngineTest {
         assertEquals("этот", engine.glossShort("este"))
         // A verb that is not the word's main part of speech still conjugates and takes pronouns.
         assertEquals("гл.", engine.analyses("place").first().entry.pos)
+    }
+
+    /** The reader's pages: hints that depend on the neighbours. */
+    @Test
+    fun hintsByNeighbours() {
+        fun gloss(text: String, word: String): String? {
+            val t = engine.inContext(engine.tokenize(text), text).first { it.text == word }
+            return engine.glossShort(t.text, t.pinyin)
+        }
+        // A form that is both a noun and an adjective keeps the word's main part of speech.
+        assertEquals("прожектор", gloss("Encendió dos potentes reflectores.", "reflectores"))
+        assertEquals("внутренний", gloss("Hizo su propia investigación interna.", "interna"))
+        // A verb with its preposition, also after an adverb.
+        assertEquals("располагать", gloss("Contamos actualmente con hechos.", "Contamos"))
+        assertEquals("располагать", gloss("Contamos con hechos.", "Contamos"))
+        assertEquals("считать", gloss("Contamos los días.", "Contamos"))
+        // Pronominal verbs.
+        assertEquals("ограничиваться", gloss("En vez de limitarse a buscar agujeros.", "limitarse"))
+        assertEquals("отказываться", gloss("El general se negó.", "negó"))
+        assertEquals("уходить", gloss("Me voy mañana.", "voy"))
+        // «volver a» is «снова» only before an infinitive.
+        assertEquals("снова", gloss("Volvió a llamar.", "Volvió"))
+        assertFalse(gloss("Volvió a casa.", "Volvió") == "снова")
+        // An adjective that is also a noun, with no noun after it.
+        assertEquals("юноша", gloss("Un joven llegó tarde.", "joven"))
+        assertEquals("молодой", gloss("El joven médico llegó.", "joven"))
     }
 
     @Test

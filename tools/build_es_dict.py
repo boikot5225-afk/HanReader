@@ -176,7 +176,7 @@ def main(ru_path, en_path, out_dir):
     regional = set()  # words with a sense used only in some countries or in a marked style
     gender = {}       # noun -> м / ж / мж
     en_pos = {}       # lemma -> {part of speech: [senses]}
-    form_pos = {}     # (form, lemma) -> part of speech of the form (haberes: a noun)
+    form_pos = {}     # (form, lemma) -> parts of speech of the form (haberes: a noun; reflectores: a noun and an adjective)
 
     def set_pos(w, p):
         # A common word first: «al» is a contraction before it is an initialism (имя); an infinitive
@@ -191,7 +191,8 @@ def main(ru_path, en_path, out_dir):
         d = forms.setdefault(form, {})
         if lemma not in d or (desc and not d[lemma]):
             d[lemma] = desc
-            form_pos[(form, lemma)] = part
+        if part:
+            form_pos.setdefault((form, lemma), []).append(part)
 
     for line in open(ru_path, encoding="utf-8"):
         e = json.loads(line)
@@ -321,6 +322,18 @@ def main(ru_path, en_path, out_dir):
             first = w.split()[0]
             verb = pos.get(first) == "гл." or (first.endswith("se") and pos.get(first[:-2]) == "гл.")
             pos.setdefault(w, "гл." if verb else "выраж." if it["pos"] == "гл." else it["pos"])
+    # Pronominal verbs (limitarse «ограничиваться», reflexive_es_ru.py) the dictionary has no entry for.
+    reflexive_path = os.path.join(data, "ru_reflexive.jsonl")
+    if os.path.exists(reflexive_path):
+        for line in open(reflexive_path, encoding="utf-8"):
+            if not line.strip():
+                continue
+            it = json.loads(line)
+            w = it["w"] + "se"
+            if not it["ru"] or ru.get(w) or pos.get(it["w"]) != "гл.":
+                continue
+            ru[w] = [x.strip() for x in it["ru"].split(";") if x.strip()]
+            source[w], short[w], pos[w] = "a", it["short"], "гл."
     # Idioms Wiktionary lacks (traer cola «иметь последствия»), written for HanReader; a Wiktionary
     # entry with a Russian meaning wins.
     idioms_path = os.path.join(data, "idioms.tsv")
@@ -365,9 +378,10 @@ def main(ru_path, en_path, out_dir):
                 if l in known:
                     resolved.setdefault(l, d)
                     # The form belongs to another part of speech of the word than its main one (haberes: the noun).
-                    part = form_pos.get((form, l))
-                    if part and part != pos.get(l) and any(a[0] == part for a in alts.get(l, [])):
-                        hint[l] = ":" + part
+                    # Only when it is not a form of the main one too (reflectores: noun and adjective - no hint).
+                    parts = form_pos.get((form, l), [])
+                    if parts and pos.get(l) not in parts and any(a[0] == parts[0] for a in alts.get(l, [])):
+                        hint[l] = ":" + parts[0]
                 elif l in forms:
                     for l2, d2 in forms[l].items():
                         if l2 in known:
