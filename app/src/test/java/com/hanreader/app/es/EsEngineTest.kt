@@ -173,6 +173,33 @@ class EsEngineTest {
         assertEquals("adoptar", at("adoptado").pinyin)
     }
 
+    /** A word that is several parts of speech: «haberes» is the noun, «el poder» power, «mañana» tomorrow. */
+    @Test
+    fun partsOfSpeechOfOneWord() {
+        val haberes = engine.analyses("haberes").first()
+        assertEquals("сущ.", haberes.entry.pos)
+        assertEquals("haber", haberes.entry.lemma)
+        assertTrue(haberes.entry.ru.any { it.contains("имущество") })
+        assertEquals("гл.", engine.analyses("haber").first().entry.pos)
+        assertEquals("haber", engine.lemma("haberes"))
+        fun gloss(text: String, word: String): String? {
+            val t = engine.inContext(engine.tokenize(text), text).first { it.text == word }
+            return engine.glossShort(t.text, t.pinyin)
+        }
+        assertEquals("власть", gloss("El cártel tomó el poder.", "poder"))
+        assertEquals("мочь", gloss("Quiero poder dormir.", "poder"))
+        assertEquals("завтра", gloss("Vuelvo mañana.", "mañana"))
+        assertEquals("утро", gloss("Llegó por la mañana.", "mañana"))
+        assertEquals("завтра", gloss("Trabajo desde mañana.", "mañana"))
+        assertEquals("поздно", gloss("Volvieron tarde.", "tarde"))
+        assertEquals("вечер", gloss("Vino esa misma tarde.", "tarde"))
+        assertEquals("делать", gloss("Al hacer eso se equivocó.", "hacer"))
+        assertEquals("врач", engine.glossShort("médico"))
+        assertEquals("этот", engine.glossShort("este"))
+        // A verb that is not the word's main part of speech still conjugates and takes pronouns.
+        assertEquals("гл.", engine.analyses("place").first().entry.pos)
+    }
+
     @Test
     fun ordinaryWordPairsAreNotPhrases() {
         val text = "La casa de la vida de una de esas personas."

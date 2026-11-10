@@ -27,7 +27,11 @@ data class EsEntry(
     /** The main meaning in a few words (frequent words, edited pass), for the note over the word. */
     val short: String = "",
     /** Gender of a noun: «м», «ж», «мж» (both); empty for other words. */
-    val gender: String = ""
+    val gender: String = "",
+    /** The word as other parts of speech (haber: the noun «имущество» beside the verb), each with its own senses. */
+    val alts: List<EsEntry> = emptyList(),
+    /** Names this reading among the readings of a word: the lemma, for another part of speech «haber/сущ.». */
+    val key: String = lemma
 ) {
     /** «сущ., ж. р.», «сущ., м. и ж. р.», «гл.». */
     val posLabel: String get() = when (gender) {
@@ -86,26 +90,40 @@ class EsEngine(
     fun entry(lemma: String): EsEntry? {
         val f = dict.get(lemma) ?: return null
         fun senses(i: Int) = f.getOrNull(i).orEmpty().split(" ; ").map { it.trim() }.filter { it.isNotEmpty() }
-        return EsEntry(lemma, f.getOrNull(0).orEmpty(), senses(1), senses(2), machine = f.getOrNull(3) == "a" || f.getOrNull(3) == "r",
-            rank = f.getOrNull(4)?.toIntOrNull() ?: 0, short = f.getOrNull(5).orEmpty(), gender = f.getOrNull(6).orEmpty())
+        val pos = f.getOrNull(0).orEmpty()
+        val machine = f.getOrNull(3) == "a" || f.getOrNull(3) == "r"
+        val rank = f.getOrNull(4)?.toIntOrNull() ?: 0
+        val gender = f.getOrNull(6).orEmpty()
+        // Other parts of speech: «сущ.|имущество|имущество ; актив|asset ; credit», several joined by « || ».
+        val alts = f.getOrNull(7).orEmpty().split(" || ").filter { it.isNotEmpty() }.map { alt ->
+            val a = alt.split('|')
+            fun list(i: Int) = a.getOrNull(i).orEmpty().split(" ; ").map { it.trim() }.filter { it.isNotEmpty() }
+            EsEntry(lemma, a[0], list(2), list(3), machine = true, rank = rank, short = a.getOrNull(1).orEmpty(),
+                gender = if (a[0] == "сущ.") gender else "", key = lemma + "/" + a[0])
+        }
+        return EsEntry(lemma, pos, senses(1), senses(2), machine = machine, rank = rank, short = f.getOrNull(5).orEmpty(),
+            gender = if (pos == "сущ.") gender else "", alts = alts)
     }
 
     /** Every dictionary reading of [word], the most useful first (a word with a Russian meaning first). */
     fun analyses(word: String): List<EsAnalysis> {
         val w = word.lowercase()
         synchronized(cache) { cache[w] }?.let { return it }
-        val self = entry(w)?.let { EsAnalysis(w, it, "") }
+        val self = entry(w)?.let { e -> listOf(EsAnalysis(w, e, "")) + e.alts.map { EsAnalysis(w, it, "") } }.orEmpty()
         val asForm = ArrayList<EsAnalysis>(2)
         // "!": a frequent verb form that is also a rare word (era: ser before «эра»).
         val f = forms.get(w)?.firstOrNull().orEmpty()
         val formFirst = f.startsWith("!")
         f.removePrefix("!").split('|').filter { it.isNotEmpty() }.forEach { item ->
-            val lemma = item.substringBefore(':')
-            val g = item.substringAfter(':', "0").toIntOrNull()?.let { grammar.getOrNull(it) }.orEmpty()
-            if (lemma != w && asForm.none { it.entry.lemma == lemma }) entry(lemma)?.let { asForm += EsAnalysis(w, it, g) }
+            // «haber:3:сущ.»: the dictionary word, its grammar, and the part of speech when it is not the word's main one.
+            val part = item.split(':')
+            val lemma = part[0]
+            val g = part.getOrNull(1)?.toIntOrNull()?.let { grammar.getOrNull(it) }.orEmpty()
+            val e = entry(lemma)?.let { e -> part.getOrNull(2)?.let { p -> e.alts.firstOrNull { it.pos == p } } ?: e }
+            if (lemma != w && e != null && asForm.none { it.entry.key == e.key }) asForm += EsAnalysis(w, e, g)
         }
         val out = ArrayList<EsAnalysis>(3)
-        if (formFirst) { out += asForm; self?.let { out += it } } else { self?.let { out += it }; out += asForm }
+        if (formFirst) { out += asForm; out += self } else { out += self; out += asForm }
         // A form with no grammar of its own that is a verb with pronouns attached (dámelo): the rule
         // names the form and the pronouns («повел. + me lo»).
         if (out.isEmpty() || out.all { it.grammar.isEmpty() && it.entry.pos == "гл." && it.entry.lemma != w }) {
@@ -137,13 +155,13 @@ class EsEngine(
         for (s in listOf(stem, unaccent(stem)).distinct()) {
             // A form first (hablando -> hablar), even if the form has an entry of its own.
             forms.get(s)?.firstOrNull()?.removePrefix("!")?.split('|')?.forEach { item ->
-                val lemma = item.substringBefore(':')
-                entry(lemma)?.takeIf { it.pos == "гл." }?.let { e ->
-                    val g = item.substringAfter(':', "0").toIntOrNull()?.let { grammar.getOrNull(it) }.orEmpty()
+                val part = item.split(':')
+                entry(part[0])?.let { e -> part.getOrNull(2)?.let { p -> e.alts.firstOrNull { it.pos == p } } ?: e }?.takeIf { it.pos == "гл." }?.let { e ->
+                    val g = part.getOrNull(1)?.toIntOrNull()?.let { grammar.getOrNull(it) }.orEmpty()
                     return EsAnalysis(stem, e, if (g.isEmpty()) plus else "$g $plus")
                 }
             }
-            entry(s)?.takeIf { it.pos == "гл." }?.let { return EsAnalysis(stem, it, "инфинитив $plus") }
+            entry(s)?.let { e -> if (e.pos == "гл.") e else e.alts.firstOrNull { it.pos == "гл." } }?.let { return EsAnalysis(stem, it, "инфинитив $plus") }
         }
         return null
     }
@@ -189,7 +207,9 @@ class EsEngine(
      * - after a pronoun that goes with a verb (se, me, te…), a subject pronoun (yo, tú, él…) or «no»,
      *   a word that can be a verb is the verb: «se alza» alzar, «no como» comer (not «как»);
      * - a form of both ser and ir before «a»/«al» is ir: «fue a Madrid», but «fue profesor» stays ser;
-     * - after a form of haber a participle is the verb: «había adoptado» adoptar, not «приёмный».
+     * - after a form of haber a participle is the verb: «había adoptado» adoptar, not «приёмный»;
+     * - after an article or a possessive, a verb that is also a noun is the noun: «el poder» «власть»
+     *   (the reading is then the noun's [EsEntry.key], "poder/сущ.").
      * With [text], dictionary phrases are marked too: the first word carries the phrase
      * («trajeron cola»: "traer cola"), the following ones [IN_PHRASE], so the hint over the text is
      * the meaning of the whole phrase, not of each word.
@@ -208,10 +228,17 @@ class EsEngine(
             val choice = when {
                 after in setOf("a", "al") && a.any { it.entry.lemma == "ir" } && a.any { it.entry.lemma == "ser" } -> "ir"
                 before != null && (before in VERB_PRONOUNS || before in SUBJECT_PRONOUNS || before == "no" || before in HABER) && a.first().entry.pos != "гл." ->
-                    a.firstOrNull { it.entry.pos == "гл." }?.entry?.lemma
+                    a.firstOrNull { it.entry.pos == "гл." }?.entry?.key
+                // After an article or a possessive, a verb or adverb that is also a noun is the noun: el poder «власть».
+                before != null && before in NOUN_MARKERS && a.first().entry.pos in setOf("гл.", "нар.") ->
+                    a.firstOrNull { it.entry.pos == "сущ." }?.entry?.key
+                // With no article or adjective before them, «mañana» is «завтра» and «tarde» «поздно»; «la mañana» is «утро».
+                t.text.lowercase() in BARE_ADVERBS && a.first().entry.pos == "сущ." && !(before != null && (before in NOUN_MARKERS ||
+                    before in setOf("de", "esta", "esa", "aquella") || analyses(before).firstOrNull()?.entry?.pos in setOf("прил.", "числ."))) ->
+                    a.firstOrNull { it.entry.pos == "нар." }?.entry?.key
                 else -> null
             }
-            if (choice != null && choice != a.first().entry.lemma) out[i] = t.copy(pinyin = choice)
+            if (choice != null && choice != a.first().entry.key) out[i] = t.copy(pinyin = choice)
         }
         if (text != null) {
             var k = 0
@@ -274,7 +301,7 @@ class EsEngine(
     /** The reading of [word] with dictionary form [reading] (chosen from the context), else the first. */
     private fun pick(word: String, reading: String?): EsAnalysis? {
         val a = analyses(word)
-        return (if (reading.isNullOrEmpty()) null else a.firstOrNull { it.entry.lemma == reading }) ?: a.firstOrNull()
+        return (if (reading.isNullOrEmpty()) null else a.firstOrNull { it.entry.key == reading }) ?: a.firstOrNull()
     }
 
     fun tokenize(text: String): List<RToken> {
@@ -480,6 +507,10 @@ class EsEngine(
         /** Pronouns that stand before a verb: the next word is read as a verb if it can be one. */
         private val VERB_PRONOUNS = setOf("se", "me", "te", "nos", "os", "le", "les")
         private val SUBJECT_PRONOUNS = setOf("yo", "tú", "él", "ella", "usted", "nosotros", "nosotras", "vosotros", "vosotras", "ellos", "ellas", "ustedes", "vos")
+        /** Words a noun follows, never a verb: after one «poder» is «власть». */
+        private val BARE_ADVERBS = setOf("mañana", "tarde")
+        private val NOUN_MARKERS = setOf("el", "la", "los", "las", "una", "un", "del", "su", "sus", "mi", "mis", "tu", "tus", "este", "ese", "aquel",
+            "estos", "esos", "nuestro", "nuestra", "nuestros", "nuestras", "unos", "unas", "cada", "ningún", "algún")
         /** [RToken.pinyin] of a word inside a phrase after its first word: no hint of its own. */
         const val IN_PHRASE = "~"
         /** Forms of haber: a participle after one is a verb (había adoptado). */

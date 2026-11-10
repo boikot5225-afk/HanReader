@@ -6,7 +6,7 @@ assets/licenses/ES_WIKTIONARY_NOTICE.txt):
   ru.jsonl  Spanish words of the Russian Wiktionary (https://kaikki.org/ruwiktionary/Испанский/)
   en.jsonl  Spanish words of the English Wiktionary (https://kaikki.org/dictionary/Spanish/)
 
-dict.tsv   lemma \t part of speech \t Russian senses \t English senses \t Russian source \t frequency rank \t main meaning \t gender
+dict.tsv   lemma \t part of speech \t Russian senses \t English senses \t Russian source \t frequency rank \t main meaning \t gender \t other parts of speech
            (senses joined by " ; "; source: w = Russian Wiktionary, a = machine translation (ru_ai.jsonl),
            r = Wiktionary or machine senses edited by the second pass (ru_refined.jsonl);
            rank: 1 = most frequent, empty = not in the frequency list; main meaning: 1-3 words, edited pass only;
@@ -93,6 +93,11 @@ def label(tags):
     return ", ".join(words + reg)
 
 
+def strip_label(x):
+    """«(Мекс., разг.) работа» -> «работа», lower-case."""
+    return re.sub(r"^\([^)]*\)\s*", "", x.strip()).lower()
+
+
 SKIP_TAGS = {"obsolete", "archaic", "rare", "proscribed", "misspelling", "nonstandard"}
 
 
@@ -170,6 +175,8 @@ def main(ru_path, en_path, out_dir):
     forms = {}    # form -> {lemma: description}
     regional = set()  # words with a sense used only in some countries or in a marked style
     gender = {}       # noun -> м / ж / мж
+    en_pos = {}       # lemma -> {part of speech: [senses]}
+    form_pos = {}     # (form, lemma) -> part of speech of the form (haberes: a noun)
 
     def set_pos(w, p):
         # A common word first: «al» is a contraction before it is an initialism (имя); an infinitive
@@ -177,13 +184,14 @@ def main(ru_path, en_path, out_dir):
         if p in POS and (w not in pos or (pos[w] == "имя" and POS[p] != "имя") or (POS[p] == "гл." and pos[w] == "сущ.")):
             pos[w] = POS[p]
 
-    def add_form(form, lemma, desc):
+    def add_form(form, lemma, desc, part=None):
         form, lemma = form.lower().strip(), lemma.lower().strip()
         if not form or form == lemma or " " in form or not re.fullmatch(r"[^\W\d_]+", form):
             return
         d = forms.setdefault(form, {})
         if lemma not in d or (desc and not d[lemma]):
             d[lemma] = desc
+            form_pos[(form, lemma)] = part
 
     for line in open(ru_path, encoding="utf-8"):
         e = json.loads(line)
@@ -210,7 +218,7 @@ def main(ru_path, en_path, out_dir):
                 if SKIP_TAGS & set(tags) or any(t.startswith("object-") for t in tags):
                     continue
                 for f in s["form_of"]:
-                    add_form(w, f.get("word", ""), describe(tags))
+                    add_form(w, f.get("word", ""), describe(tags), POS.get(e.get("pos")))
                 continue
             if "form-of" in tags or SKIP_TAGS & set(tags):
                 continue
@@ -223,6 +231,9 @@ def main(ru_path, en_path, out_dir):
                     regional.add(w)
                 if g and g not in en.setdefault(w, []):
                     en[w].append(g)
+                by = en_pos.setdefault(w, {}).setdefault(POS.get(e.get("pos"), ""), [])
+                if g and g not in by:
+                    by.append(g)
         if lemma_entry:
             set_pos(w, e.get("pos"))
             if e.get("pos") == "noun" and w not in gender:
@@ -257,6 +268,56 @@ def main(ru_path, en_path, out_dir):
                 ru[it["w"]] = senses
                 source[it["w"]] = "r"
                 short[it["w"]] = it["short"].strip()
+    # Words that are several parts of speech (haber: verb and noun «имущество»; pos_es_ru.py): the main
+    # part of speech keeps the row, the others go to the last column, each with its own senses.
+    alts = {}
+    pos_path = os.path.join(data, "ru_pos.jsonl")
+    if os.path.exists(pos_path):
+        for line in open(pos_path, encoding="utf-8"):
+            if not line.strip():
+                continue
+            it = json.loads(line)
+            w, by = it["w"], it["pos"]
+            if w in MANUAL_RU or w not in pos:
+                continue
+            # The main part of speech is the one of the word's main meaning so far (médico «врач»: the
+            # noun, not the adjective; este «этот», not «восток»); with no match it stays as it was.
+            was = [strip_label(x) for x in (short.get(w, "").split(";") + ru.get(w, [])[:1]) if x.strip()]
+            def match(part):
+                v = by[part]
+                senses = [strip_label(x) for x in v["ru"].split(";")]
+                return max([3 - k for k, x in enumerate(was[:2]) if x == strip_label(v["short"])] +
+                           [1 for x in was[:2] if x in senses] + [0])
+            best = max(by, key=lambda part: (match(part), part == pos[w]))
+            if match(best) > 0:
+                pos[w] = best
+            # An edited frequent word whose main meaning matches none of the new ones keeps its senses
+            # (haber «вспомогательный глагол», el «определённый артикль…»); it only gains the other parts of speech.
+            keep = match(best) == 0 and w in short
+            for part, v in by.items():
+                senses = [x.strip().replace("|", "/") for x in v["ru"].split(";") if x.strip()]
+                if part == pos[w]:
+                    if keep:
+                        continue
+                    ru[w], source[w], short[w] = senses, "r", strip_label(v["short"]) if v["short"].startswith("(") else v["short"].strip()
+                    if en_pos.get(w, {}).get(part):
+                        en[w] = en_pos[w][part]
+                elif senses:
+                    e = [x.replace("|", "/") for x in en_pos.get(w, {}).get(part, [])[:MAX_SENSES]]
+                    alts.setdefault(w, []).append((part, re.sub(r"^\([^)]*\)\s*", "", v["short"].strip()).replace("|", "/"), senses[:MAX_SENSES], e))
+    # Set phrases of the Spanish Wiktionary the English one lacks (translate_es_phrases.py).
+    phrases_path = os.path.join(data, "ru_phrases.jsonl")
+    if os.path.exists(phrases_path):
+        for line in open(phrases_path, encoding="utf-8"):
+            if not line.strip():
+                continue
+            it = json.loads(line)
+            w = it["w"]
+            if not it["ru"] or ru.get(w):
+                continue
+            ru[w] = [x.strip() for x in it["ru"].split(";") if x.strip()]
+            source[w], short[w] = "a", it["short"]
+            pos.setdefault(w, it["pos"])
     # Idioms Wiktionary lacks (traer cola «иметь последствия»), written for HanReader; a Wiktionary
     # entry with a Russian meaning wins.
     idioms_path = os.path.join(data, "idioms.tsv")
@@ -283,7 +344,8 @@ def main(ru_path, en_path, out_dir):
             g = en.get(w, [])[:MAX_SENSES]
             if not r and not g:
                 continue
-            f.write(f"{w}\t{pos.get(w, '')}\t{' ; '.join(r)}\t{' ; '.join(g)}\t{source.get(w, '')}\t{rank.get(w, '')}\t{short.get(w, '')}\t{gender.get(w, '') if pos.get(w) == 'сущ.' else ''}\n")
+            alt = " || ".join(f"{part}|{sh}|{' ; '.join(senses)}|{' ; '.join(e)}" for part, sh, senses, e in alts.get(w, []))
+            f.write(f"{w}\t{pos.get(w, '')}\t{' ; '.join(r)}\t{' ; '.join(g)}\t{source.get(w, '')}\t{rank.get(w, '')}\t{short.get(w, '')}\t{gender.get(w, '') if pos.get(w) == 'сущ.' or any(a[0] == 'сущ.' for a in alts.get(w, [])) else ''}\t{alt}\n")
             n += 1
     known = set(lemmas)
     grammar = [""]
@@ -295,9 +357,14 @@ def main(ru_path, en_path, out_dir):
             # A form of a form (controlada -> controlado -> controlar): to the dictionary word, keeping
             # the outer description (feminine participle).
             resolved = {}
+            hint = {}
             for l, d in forms[form].items():
                 if l in known:
                     resolved.setdefault(l, d)
+                    # The form belongs to another part of speech of the word than its main one (haberes: the noun).
+                    part = form_pos.get((form, l))
+                    if part and part != pos.get(l) and any(a[0] == part for a in alts.get(l, [])):
+                        hint[l] = ":" + part
                 elif l in forms:
                     for l2, d2 in forms[l].items():
                         if l2 in known:
@@ -314,7 +381,7 @@ def main(ru_path, en_path, out_dir):
                 if d not in index:
                     index[d] = len(grammar)
                     grammar.append(d)
-            f.write(form + "\t" + ("!" if form in FORM_FIRST else "") + "|".join(f"{l}:{index[d]}" for l, d in items) + "\n")
+            f.write(form + "\t" + ("!" if form in FORM_FIRST else "") + "|".join(f"{l}:{index[d]}{hint.get(l, '')}" for l, d in items) + "\n")
             m += 1
     with open(f"{out_dir}/grammar.tsv", "w", encoding="utf-8") as f:
         f.write("\n".join(grammar) + "\n")

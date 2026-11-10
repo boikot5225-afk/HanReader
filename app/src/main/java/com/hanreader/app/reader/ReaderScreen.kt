@@ -1295,7 +1295,7 @@ private fun WordSheet(
             else (if (selection.first != selection.last) e.phraseKey(tokens, block.text, selection.first, selection.last)?.let { e.analyses(it) } else null)
                 ?: e.analyses(word)
         val inContext = if (selection.first == selection.last) first.pinyin else ""
-        if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.lemma == inContext) 0 else 1 }
+        if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.key == inContext) 0 else 1 }
     }
     val entry = remember(word) { zh?.lookup(word)?.takeIf { it.hasDefinition } }
     // A combination the dictionary lacks: its dictionary words (革命 + 党), else its characters.
@@ -1317,7 +1317,7 @@ private fun WordSheet(
             com.hanreader.app.zh.Grammar.at(tokens.subList(r.first, r.last + 1).map { it.text }, selection.first - r.first)
         }
     }
-    val translation = userMeaning ?: (if (zh == null) engine.cardTranslation(word, es.firstOrNull()?.entry?.lemma) else engine.cardTranslation(word, pageReading))
+    val translation = userMeaning ?: (if (zh == null) engine.cardTranslation(word, es.firstOrNull()?.entry?.key) else engine.cardTranslation(word, pageReading))
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
     var status by remember(word) { mutableStateOf<String?>(null) }
