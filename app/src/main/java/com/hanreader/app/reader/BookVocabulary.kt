@@ -85,9 +85,66 @@ object DotNames {
     }
 }
 
+/**
+ * Chinese personal names the lexicon lacks: a surname and one or two more characters, which the
+ * segmenter leaves as single characters (林 晓 梅). Candidates are counted over the whole book;
+ * a name is kept when it is repeated at least [MIN_REPEATS] times. Two-character names are found
+ * only for surnames that are not everyday words (张, 王, 陈 — not 高, 白, 马).
+ */
+object ChineseNames {
+    const val MIN_REPEATS = 4
+    /** Surnames that rarely stand alone as an everyday word. */
+    private const val PLAIN = "王李张刘陈杨赵周吴徐孙胡朱林何郭罗梁宋郑谢韩唐冯董萧程曹袁邓许傅沈曾彭吕苏卢蒋蔡贾丁魏薛叶阎余潘杜戴夏钟汪任姜范姚谭廖邹熊陆郝孔崔康邱秦顾侯邵孟雷汤尹黎乔贺赖龚庞樊殷施陶洪翟颜倪严芦俞鲁葛伍韦尤毕聂焦柳邢岳祝涂祁耿詹苗凌纪靳甄裴霍翁柯阮闵柴冉辜饶瞿戚滕臧褚娄奚穆郎邸姬屠栾窦敖卓仇虞卞冼佟荆岑胥蔺"
+    /** Surnames that are also common words: only three-character names are looked for. */
+    private const val COMMON = "黄高马金石毛方白龙万钱常武易江田牛温路齐梅庄辛管左谷舒关费盛童曲游席卫查鲍甘景包司柏宁桂华车房边吉古米池宫简符木党燕商蒙喻冷花蓝井乐封宗楚桑沙史段文安兰季章申丛"
+    /** Characters that end a name candidate: particles, pronouns, the commonest verbs and adverbs after a name. */
+    private const val STOP = "曰云说道笑问想看的了是在有也都和就不走来去把被给对叫让听又还才等们着过得地很太最更要会能可这那你我他她它一二三两几上下里中大小多少好与及或而但却便即将已曾正没别吗呢吧啊呀哦嗯哈之其所以为从到向往跟同比像如若虽因由站坐跑拿带见点摇叹喊哭答接转回忙急只再先刚才连并且则乃亦家人们"
+    private const val BEFORE_MEASURE = "一二三四五六七八九十两几每这那哪半"
+
+    /**
+     * Name candidates of one paragraph: for each surname token followed by single-character
+     * tokens, the two-character candidate and the three-character one (either may be null).
+     */
+    fun <T> candidates(tokens: List<T>, text: (T) -> String, isHan: (T) -> Boolean): List<Pair<String?, String?>> {
+        val out = ArrayList<Pair<String?, String?>>()
+        fun single(i: Int): Char? = tokens.getOrNull(i)?.takeIf { isHan(it) && text(it).length == 1 }?.let { text(it)[0] }
+        for (i in tokens.indices) {
+            val s = single(i) ?: continue
+            val plain = s in PLAIN
+            if (!plain && s !in COMMON) continue
+            // 一张纸, 这位老师: a measure word, not a surname.
+            val before = tokens.getOrNull(i - 1)?.takeIf { isHan(it) }?.let { text(it) }
+            if (before != null && before.last() in BEFORE_MEASURE) continue
+            val a = single(i + 1)?.takeIf { it !in STOP } ?: continue
+            val b = single(i + 2)?.takeIf { it !in STOP }
+            out += (if (plain) "$s$a" else null) to (b?.let { "$s$a$it" })
+        }
+        return out
+    }
+
+    /** The names among counted candidates: [two] and [three] map a candidate to [count, firstChapter]. */
+    fun accept(two: Map<String, IntArray>, three: Map<String, IntArray>, dict: ZhDictionary): Map<String, IntArray> {
+        val out = HashMap<String, IntArray>()
+        val taken = HashMap<String, Int>() // occurrences of a two-character prefix that belong to a longer name
+        for ((name, e) in three) {
+            if (e[0] < MIN_REPEATS || dict.contains(name)) continue
+            // 王明站 is 王明 + a verb if 王明 is followed by many other characters too.
+            val prefix = two[name.substring(0, 2)]?.get(0) ?: e[0]
+            if (e[0] * 2 < prefix) continue
+            out[name] = e
+            taken.merge(name.substring(0, 2), e[0], Int::plus)
+        }
+        for ((name, e) in two) {
+            val own = e[0] - (taken[name] ?: 0)
+            if (own >= MIN_REPEATS && !dict.contains(name)) out[name] = intArrayOf(own, e[1])
+        }
+        return out
+    }
+}
+
 object BookAnalyzer {
-    /** Bumped when the analysis finds more (2: names next to a middle dot). Older books are re-analysed. */
-    const val VERSION = 2
+    /** Bumped when the analysis finds more (2: names next to a middle dot; 3: Chinese names). Older books are re-analysed. */
+    const val VERSION = 3
 
     /**
      * Segments every chapter once and counts Han words. Name runs repeated in the book are stored
@@ -105,6 +162,8 @@ object BookAnalyzer {
         val counts = HashMap<String, IntArray>(32_000) // [count, firstChapter]
         val runs = HashMap<String, IntArray>()          // [count, firstChapter]
         val dotNames = HashSet<String>()
+        val two = HashMap<String, IntArray>()
+        val three = HashMap<String, IntArray>()
         var tokens = 0
         val total = epub.chapters.size
         for (c in epub.chapters) {
@@ -120,6 +179,10 @@ object BookAnalyzer {
                     val name = r.joinToString("") { seg[it].text }
                     runs.getOrPut(name) { intArrayOf(0, c.index) }[0]++
                 }
+                for ((a, b) in ChineseNames.candidates(seg, { it.text }, { it.kind == TokenKind.HAN })) {
+                    a?.let { two.getOrPut(it) { intArrayOf(0, c.index) }[0]++ }
+                    b?.let { three.getOrPut(it) { intArrayOf(0, c.index) }[0]++ }
+                }
                 // Names next to a middle dot count from the first occurrence.
                 for (r in DotNames.runs(seg, { it.text }, { it.kind == TokenKind.HAN }, dict)) {
                     val name = r.joinToString("") { seg[it].text }
@@ -133,6 +196,12 @@ object BookAnalyzer {
         val names = ArrayList<BookWord>()
         for ((name, e) in runs) {
             if (e[0] < NameRuns.MIN_REPEATS && name !in dotNames) continue
+            names += BookWord(bookId, name, e[0], e[1], ignored = true)
+            for (ch in name) counts[ch.toString()]?.let { it[0] -= e[0] }
+            tokens -= e[0] * name.length
+        }
+        for ((name, e) in ChineseNames.accept(two, three, dict)) {
+            if (names.any { it.word == name }) continue
             names += BookWord(bookId, name, e[0], e[1], ignored = true)
             for (ch in name) counts[ch.toString()]?.let { it[0] -= e[0] }
             tokens -= e[0] * name.length

@@ -41,6 +41,29 @@ class NamesTest {
         assertEquals("suǒqídān", engine.pinyinOf(tok))
     }
 
+    /** Chinese names the lexicon lacks are found by their surname and repetition. Own text, made-up names. */
+    @Test
+    fun chineseNamesOfTheBookAreFound() {
+        val text = buildString {
+            repeat(5) {
+                append("邹晓岚走进教室，看见蒋沐正在写字。蒋沐抬头说：“你来了。”邹晓岚点点头。\n")
+                append("桌上有一张纸，纸上写着几行字。高兴的孩子们在外面玩。\n")
+            }
+        }
+        val book = com.hanreader.app.epub.TxtBook(text.toByteArray(), "x")
+        val words = BookAnalyzer.analyze(1, book, engine.segmenter, engine.dictionary).words
+        val found = words.filter { it.ignored }.map { it.word }.toSet()
+        assertTrue(found.toString(), "邹晓岚" in found && "蒋沐" in found)
+        // Not names: a measure word after a numeral, a surname-like adjective, a name plus a verb.
+        assertTrue(found.toString(), found.none { it.startsWith("张") || it.startsWith("高") || it.length > 3 })
+        assertFalse("邹晓" in found)
+        // Kept whole once known, like the reader's own names.
+        val kept = engine.segmenter.segment("邹晓岚看见蒋沐。", found).filter { it.kind == TokenKind.HAN }.map { it.text }
+        assertEquals(listOf("邹晓岚", "看见", "蒋沐"), kept)
+        // The characters of the names are not counted as words of the book.
+        assertTrue(words.none { it.word == "邹" && !it.ignored })
+    }
+
     @Test
     fun namesAreNotRecommended() {
         val text = "中国科学院的老师终于回来了。中国科学院很大。"
