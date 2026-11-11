@@ -234,6 +234,26 @@ class EsEngineTest {
         assertEquals("пройти через", gloss("Han pasado por mucho.", "pasado"))
     }
 
+    /** The second check over a whole book. */
+    @Test
+    fun secondBookCheck() {
+        fun t(text: String, word: String) = engine.inContext(engine.tokenize(text), text).first { it.text == word }
+        fun gloss(text: String, word: String) = t(text, word).let { engine.glossShort(it.text, it.pinyin) }
+        // A phrase whose «de» / «a» is joined with the article.
+        assertEquals("a pesar de", t("A pesar del apaño de las elecciones.", "A").pinyin)
+        assertEquals("несмотря на", gloss("A pesar del apaño de las elecciones.", "A"))
+        assertEquals("después de", t("Llegó después del mediodía.", "después").pinyin)
+        assertEquals("внутри", gloss("Vive dentro del país.", "dentro"))
+        assertFalse(t("No sabía nada del dinero.", "nada").pinyin.contains(' '))
+        assertEquals("перейти к", gloss("El nuevo PRI se pasó al libre comercio.", "pasó"))
+        assertEquals("исчисляться", gloss("Los asesinados se contaban por centenares.", "contaban"))
+        // A form whose own entry is only regional: the ordinary word first.
+        assertEquals("начальник", engine.glossShort("jefes"))
+        // A name with no Russian meaning gets no hint.
+        assertEquals(null, engine.glossShort("Gustavo"))
+        assertEquals("резня", engine.glossShort("matanza"))
+    }
+
     @Test
     fun ordinaryWordPairsAreNotPhrases() {
         val text = "La casa de la vida de una de esas personas."

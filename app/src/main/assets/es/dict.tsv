@@ -9036,7 +9036,7 @@ apaza	имя		a surname
 apañado	прил.	ловкий ; способный ; умелый ; сносный	able; deft; capable ; good enough; sufficient	r	16146	ловкий		
 apañar	гл.	чинить ; улаживать ; прихватывать ; подделывать	to fix, to mend ; to pick up, to grab with the hand ; to get by, to manage	r	17036	чинить		
 apañarse	гл.	выкручиваться ; справляться ; устраиваться		a		выкручиваться		
-apaño	сущ.	(разг.) починка ; (разг.) подручное средство ; (разг.) связь ; (разг.) любовник	(разг.) quick fix; patching up ; (разг.) fling, on-off relationship ; (разг.) person in an on-off relationship	r	15412	починка	м	
+apaño	сущ.	(разг.) махинация ; (разг.) уловка ; (разг.) починка ; (разг.) любовник	(разг.) quick fix; patching up ; (разг.) fling, on-off relationship ; (разг.) person in an on-off relationship	a	15412	махинация	м	
 apañárselas	гл.	справляться ; выкручиваться	to cope, get by, get along	a				
 apeadero	сущ.	полустанок	halt (minor railway station)	a			м	
 apear	гл.	снимать ; (разг., устар.) слезать ; располагать ; убирать	to take down ; (разг., устар.) to come down, dismount ; to dispose ; to remove	r		снимать		
@@ -14231,7 +14231,7 @@ banco de pruebas	сущ.	испытательный стенд	testbed	a			м
 banco de sangre	сущ.	банк крови	blood bank	a			м	
 banco internacional de reconstrucción y fomento	выраж.	Международный банк реконструкции и развития, МБРР		w				
 banco mundial	имя		World Bank					
-banda	сущ.	группа ; банда ; лента ; пояс	band, sash ; bend ; band (musical group) ; gang, band, group	r	987	группа	ж	
+banda	сущ.	банда ; группа ; оркестр ; полоса	band, sash ; bend ; band (musical group) ; gang, band, group	a	987	банда	ж	
 banda ancha	сущ.	широкополосный доступ	broadband	a			ж	
 banda de fluctuación	сущ.	полоса колебаний	band of fluctuation	a			ж	
 banda de frecuencia	сущ.	полоса частот	frequency band	a			ж	
@@ -22719,7 +22719,7 @@ cerbatana	сущ.	духовая трубка ; трубка ; горохост�
 cerbatanero	сущ.	стрелок из духовой трубки	one who uses a blowgun or blowpipe	a			м	
 cerbero	имя		Cerberus					
 cerca	нар.	близко ; около ; почти	close, near, around, about, nearly, nigh (referring to quantity or time-related) ; close, near, around, nigh, at hand, close at hand, in sight (spatially) ; nearby, close by	r	374	близко	ж	сущ.|забор|забор ; изгородь ; каменная стена|fence (a thin artificial barrier that separates two pieces of land or a house perimeter) ; stone wall
-cerca de	выраж.	у, около, возле ; около, приблизительно	close to, about, nearly, approximately, around ; close to, near, near to, around, close by	w				нар.|около|около ; приблизительно ; почти|close to, about, nearly, approximately, around || предл.|возле|возле ; около ; у|close to, near, near to, around, close by
+cerca de	выраж.	около ; рядом с ; почти	close to, about, nearly, approximately, around ; close to, near, near to, around, close by	a		около		нар.|около|около ; приблизительно ; почти|close to, about, nearly, approximately, around || предл.|возле|возле ; около ; у|close to, near, near to, around, close by
 cercado	сущ.	забор ; ограда ; огороженный участок	vegetable garden or plot of land surrounded by a palisade ; palisade ; stockade	r	14869	забор	м	
 cercamiento	сущ.	ограждение ; огораживание	enclosure	a			м	
 cercanamente	нар.	близко ; почти	closely, nearly	a				
@@ -29043,6 +29043,7 @@ contante y sonante	прил.	наличные	cold hard (said of money)	a
 contar	гл.	считать ; рассказывать	to count; to tally ; to tell (a story); narrate ; to be (a certain number of years of age) ; to rely	r	385	считать		
 contar con	гл.	располагать ; рассчитывать на ; иметь		a		располагать		
 contario	сущ.	синоним контеро	synonym of contero	a			м	
+contarse por	гл.	исчисляться		a		исчисляться		
 contemplación	сущ.	созерцание	contemplation	r	16873	созерцание	ж	
 contemplador	прил.	созерцательный	contemplative	r		созерцательный	м	сущ.|созерцатель|созерцатель|contemplator
 contemplar	гл.	созерцать ; рассматривать ; предусматривать	to contemplate ; to behold ; to regard ; to envisage	r	5314	созерцать		
@@ -34926,7 +34927,7 @@ dentomicrobiano	прил.	относящийся к микробам на зуб
 dentrada	сущ.	(Лат. Ам., разг.) вход ; (Лат. Ам., разг.) вступление	(Лат. Америка, разг.) Prothetic form of entrada	r		вход	ж	
 dentrar	гл.	(Лат. Ам., разг., устар.) входить ; (Лат. Ам., разг., устар.) заходить	(Лат. Америка, разг., устар.) to enter, go in	r		входить		
 dentro	нар.	внутри ; через	inside (for space) ; indoors ; within, in (for time)	r	322	внутри		
-dentro de	выраж.	через (о времени)	in, inside	w				
+dentro de	выраж.	внутри ; в пределах ; через (о времени)	in, inside	a		внутри		
 dentudo	прил.	зубастый	toothy	a				
 dentículo	сущ.	зубец ; дентикул	denticle ; dentil, denticle	a			м	
 dentífrico	сущ.	зубная паста	toothpaste	r	15192	зубная паста	м	прил.|зубной|зубной ; гигиенический для зубов|dental hygiene
@@ -38933,7 +38934,7 @@ docto	прил.	учёный ; эрудированный	learned, erudite	a
 doctor	сущ.	врач ; доктор	doctor (Ph.D.) ; physician	r	373	врач	м	
 doctor honoris causa	сущ.	почётный доктор ; доктор honoris causa		a		почётный доктор		
 doctora	сущ.	женщина-врач ; докторша	doctor's wife	r	1755	женщина-врач	ж	
-doctorado	сущ.	докторантура	doctorate	r	6935	докторантура	м	
+doctorado	сущ.	докторская степень ; докторантура	doctorate	a	6935	докторская степень	м	
 doctoral	прил.	докторский	doctoral	w				
 doctorando	сущ.	аспирант	PhD student	a			м	
 doctorar	гл.	присуждать докторскую степень ; получать докторскую степень	to give/grant a doctorate ; to get a doctorate	a				
@@ -45699,7 +45700,7 @@ estadillo	сущ.	опрос	survey	a			м
 estadio	сущ.	стадион ; стадия ; этап	stadium ; stage (phase)	r	4057	стадион	м	
 estadista	сущ.	государственный деятель ; статистик	statesman, stateswoman ; statistician	a			мж	
 estadity	сущ.	(П.-Р.) статус штата	(Пуэрто-Рико) alternative form of estadidad	r		статус штата	ж	
-estado	сущ.	состояние ; государство ; штат ; положение	country, land (any broad area or territory) ; state (a province, particularly a fairly autonomous one within a federation) ; state, status (a condition) ; estado, Spanish fathom (a traditional unit of length equivalent to about 167 cm)	r	1156	состояние	м	
+estado	сущ.	государство ; штат ; состояние ; положение	country, land (any broad area or territory) ; state (a province, particularly a fairly autonomous one within a federation) ; state, status (a condition) ; estado, Spanish fathom (a traditional unit of length equivalent to about 167 cm)	a	1156	государство	м	
 estado civil	сущ.	семейное положение	marital status	a			м	
 estado cuántico	выраж.	физ. квантовое состояние		w				
 estado de alarma	сущ.	режим тревоги	state of alarm	a			м	
@@ -62494,7 +62495,7 @@ invertido	прил.	перевёрнутый ; (разг., пренебр.) го
 invertir	гл.	инвестировать ; вкладывать ; инвертировать ; переворачивать	to invest (to spend money, time, or energy on something) ; to invert	r	3484	инвестировать		
 invertirse	гл.	вкладываться ; инвестироваться		a		вкладываться		
 investidura	сущ.	инвеститура ; инаугурация	investiture, inauguration	a			ж	
-investigación	сущ.	исследование ; следствие	investigation ; research	r	790	исследование	ж	
+investigación	сущ.	исследование ; расследование ; следствие	investigation ; research	a	790	исследование	ж	
 investigación básica	сущ.	фундаментальное исследование	basic research	a			ж	
 investigación criminal	выраж.	уголовное расследование ; следствие		a		уголовное расследование		
 investigado	прил.	исследованный ; обследованный	investigated	r	5164	исследованный		
@@ -70634,7 +70635,7 @@ matamorense	прил.	матаморосский	of, from or relating to Matamor
 matamoros	сущ.	Матаморос ; хвастун ; выдумщик	a surname ; a city in Tamaulipas, Mexico, located on the Mexico–United States border ; a braggart; often one who tells unbelievable stories	a			м	
 matamoscas	сущ.	мухобойка ; мухомор, Amanita muscaria	flyswatter ; fly agaric, Amanita muscaria	w			м	
 matancero	прил.	матанский	of, from or relating to Matanzas	r		матанский	м	сущ.|житель Матансаса|житель Матансаса ; уроженец Матансаса|native or inhabitant of Matanzas (usually male)
-matanza	сущ.	убой ; резня ; забой	kill, killing (the act of killing) ; massacre, slaughter (the killing of a large number of people) ; slaughter (the killing of animals, generally for food)	r	5755	убой	ж	
+matanza	сущ.	резня ; бойня ; забой скота	kill, killing (the act of killing) ; massacre, slaughter (the killing of a large number of people) ; slaughter (the killing of animals, generally for food)	a	5755	резня	ж	
 matanzas	имя		Matanzas (a city, the capital of Matanzas Province, Cuba) ; Matanzas Province (a province of Cuba; capital: Matanzas)		12462			
 mataojos	сущ.	южноамериканское дерево	Pouteria salicifolia, a South American tree	a			м	
 matapalo	сущ.	фикус ; растение-душитель	Any of a number of plants. To name just one, there's the narrow leaf fig (Ficus…	a			м	
@@ -74698,7 +74699,7 @@ mordedor	прил.	кусачий ; кусающий	biting, bitey (prone to bit
 mordedura	сущ.	укус	bite	r	8988	укус	ж	
 morder	гл.	кусать ; откусывать ; грызть	to bite, nip ; to gnaw ; to grasp, clutch ; to wear away, to wear down	r	2047	кусать		
 morder cemento	гл.	(разг.) провалиться ; потерпеть неудачу		a		провалиться		
-morder el polvo	гл.	кусать пыль	to bite the dust	a				
+morder el polvo	гл.	потерпеть поражение ; быть поверженным	to bite the dust	a		потерпеть поражение		
 morder la bala	гл.	стиснуть зубы	to bite the bullet	a				
 morder la mano que se da de comer	гл.	кусать руку кормящего	to bite the hand that feeds one	a				
 morderse	гл.	кусать себя ; кусаться		a		кусать себя		
@@ -76776,7 +76777,7 @@ negociante	сущ.	торговец ; делец ; бизнесмен	shopkeeper
 negociar	гл.	вести переговоры ; торговать ; договариваться	to negotiate ; to trade ; (разг.) to make money, make profit	r	2685	вести переговоры		
 negociarse	гл.	договариваться ; вести переговоры		a		договариваться		
 negocio	сущ.	бизнес ; дело ; магазин	business, enterprise (commercial enterprise or establishment) ; deal (a particular instance of buying or selling, a transaction) ; deal (agreement between parties) ; profit, money-making	r	440	бизнес	м	
-negra	сущ.	негритянка ; четвертная нота ; чёрная фигура ; неудача	crotchet, quarter note ; black piece ; bad luck	r	1600	негритянка	ж	
+negra	сущ.	чернокожая ; четвертная нота ; неудача	crotchet, quarter note ; black piece ; bad luck	a	1600	чернокожая	ж	
 negrada	сущ.	негр	The equivalent of the noun form of nigger-rig in Cuban Spanish	a			ж	
 negral	прил.	черноватый	black poplar ; Pyrenean oak	w				
 negrata	сущ.	(сленг, пренебр.) негр	(сленг, пренебр.) black person, nigger	r	13376	негр	мж	
@@ -82850,6 +82851,7 @@ pasarlo pipa	гл.	(разг.) отлично проводить время	(р�
 pasarlo teta	гл.	(разг.) отлично проводить время	(разг.) to have a whale of a time	r		отлично проводить время		
 pasarruedas	сущ.	колёсная арка	wheel arch	a			м	
 pasarse	гл.	проводить (время) ; переходить ; перебарщивать		a	8027	проводить		
+pasarse a	гл.	перейти к ; перейти на сторону		a		перейти к		
 pasarse de frenada	гл.	поздно затормозить ; переусердствовать	to brake a car or vehicle too late, and therefore go off the road ; to overshoot, to go too far, to exceed, to overreach (to do something beyond an…	a				
 pasarse de la raya	гл.	переходить границы ; перегибать палку	to cross the line, step out of line, go too far	a				
 pasarse de listo	гл.	переоценить себя ; хватить через край	to get in out of one's depth; to bite off more than one can chew	a				
@@ -110740,7 +110742,7 @@ tryhard	сущ.	старатель ; соревновательный игрок
 tryout	сущ.	пробное испытание	tryout	a			м	
 trácala	сущ.	['(Лат. Ам.) ловушка', '(Лат. Ам.) уловка', '(Лат. Ам.) хитрость']	(Лат. Америка) trap, ruse, wile	r		ловушка	ж	
 tráfago	сущ.	(разг.) суета ; хлопоты ; движение	traffic ; (разг.) hustle, bustle ; tiring activities, work	r		суета	м	
-tráfico	сущ.	движение ; торговля ; (Лат. Ам.) контрабанда	traffic ; (Лат. Америка) smuggle	r	2099	движение	м	
+tráfico	сущ.	движение (транспорта) ; незаконная торговля ; торговля	traffic ; (Лат. Америка) smuggle	a	2099	движение	м	
 tráfico de drogas	сущ.	наркоторговля	drug trafficking	a			м	
 tráfico de influencias	сущ.	торговля влиянием	influence peddling	a			м	
 tráfico de menores	сущ.	торговля детьми	trafficking of children	a			м	

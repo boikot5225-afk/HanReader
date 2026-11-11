@@ -123,7 +123,11 @@ class EsEngine(
             if (lemma != w && e != null && asForm.none { it.entry.key == e.key }) asForm += EsAnalysis(w, e, g)
         }
         val out = ArrayList<EsAnalysis>(3)
-        if (formFirst) { out += asForm; out += self } else { out += self; out += asForm }
+        // A form with an entry of its own whose main sense is regional or marked (jefes «(Мекс.) родители»,
+        // bolsas «(Венес.) придурок»): the ordinary word it is a form of comes first (jefe «начальник»).
+        val marked = self.firstOrNull()?.entry?.ru?.firstOrNull()?.startsWith("(") == true &&
+            asForm.any { f -> f.entry.ru.firstOrNull()?.let { !it.startsWith("(") } == true }
+        if (formFirst || marked) { out += asForm; out += self } else { out += self; out += asForm }
         // A form with no grammar of its own that is a verb with pronouns attached (dámelo): the rule
         // names the form and the pronouns («повел. + me lo»).
         if (out.isEmpty() || out.all { it.grammar.isEmpty() && it.entry.pos == "гл." && it.entry.lemma != w }) {
@@ -291,7 +295,7 @@ class EsEngine(
                 (before == "nos" && v.grammar.startsWith("1 л. мн. ч.")))
             val gap = words.getOrNull(k + 1)?.takeIf { linked(i, it) }
             val prep = words.getOrNull(k + 2)?.takeIf { gap != null && linked(gap, it) && tokens[gap].text.lowercase().let { g -> g.endsWith("mente") || g in GAP_ADVERBS } }
-                ?.let { tokens[it].text.lowercase() }?.takeIf { it in VERB_PREPOSITIONS }
+                ?.let { tokens[it].text.lowercase().let { p -> CONTRACTED[p] ?: p } }?.takeIf { it in VERB_PREPOSITIONS }
             val key = when {
                 prep != null && reflexive && dict.contains("${lemma}se $prep") -> "${lemma}se $prep"
                 prep != null && dict.contains("$lemma $prep") && "$lemma $prep" !in BEFORE_INFINITIVE -> "$lemma $prep"
@@ -333,9 +337,12 @@ class EsEngine(
     fun phraseKey(tokens: List<RToken>, text: String, a: Int, b: Int): String? {
         if (b <= a || tokens.getOrNull(a)?.kind != TokenKind.HAN || tokens.getOrNull(b)?.kind != TokenKind.HAN) return null
         for (j in a + 1..b) if (tokens[j].kind == TokenKind.SPACE && tokens[j].text != " ") return null
-        val surface = text.substring(tokens[a].start, tokens[b].end).lowercase()
+        // A phrase ending in «de» / «a» written with the article joined: «a pesar del» is a pesar de + el.
+        val tail = CONTRACTED[tokens[b].text.lowercase()]
+        fun from(i: Int) = if (tail == null) text.substring(i, tokens[b].end).lowercase() else text.substring(i, tokens[b].start).lowercase() + tail
+        val surface = from(tokens[a].start)
         if (dict.contains(surface)) return surface
-        val rest = text.substring(tokens[a].end, tokens[b].end).lowercase()
+        val rest = from(tokens[a].end)
         val reflexive = reflexiveBefore(tokens, a)
         for (an in analyses(tokens[a].text)) {
             val lemma = an.entry.lemma
@@ -389,6 +396,8 @@ class EsEngine(
         if (reading == IN_PHRASE) return null
         // The first word of a phrase: the meaning of the phrase (trajeron cola: «вызвать последствия»).
         val e = pick(word, reading) ?: return null
+        // A name with no Russian meaning (Gustavo «a male given name»): no hint.
+        if (e.pos == "имя" && e.ru.isEmpty()) return null
         // A sense of the chosen variant wins over the general main meaning (carro: «автомобиль» in Latin America).
         e.ru.firstOrNull { variant.rank(it) == 0 }?.let { s -> shortSense(s)?.let { return it } }
         if (e.short.isNotEmpty()) return e.short
@@ -563,6 +572,8 @@ class EsEngine(
         /** Adverbs that may stand between a verb and its preposition (contamos ya con). */
         private val GAP_ADVERBS = setOf("ya", "también", "siempre", "aún", "todavía", "solo", "sólo", "nunca", "además", "hoy", "ahora", "más", "bien", "mucho", "apenas")
         private val VERB_PREPOSITIONS = setOf("a", "de", "con", "en", "por", "para")
+        /** A preposition joined with the article: what it is in a phrase. */
+        private val CONTRACTED = mapOf("del" to "de", "al" to "a")
         /** Verb + preposition that mean something else only before an infinitive: «volvió a llamar» «снова», not «volvió a casa». */
         private val BEFORE_INFINITIVE = setOf("volver a", "echar a", "echarse a", "ponerse a", "acabar de", "llegar a", "acabar por", "terminar por")
         /** Verbs whose forms after «se» are nearly always impersonal or passive (se está investigando, se tiene que). */
@@ -591,7 +602,8 @@ class EsEngine(
             "a menos que", "lo que", "a la vez", "a lo mejor", "por lo menos", "a lo largo de", "por lo general", "con todo")
         /** Dictionary phrases that in running text are nearly always the plain words. */
         private val PHRASE_NOISE = setOf("al día", "de la casa", "caso de", "en masa", "de más", "y todo", "de todo", "por todo",
-            "más que", "se puede", "y si", "ser como", "hacer de", "los más", "lo mismo", "la vida", "una de", "de esta")
+            "más que", "se puede", "y si", "ser como", "hacer de", "los más", "lo mismo", "la vida", "una de", "de esta",
+            "nada de", "cosa de", "ir de")
 
         /** Reflexive pronouns: «me di cuenta» reads as darse cuenta. */
         private val REFLEXIVE = setOf("me", "te", "se", "nos", "os")

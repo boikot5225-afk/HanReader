@@ -199,7 +199,9 @@ internal fun layout(
     glossFor: Map<String, String>? = null,
     /** Only these tokens get their translation drawn (it fades after a few appearances); null: all. */
     glossOnly: Set<Int>? = null,
-    style: com.hanreader.app.epub.EpubTextStyle = com.hanreader.app.epub.EpubTextStyle()
+    style: com.hanreader.app.epub.EpubTextStyle = com.hanreader.app.epub.EpubTextStyle(),
+    /** The paragraph's index in its chapter: the reader's meaning for one place is under «@<block>:<start>». */
+    blockIndex: Int = -1
 ): RubyLayout {
     if (style != com.hanreader.app.epub.EpubTextStyle()) {
         val inset = if (style.inset) minOf(metrics.emWidth * 1.4f, widthPx * 0.12f) else 0f
@@ -207,7 +209,7 @@ internal fun layout(
         val aligned = style.alignment in setOf("left", "center", "right")
         val laid = layout(tokens, contentWidth, metrics, heading, showPinyin, hidePinyinFor,
             gapPx, lineGapPx, justify && !aligned && !(style.inset && style.indent == false),
-            style.indent ?: (indent && !style.inset), glossFor, glossOnly)
+            style.indent ?: (indent && !style.inset), glossFor, glossOnly, blockIndex = blockIndex)
         val shifts = laid.items.groupBy { it.lineTop }.mapValues { (_, line) ->
             val end = line.maxOf { it.x + it.width }
             inset + when (style.alignment) {
@@ -220,7 +222,7 @@ internal fun layout(
             Placed(p.token, p.x + shifts.getValue(p.lineTop), p.lineTop, p.width, p.hanLayout, p.pinyinLayout)
         }
         // Refit hints after alignment: a long hint over a short, right-aligned line must stay on screen.
-        val glosses = if (glossFor != null && !heading) placeGlosses(placed, tokens, glossFor, metrics, widthPx, glossOnly) else emptyList()
+        val glosses = if (glossFor != null && !heading) placeGlosses(placed, tokens, glossFor, metrics, widthPx, glossOnly, blockIndex) else emptyList()
         return RubyLayout(placed, laid.height, laid.hanTop, laid.hanHeight, laid.lineHeight, laid.lineCount, laid.pinTop, glosses)
     }
     val hyphenate = com.hanreader.app.lang.Languages.current.hyphenate
@@ -281,7 +283,7 @@ internal fun layout(
     }
     if (justify && !heading) justifyLines(items, stretch, widthPx) { p -> p.token > 0 && tokens[p.token - 1].kind == TokenKind.SPACE }
     val count = if (items.isEmpty()) 0 else (y / lineH + 0.5f).toInt() + 1
-    val glosses = if (glossH > 0f) placeGlosses(items, tokens, glossFor!!, metrics, widthPx, glossOnly) else emptyList()
+    val glosses = if (glossH > 0f) placeGlosses(items, tokens, glossFor!!, metrics, widthPx, glossOnly, blockIndex) else emptyList()
     return RubyLayout(items, if (items.isEmpty()) 0f else y + lineH, glossH + pinH, hanH, lineH, count, glossH, glosses)
 }
 
@@ -291,7 +293,9 @@ internal fun layout(
  * cut with an ellipsis. Word widths never change, so lines break exactly as without translations.
  */
 /** The translation of a token: "text|reading" first (a character read as on the page), then the word. */
-internal fun glossOf(glossFor: Map<String, String>, t: RToken): String? {
+internal fun glossOf(glossFor: Map<String, String>, t: RToken, block: Int = -1): String? {
+    // The reader's meaning for this very place (ContextMeanings) wins.
+    if (block >= 0) glossFor["@$block:${t.start}"]?.let { return it }
     // An empty hint for a reading: no hint at all (a word inside a phrase whose first word carries it).
     if (t.pinyin.isNotEmpty()) glossFor[t.text + "|" + t.pinyin]?.let { return it.ifEmpty { null } }
     return glossFor[t.text]
@@ -303,11 +307,13 @@ private fun placeGlosses(
     glossFor: Map<String, String>,
     metrics: RubyMetrics,
     widthPx: Float,
-    only: Set<Int>? = null
+    only: Set<Int>? = null,
+    block: Int = -1
 ): List<GlossPlaced> {
     val out = ArrayList<GlossPlaced>()
     // A word broken across lines gets its translation once, over its first part.
-    val byLine = items.distinctBy { it.token }.filter { tokens[it.token].kind == TokenKind.HAN && (only == null || it.token in only) && glossOf(glossFor, tokens[it.token]) != null }
+    val byLine = items.distinctBy { it.token }.filter { tokens[it.token].kind == TokenKind.HAN && (only == null || it.token in only || block >= 0 && "@$block:${tokens[it.token].start}" in glossFor) &&
+        glossOf(glossFor, tokens[it.token], block) != null }
         .groupBy { it.lineTop }
     val pad = metrics.emWidth * 0.15f
     for ((top, line) in byLine) {
@@ -316,7 +322,7 @@ private fun placeGlosses(
             val left = if (k == 0) 0f else (centres[k - 1] + centres[k]) / 2f + pad
             val right = if (k == line.lastIndex) widthPx else (centres[k] + centres[k + 1]) / 2f - pad
             val room = (right - left).coerceAtLeast(metrics.emWidth.toFloat())
-            val g = metrics.gloss(glossOf(glossFor, tokens[p.token])!!, room.toInt())
+            val g = metrics.gloss(glossOf(glossFor, tokens[p.token], block)!!, room.toInt())
             val gx = (centres[k] - g.size.width / 2f).coerceIn(left, (right - g.size.width).coerceAtLeast(left))
             out += GlossPlaced(p.token, gx, top, g)
         }
@@ -365,7 +371,9 @@ fun RubyParagraph(
     /** Tokens whose translation is drawn; null: every one in [glossFor]. */
     glossOnly: Set<Int>? = null,
     /** A tap on a footnote mark (the «4» of «Villa4»): shows the note's text. */
-    onNote: ((String) -> Unit)? = null
+    onNote: ((String) -> Unit)? = null,
+    /** The paragraph's index in its chapter, for the reader's meanings of one place; -1: none. */
+    blockIndex: Int = -1
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val density = LocalDensity.current
@@ -374,8 +382,8 @@ fun RubyParagraph(
         val lineGapPx = with(density) { colors.lineGap.toPx() }
         // Names (noMarks) get no translation over them either.
         val only = if (noMarks.isEmpty()) glossOnly else (glossOnly ?: block.tokens.indices.toSet()) - noMarks
-        val laid = remember(block, widthPx, metrics, showPinyin, hidePinyinFor, colors, glossFor, only) {
-            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx, colors.justify, colors.indent, glossFor, only, block.style)
+        val laid = remember(block, widthPx, metrics, showPinyin, hidePinyinFor, colors, glossFor, only, blockIndex) {
+            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx, colors.justify, colors.indent, glossFor, only, block.style, blockIndex)
         }
         val shown = lines ?: (0 until laid.lineCount)
         val offsetY = shown.first * laid.lineHeight
@@ -599,7 +607,9 @@ internal fun fadingGlosses(chapter: ChapterContent, glossFor: Map<String, String
     chapter.blocks.forEachIndexed { bi, b ->
         val keep = HashSet<Int>()
         (b as? ReaderBlock.Text)?.tokens?.forEachIndexed { ti, t ->
-            if (t.kind == TokenKind.HAN && glossOf(glossFor, t) != null && (bi < fromBlock || seen.merge(if (' ' in t.pinyin) t.pinyin else t.text, 1, Int::plus)!! <= repeats)) keep += ti
+            // The reader's meaning for this place is always drawn.
+            if (t.kind == TokenKind.HAN && "@$bi:${t.start}" in glossFor) keep += ti
+            else if (t.kind == TokenKind.HAN && glossOf(glossFor, t, bi) != null && (bi < fromBlock || seen.merge(if (' ' in t.pinyin) t.pinyin else t.text, 1, Int::plus)!! <= repeats)) keep += ti
         }
         out[bi] = keep
     }
