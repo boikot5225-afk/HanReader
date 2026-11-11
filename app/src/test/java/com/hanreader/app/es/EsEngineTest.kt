@@ -254,6 +254,25 @@ class EsEngineTest {
         assertEquals("резня", engine.glossShort("matanza"))
     }
 
+    /** Combinations of a whole book that read wrongly word by word. */
+    @Test
+    fun bookCombinations() {
+        fun key(text: String, word: String) = engine.inContext(engine.tokenize(text), text).first { it.text == word }.pinyin
+        fun gloss(text: String, word: String) = engine.inContext(engine.tokenize(text), text).first { it.text == word }.let { engine.glossShort(it.text, it.pinyin) }
+        assertEquals("конспиративные квартиры", gloss("Tenían varias casas francas en Juárez.", "casas"))
+        assertEquals("конспиративная квартира", gloss("Lo llevaron a una casa franca.", "casa"))
+        assertEquals("триллион долларов", gloss("Un billón de dólares al año.", "billón"))
+        assertEquals("миллиарды", gloss("Ganan miles de millones de dólares.", "miles"))
+        assertEquals("застреленный", gloss("Fue muerto a tiros en la calle.", "muerto"))
+        assertEquals("застрелить", gloss("Lo mataron a tiros.", "mataron"))
+        assertEquals("сборочный завод", gloss("Trabajar en las plantas de montaje de la frontera.", "plantas"))
+        assertEquals("жилой квартал", gloss("Crecieron a razón de una manzana de viviendas al día.", "manzana"))
+        assertEquals("спецназ", gloss("Las fuerzas especiales llegaron.", "fuerzas"))
+        assertEquals("обнародовать", gloss("La noticia se hizo pública ayer.", "hizo"))
+        assertEquals("генпрокурор", gloss("El fiscal general habló.", "fiscal"))
+        assertEquals("давно", gloss("Hace tiempo que no lo veo.", "Hace"))
+    }
+
     @Test
     fun ordinaryWordPairsAreNotPhrases() {
         val text = "La casa de la vida de una de esas personas."
