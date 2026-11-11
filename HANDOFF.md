@@ -1,6 +1,6 @@
 # HanReader — передача дел следующей сессии
 
-Состояние на 8 ноября 2026, версия **0.20.0** (versionCode 40), ветка `ccr-954eeb21-p65jbl`.
+Состояние на 8 ноября 2026, версия **0.21.0** (versionCode 41), ветка `ccr-954eeb21-p65jbl`.
 
 ## Владелец и договорённости
 
@@ -24,7 +24,7 @@ Android-читалка китайских книг (Kotlin, Jetpack Compose, Roo
 - Окружение «HanReader Android»: доступ к dl.google.com, kaikki.org (если сессия стартовала в «Default» — переключить через switch_environment); секрет для api.deepseek.com сохранён в настройках среды (ключ в командах — заглушка `proxy-injected`).
 - Android SDK: `/opt/android-sdk` (`local.properties`, не в git). В новой машине его нет: скачать commandlinetools с dl.google.com, `sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"`.
 - Maven Central отвечает 429: `~/.gradle/init.d/mirror.gradle` подменяет repo.maven.apache.org / repo1.maven.org на `https://maven-central.storage-download.googleapis.com/maven2/`; `~/.gradle/gradle.properties` — `robolectricRepoUrl` на то же зеркало. Первый прогон — без `--offline`.
-- Тесты: `gradle :app:testDebugUnitTest --offline -q` (167 тестов, 6 пропускаются: замеры на книгах и скриншоты для магазина). Robolectric; скриншоты UI рисуются через `decorView.draw`.
+- Тесты: `gradle :app:testDebugUnitTest --offline -q` (175 тестов, 7 пропускаются: замеры на книгах и скриншоты для магазина). Robolectric; скриншоты UI рисуются через `decorView.draw`.
 - APK: `gradle clean :app:assembleDebug --offline -q` (всегда `clean`).
 
 ## GitHub (boikot5225-afk/HanReader, публичный)
@@ -54,6 +54,15 @@ Android-читалка китайских книг (Kotlin, Jetpack Compose, Roo
 - Счётные слова: `zh/measure.tsv` (`tools/extract_measure_words.py`), строка «Счётное слово» в карточке.
 - Без русского остались ~50 связанных иероглифов (咐, 徨…): модель отвечает с иероглифами, фильтр отбрасывает.
 - Исходники для повторной сборки (kaikki Chinese .jsonl.gz, ~156 МБ) в репозиторий не кладутся — скачиваются с kaikki.org.
+
+## Сегментатор и словарь (0.21.0)
+
+- Замер разбивки: эталон — 6 тыс. современных предложений из Викисловаря, размеченных моделью (в scratchpad, не в репо); `SegmentDumpTest` (HANREADER_SEG_IN/OUT) + `tools/seg_eval.py`. F1 0,806 → 0,819.
+- lexicon.bin: бит 29 «рыхлое» сочетание (Jieba без значения, начинается/кончается служебным словом или два словарных слова) — сегментатор его не склеивает. Контекстные правила — `ZhSegmenter.refine`.
+- Китайские имена книги: `ChineseNames` в BookVocabulary.kt (версия анализа 3).
+- Значения: `tools/order_senses_ru.py` (итоговая статья) → `tools/rank_senses_ru.py` (только порядок) → `tools/update_ru_ai.py … --all`. Приложение показывает ru_ai раньше Викисловаря.
+- Лимиты файлов: `BookLimits` (BookSource.kt).
+- Сборка в RuStore — 0.14.4 (31), подпись релизная `59345a3b…d97859`, без INTERNET, не debuggable (проверено 11.11).
 
 ## Известные ограничения
 

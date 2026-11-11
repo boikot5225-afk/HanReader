@@ -30,8 +30,13 @@ class DictionaryExtrasTest {
         val senses = e.russianSenses("画蛇添足")
         assertTrue(senses.any { it.startsWith("букв.") })
         assertEquals(ZhEngine.RussianSource.AI, e.russianSource("画蛇添足"))
-        // Ordinary words keep the Wiktionary first.
-        assertEquals(ZhEngine.RussianSource.WIKTIONARY, e.russianSource("事实"))
+        // Frequent words: the commonest sense first (东西 «вещь», not «восток и запад»).
+        assertTrue(e.russianSenses("东西").first().contains("вещь"))
+        assertTrue(e.russianSenses("本事").first().contains("способность"))
+        // Rare words only the Russian Wiktionary has keep it.
+        assertEquals(ZhEngine.RussianSource.WIKTIONARY, e.russianSource("一神教"))
+        // Characters used only inside one word say so.
+        assertTrue(e.russianSenses("咐").first().contains("吩咐"))
         // Names and terms now have Russian too.
         assertTrue(e.russianSenses("长城").first().contains("Великая Китайская стена"))
     }

@@ -9,7 +9,10 @@ Applied in order:
 Senses are joined by "; ". Words the Russian Wiktionary (ru.tsv) covers are left out, except set
 expressions (idioms, proverbs, xiehouyu), whose machine translation the app prefers.
 
-Usage: python3 tools/update_ru_ai.py <verdicts.jsonl> <translations.jsonl>
+With --all, words the Russian Wiktionary covers are written too (final entries of
+tools/order_senses_ru.py, which already took the Wiktionary senses into account).
+
+Usage: python3 tools/update_ru_ai.py <verdicts.jsonl> <translations.jsonl> [--all]
 """
 import gzip
 import json
@@ -23,7 +26,7 @@ def norm(ru):
     return "; ".join(s.strip() for s in ru.replace("\t", " ").split(";") if s.strip())
 
 
-def main(verdicts, translations):
+def main(verdicts, translations, everything=False):
     path = os.path.join(ASSETS, "ru_ai.tsv")
     rows = {}
     for line in open(path, encoding="utf-8"):
@@ -47,7 +50,7 @@ def main(verdicts, translations):
         # Set expressions are kept even where the Russian Wiktionary has them: the app shows the
         # «смысл; букв.: …» form first for them (ZhEngine.russianSenses).
         is_saying = any(k in lexicon.get(w, "") for k in ("(idiom)", "(proverb)", "(xiehouyu)"))
-        if (w in wikt and not is_saying) or not m or w not in lexicon:
+        if (w in wikt and not is_saying and not everything) or not m or w not in lexicon:
             continue
         if w in rows:
             replaced += rows[w] != m
@@ -61,6 +64,7 @@ def main(verdicts, translations):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    args = [a for a in sys.argv[1:] if a != "--all"]
+    if len(args) != 2:
         sys.exit(__doc__)
-    main(*sys.argv[1:])
+    main(*args, everything="--all" in sys.argv)

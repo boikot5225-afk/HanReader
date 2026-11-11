@@ -98,16 +98,15 @@ class ZhEngine(
 
     enum class RussianSource(val label: String) {
         WIKTIONARY("Викисловарь"),
-        AI("машинный перевод CC-CEDICT и Викисловаря"),
+        AI("по CC-CEDICT и Викисловарю, машинная редакция"),
         READING("машинный перевод CC-CEDICT, по чтению")
     }
 
     /** Where the Russian meaning of a word comes from, or null when there is none. */
     fun russianSource(word: String): RussianSource? = when {
         word in russianChars -> RussianSource.READING
-        word in russianAi && isSaying(word) -> RussianSource.AI
-        word in russian -> RussianSource.WIKTIONARY
         word in russianAi -> RussianSource.AI
+        word in russian -> RussianSource.WIKTIONARY
         else -> null
     }
 
@@ -133,20 +132,14 @@ class ZhEngine(
     /**
      * Russian senses of a word. A single character takes the meanings of the reading on the page
      * ([reading], e.g. 得 de after a verb), since a character's Wiktionary page mixes all its
-     * readings. Idioms and proverbs: the machine translation («смысл; букв.: …») first. Other words:
-     * the Russian Wiktionary first, then the machine translation.
+     * readings. Words: the edited entry (ru_ai: frequent words ordered by use, idioms as
+     * «смысл; букв.: …», made from CC-CEDICT, both Wiktionaries) first, else the Russian Wiktionary.
      */
     fun russianSenses(word: String, reading: String? = null): List<String> {
         charEntry(word, reading)?.let { e -> return e.second.split(";").map { it.trim() }.filter { it.isNotEmpty() } }
-        // Idioms and proverbs: the machine translation gives the figurative sense and «букв.: …».
-        if (isSaying(word)) russianAi[word]?.let { v -> return v.split(";").map { it.trim() }.filter { it.isNotEmpty() } }
-        russian[word]?.let { v -> return v.split(" ; ").map { it.trim() }.filter { it.isNotEmpty() } }
-        return russianAi[word]?.split(";")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+        russianAi[word]?.let { v -> return v.split(";").map { it.trim() }.filter { it.isNotEmpty() } }
+        return russian[word]?.split(" ; ")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
     }
-
-    /** A chengyu, proverb or xiehouyu (marked in its English meaning, CC-CEDICT style). */
-    private fun isSaying(word: String): Boolean = word.length >= 3 &&
-        dictionary.lookup(word)?.gloss?.let { g -> "(idiom)" in g || "(proverb)" in g || "(xiehouyu)" in g } == true
 
     private fun toneless(p: String): String = java.text.Normalizer.normalize(p.lowercase(), java.text.Normalizer.Form.NFD)
         .filter { it in 'a'..'z' }.replace("v", "u")
