@@ -5,12 +5,22 @@ on:
     # experiment/** and claude/**: tests and an APK artifact only, never the public beta.
     branches: [main, 'ccr-*', 'experiment/**', 'claude/**']
   workflow_dispatch:
+    inputs:
+      publish_run_id:
+        description: 'Completed Android CI run whose APK should be published (leave empty for a normal build)'
+        required: false
+        type: string
+      publish_tag:
+        description: 'New es-* prerelease tag for the APK'
+        required: false
+        type: string
 # Two pushes in a row: the newer build replaces the older one.
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ github.ref }}-${{ inputs.publish_run_id || 'build' }}
   cancel-in-progress: true
 jobs:
   build:
+    if: inputs.publish_run_id == ''
     runs-on: ubuntu-latest
     permissions:
       # write: to publish the beta APK as a release asset.
@@ -111,3 +121,35 @@ jobs:
           name: hanreader-signed-release-apk
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+  publish_es_apk:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_run_id != ''
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_ID: ${{ inputs.publish_run_id }}
+      RELEASE_TAG: ${{ inputs.publish_tag }}
+      SOURCE_BRANCH: ${{ github.ref_name }}
+    steps:
+      - name: Verify successful build from this branch
+        shell: bash
+        run: |
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$RELEASE_TAG" =~ ^es-[A-Za-z0-9._-]+$ ]]
+          gh run watch "$RUN_ID" --exit-status --interval 10
+          gh run view "$RUN_ID" --json name,headBranch,headSha,conclusion > build.json
+          jq -e --arg branch "$SOURCE_BRANCH" '.name == "HanReader Android CI" and .headBranch == $branch and .conclusion == "success"' build.json
+          echo "SOURCE_SHA=$(jq -r .headSha build.json)" >> "$GITHUB_ENV"
+      - name: Download tested APK
+        shell: bash
+        run: |
+          gh run download "$RUN_ID" --name hanreader-debug-apk --dir apk
+          cp apk/app-debug.apk HanReader-ES-epigraph.apk
+      - name: Publish separate ES prerelease
+        shell: bash
+        run: |
+          printf 'HanReader ES: исправлено отображение цитат и эпиграфов EPUB.\n\nПроверенная сборка из ветки %s, коммит %s.\n' "$SOURCE_BRANCH" "$SOURCE_SHA" > notes.md
+          gh release create "$RELEASE_TAG" HanReader-ES-epigraph.apk --target "$SOURCE_SHA" --title 'HanReader ES — исправление цитат' --notes-file notes.md --prerelease --latest=false
