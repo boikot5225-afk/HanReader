@@ -9,19 +9,30 @@ All numbers little-endian int32; sections in this order, each starting on a 4-by
   words    uint16[...]  every word, UTF-16, sorted by word (padded to 4 bytes)
   table    int32[T]     open addressing, linear probing: entry index + 1, 0 = empty;
                         slot = Java String.hashCode(word) & (T-1)
-  rank     int32[N]     HSK frequency rank (0 = unranked); bit 30 set if the entry has a meaning
+  rank     int32[N]     HSK frequency rank (0 = unranked); bit 30 set if the entry has a meaning;
+                        bit 29 set if the entry is "loose": a Jieba combination without a meaning,
+                        not a proper name, that starts or ends with a function word (一个, 放在,
+                        是因为) or is two dictionary words together (解决问题) — the segmenter does not keep it whole, its parts are the words
   freq     int32[N]     Jieba count
   pyOff    int32[N+1]   offsets into pinyin bytes;  pinyin  UTF-8 bytes (padded)
   glOff    int32[N+1]   offsets into gloss bytes;   gloss   UTF-8 bytes (padded)
 
+Proper names come from app/src/main/assets/zh/names.tsv (next to the output file).
+
 Usage: python3 tools/build_lexicon_bin.py data/zh/lexicon.dat app/src/main/assets/zh/lexicon.bin
 """
 import gzip
+import os
 import struct
 import sys
 
 VERSION = 1
 HAS_DEF = 1 << 30
+LOOSE = 1 << 29
+# A Jieba combination is loose when a function word starts or ends it: numerals and demonstratives,
+# adverbs, coverbs, pronouns in front (一个, 很大, 是因为, 我会); particles and complements behind (放在, 美的).
+LOOSE_FIRST = set("零一二三四五六七八九十百千万两几每这那哪某各不没很最更也都就还又才再只已曾将正是有在把被给让叫对向往从和与跟同比为以用我你他她它谁")
+LOOSE_LAST = set("的了着过得地在到给是有不们吗呢吧啊")
 
 
 def java_hash(s: str) -> int:
@@ -69,7 +80,19 @@ def main(src: str, out: str) -> None:
         return off, bytes(data)
     py_off, py = block(r[1] for r in rows)
     gl_off, gl = block(r[2] for r in rows)
-    rank = [r[3] | (HAS_DEF if r[2] else 0) for r in rows]
+    names_path = os.path.join(os.path.dirname(os.path.abspath(out)), "names.tsv")
+    names = {l.split("\t")[0] for l in open(names_path, encoding="utf-8")} if os.path.exists(names_path) else set()
+    defined = {r[0] for r in rows if r[2]}
+    def loose(r):
+        w = r[0]
+        if r[2] or len(w) < 2 or w in names:
+            return False
+        if w[0] in LOOSE_FIRST or w[-1] in LOOSE_LAST:
+            return True
+        # Two dictionary words written together: 解决问题, 产品质量.
+        return len(w) in (4, 5) and any(w[:k] in defined and w[k:] in defined for k in (2, 3) if len(w) - k >= 2)
+    rank = [r[3] | (HAS_DEF if r[2] else 0) | (LOOSE if loose(r) else 0) for r in rows]
+    print(f"{sum(1 for r in rows if loose(r))} loose combinations")
     freq = [r[4] for r in rows]
     total = sum(freq)
     max_len = max(len(r[0]) for r in rows)

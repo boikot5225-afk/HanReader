@@ -40,6 +40,9 @@ android {
             providers.environmentVariable("HANREADER_TEST_EPUB").orNull?.let {
                 test.environment("HANREADER_TEST_EPUB", it)
             }
+            for (name in listOf("HANREADER_SEG_IN", "HANREADER_SEG_OUT")) {
+                providers.environmentVariable(name).orNull?.let { test.environment(name, it) }
+            }
             providers.environmentVariable("HANREADER_STORE_SHOTS").orNull?.let {
                 test.environment("HANREADER_STORE_SHOTS", it)
             }

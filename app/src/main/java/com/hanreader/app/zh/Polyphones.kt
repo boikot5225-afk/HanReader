@@ -62,7 +62,7 @@ object Polyphones {
             '倒' -> if (next != null && next[0] in "在地下") "dǎo" else null
             '背' -> if (next != null && next[0] in "起包走回") "bēi" else null
             '量' -> if (prev?.endsWith("一") == true || next != null && (next[0] in "一了体血身尺" || next == "量")) "liáng" else null
-            '假' -> if (prev != null && (prev.last() in "放请休度暑寒病婚产" || prev.length >= 2 && prev.last() == '天' && prev[0] in COUNTERS)) "jià" else null
+            '假' -> if (prev != null && (prev.last() in "放请休度暑寒病婚产" || prev == "天" || prev.length >= 2 && prev.last() == '天' && prev[0] in COUNTERS)) "jià" else null
             '着' -> if (prev != null && next != null && prev.last() in "猜点烧摸够睡找" && next[0] == '了') "zháo" else null
             '了' -> if (prev == "不") "liǎo" else null
             '削' -> "xiāo"

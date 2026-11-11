@@ -88,6 +88,30 @@ class ZhSegmenterTest {
         expected.forEach { (word, reading) -> assertEquals(word, reading, dict.lookup(word)!!.pinyin) }
     }
 
+    /**
+     * The sentence set in src/test/resources/segmentation.tsv: words in context (把门 as 把 + 门
+     * before a verb, 才能 as 才 + 能, numerals apart from measure words). Lines starting with "?"
+     * are known hard cases: counted, not required.
+     */
+    @Test
+    fun sentenceSet() {
+        val lines = javaClass.classLoader!!.getResourceAsStream("segmentation.tsv")!!.bufferedReader().readLines()
+            .filter { it.isNotBlank() && !it.startsWith("#") }
+        assertTrue(lines.size >= 60)
+        val failures = ArrayList<String>()
+        var hard = 0
+        var hardPassed = 0
+        for (line in lines) {
+            val optional = line.startsWith("?")
+            val (sentence, expected) = line.removePrefix("?").split("\t")
+            val got = words(sentence).joinToString(" ")
+            if (optional) { hard++; if (got == expected) hardPassed++ }
+            else if (got != expected) failures += "$sentence\n    expected $expected\n    got      $got"
+        }
+        println("Segmentation set: ${lines.size - hard - failures.size}/${lines.size - hard} pass, hard cases $hardPassed/$hard")
+        assertTrue(failures.joinToString("\n", "\n"), failures.isEmpty())
+    }
+
     /** Regression cases carried over from Reader AI (data/zh_lexical_regressions.json). */
     @Test
     fun readerAiRegressions() {
