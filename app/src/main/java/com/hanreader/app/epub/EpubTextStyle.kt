@@ -19,7 +19,8 @@ internal class EpubStyles(doc: Document, sheets: List<String>) {
     init {
         for (sheet in sheets) {
             val css = sheet.replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), "")
-            for (rule in Regex("([^{}]+)\\{([^{}]*)}").findAll(css)) {
+            // Android uses ICU: unlike the host JVM, it rejects an unescaped closing brace.
+            for (rule in Regex("([^{}]+)\\{([^{}]*)\\}").findAll(css)) {
                 val declarations = declarations(rule.groupValues[2])
                 if (declarations.isEmpty()) continue
                 for (selector in rule.groupValues[1].split(',')) {
