@@ -16,10 +16,10 @@ data class EpubChapter(val index: Int, val path: String, val title: String)
 /** A table-of-contents line pointing into a spine item. */
 data class TocEntry(val title: String, val chapterIndex: Int, val depth: Int)
 
-/** What the reader renders: paragraphs, headings and images. Styling from the book is dropped. */
+/** What the reader renders: paragraphs, headings and images, with basic paragraph geometry. */
 sealed interface EpubBlock {
     /** [notes]: footnote marks inside [text] (the «4» of «Villa4»), resolved by [BookSource.note]. */
-    data class Text(val text: String, val heading: Boolean, val notes: List<EpubNote> = emptyList()) : EpubBlock
+    data class Text(val text: String, val heading: Boolean, val notes: List<EpubNote> = emptyList(), val style: EpubTextStyle = EpubTextStyle()) : EpubBlock
     data class Image(val path: String) : EpubBlock
 }
 
@@ -95,7 +95,10 @@ class EpubBook(file: File) : BookSource {
         val html = text(chapter.path) ?: return emptyList()
         val doc = Jsoup.parse(html)
         val out = ArrayList<EpubBlock>()
-        BlockWalker(chapter.path.substringBeforeLast('/', ""), out).walk(doc.body(), heading = false)
+        val base = chapter.path.substringBeforeLast('/', "")
+        val sheets = doc.select("link[href]").filter { it.attr("rel").equals("stylesheet", true) }
+            .mapNotNull { text(resolve(base, it.attr("href"))) } + doc.select("style").map { it.data() }
+        BlockWalker(base, out, EpubStyles(doc, sheets)).walk(doc.body(), heading = false)
         return out
     }
 
@@ -212,7 +215,8 @@ class EpubBook(file: File) : BookSource {
         nav.children().filter { it.tagName() == "ol" }.forEach { visit(it, 0) }
     }
 
-    private class BlockWalker(private val base: String, private val out: MutableList<EpubBlock>) {
+    private class BlockWalker(private val base: String, private val out: MutableList<EpubBlock>, private val styles: EpubStyles) {
+        private var bufferStyle = EpubTextStyle()
         private val buffer = StringBuilder()
         private var bufferHeading = false
 
@@ -243,8 +247,11 @@ class EpubBook(file: File) : BookSource {
                         tag in BLOCKS -> {
                             flush()
                             val isHeading = heading || tag in HEADINGS
+                            val parentStyle = bufferStyle
+                            bufferStyle = styles.textStyle(node)
                             for (child in node.childNodes()) visit(child, isHeading)
                             flush()
+                            bufferStyle = parentStyle
                         }
                         else -> for (child in node.childNodes()) visit(child, heading)
                     }
@@ -306,7 +313,7 @@ class EpubBook(file: File) : BookSource {
                 i++
             }
             val clean = text.toString()
-            if (clean.isNotBlank()) out += EpubBlock.Text(clean, bufferHeading, notes)
+            if (clean.isNotBlank()) out += EpubBlock.Text(clean, bufferHeading, notes, bufferStyle)
         }
     }
 

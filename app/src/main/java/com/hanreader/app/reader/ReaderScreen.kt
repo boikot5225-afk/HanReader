@@ -1017,16 +1017,25 @@ private fun ScrollChapter(
             start = appearance.margin.dp, end = appearance.margin.dp,
             top = bars.calculateTopPadding() + 16.dp, bottom = bars.calculateBottomPadding() + 16.dp
         ),
-        verticalArrangement = Arrangement.spacedBy(appearance.paragraphSpacing.dp)
+        verticalArrangement = Arrangement.Top
     ) {
         item(key = "prepare:${chapter.index}") { banner() }
         itemsIndexed(chapter.blocks, key = { i, _ -> "${chapter.index}:$i" }) { i, block ->
             when (block) {
-                is ReaderBlock.Text -> paragraph(block, i, null)
-                is ReaderBlock.Image -> BookImage(vm, block.path)
+                is ReaderBlock.Text -> Column {
+                    if (!block.style.compactBefore) Spacer(Modifier.height(appearance.paragraphSpacing.dp))
+                    paragraph(block, i, null)
+                }
+                is ReaderBlock.Image -> Column {
+                    Spacer(Modifier.height(appearance.paragraphSpacing.dp))
+                    BookImage(vm, block.path)
+                }
             }
         }
-        item(key = "footer:${chapter.index}") { footer() }
+        item(key = "footer:${chapter.index}") {
+            Spacer(Modifier.height(appearance.paragraphSpacing.dp))
+            footer()
+        }
     }
 }
 

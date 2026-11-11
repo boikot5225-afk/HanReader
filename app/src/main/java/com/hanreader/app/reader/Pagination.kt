@@ -79,7 +79,7 @@ object Paginator {
                 is ReaderBlock.Text -> {
                     val laid = layout(
                         block.tokens, spec.widthPx, metrics, block.heading, spec.showPinyin, spec.hidePinyinFor,
-                        spec.gapPx, spec.lineGapPx, spec.justify, spec.indent, spec.glossFor
+                        spec.gapPx, spec.lineGapPx, spec.justify, spec.indent, spec.glossFor, style = block.style
                     )
                     if (laid.lineCount == 0) continue
                     val lineChars = IntArray(laid.lineCount)
@@ -94,7 +94,7 @@ object Paginator {
                     }
                     var line = 0
                     while (line < laid.lineCount) {
-                        val gap = if (items.isEmpty() || line > 0) 0f else spec.paragraphSpacingPx
+                        val gap = if (items.isEmpty() || line > 0 || block.style.compactBefore) 0f else spec.paragraphSpacingPx
                         var room = ((spec.heightPx - y - gap) / laid.lineHeight).toInt()
                         if (room <= 0) {
                             if (items.isNotEmpty()) {

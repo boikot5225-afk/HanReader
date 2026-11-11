@@ -198,8 +198,31 @@ internal fun layout(
     /** Short translations to draw above the pinyin (word -> text); null: no translation row. */
     glossFor: Map<String, String>? = null,
     /** Only these tokens get their translation drawn (it fades after a few appearances); null: all. */
-    glossOnly: Set<Int>? = null
+    glossOnly: Set<Int>? = null,
+    style: com.hanreader.app.epub.EpubTextStyle = com.hanreader.app.epub.EpubTextStyle()
 ): RubyLayout {
+    if (style != com.hanreader.app.epub.EpubTextStyle()) {
+        val inset = if (style.inset) minOf(metrics.emWidth * 1.4f, widthPx * 0.12f) else 0f
+        val contentWidth = (widthPx - inset * 2).coerceAtLeast(1f)
+        val aligned = style.alignment in setOf("left", "center", "right")
+        val laid = layout(tokens, contentWidth, metrics, heading, showPinyin, hidePinyinFor,
+            gapPx, lineGapPx, justify && !aligned && !(style.inset && style.indent == false),
+            style.indent ?: (indent && !style.inset), glossFor, glossOnly)
+        val shifts = laid.items.groupBy { it.lineTop }.mapValues { (_, line) ->
+            val end = line.maxOf { it.x + it.width }
+            inset + when (style.alignment) {
+                "right" -> (contentWidth - end).coerceAtLeast(0f)
+                "center" -> (contentWidth - end).coerceAtLeast(0f) / 2f
+                else -> 0f
+            }
+        }
+        val placed = laid.items.map { p ->
+            Placed(p.token, p.x + shifts.getValue(p.lineTop), p.lineTop, p.width, p.hanLayout, p.pinyinLayout)
+        }
+        // Refit hints after alignment: a long hint over a short, right-aligned line must stay on screen.
+        val glosses = if (glossFor != null && !heading) placeGlosses(placed, tokens, glossFor, metrics, widthPx, glossOnly) else emptyList()
+        return RubyLayout(placed, laid.height, laid.hanTop, laid.hanHeight, laid.lineHeight, laid.lineCount, laid.pinTop, glosses)
+    }
     val hyphenate = com.hanreader.app.lang.Languages.current.hyphenate
     // The pinyin row is kept even above known words, so lines keep one rhythm; so is the translation row.
     val glossH = if (glossFor != null && !heading) metrics.glossHeight.toFloat() else 0f
@@ -352,7 +375,7 @@ fun RubyParagraph(
         // Names (noMarks) get no translation over them either.
         val only = if (noMarks.isEmpty()) glossOnly else (glossOnly ?: block.tokens.indices.toSet()) - noMarks
         val laid = remember(block, widthPx, metrics, showPinyin, hidePinyinFor, colors, glossFor, only) {
-            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx, colors.justify, colors.indent, glossFor, only)
+            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx, colors.justify, colors.indent, glossFor, only, block.style)
         }
         val shown = lines ?: (0 until laid.lineCount)
         val offsetY = shown.first * laid.lineHeight

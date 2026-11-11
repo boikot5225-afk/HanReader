@@ -518,7 +518,8 @@ sealed interface ReaderBlock {
         val heading: Boolean,
         val tokens: List<RToken>,
         val shown: String = text,
-        val notes: List<ReaderNote> = emptyList()
+        val notes: List<ReaderNote> = emptyList(),
+        val style: com.hanreader.app.epub.EpubTextStyle = com.hanreader.app.epub.EpubTextStyle()
     ) : ReaderBlock
     data class Image(val path: String) : ReaderBlock
 }
@@ -556,7 +557,7 @@ object ChapterBuilder {
                     chars += b.text.length
                     val p = prepare(b.text)
                     val notes = b.notes.mapNotNull { n -> book.note(index, n.ref)?.let { ReaderNote(n.start, n.end, it) } }
-                    ReaderBlock.Text(p.text, b.heading, p.tokens, p.shown, notes)
+                    ReaderBlock.Text(p.text, b.heading, p.tokens, p.shown, notes, b.style)
                 }
             }
         }

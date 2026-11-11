@@ -30,6 +30,7 @@ import com.hanreader.app.reader.rubyColors
 import com.hanreader.app.zh.TokenKind
 import org.junit.Rule
 import org.junit.Test
+import org.junit.After
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -39,7 +40,8 @@ import java.io.File
 /**
  * Pages of Spanish text drawn by the reader, to look at the layout of a language with spaces.
  * By default a sample text written for the test (test resources es/muestra.txt); with a book of
- * your own (not committed): HANREADER_ES_BOOK=/path/book.epub. Output: build/screens/es-*.png
+ * your own (not committed): HANREADER_ES_BOOK=/path/book.epub; HANREADER_ES_CHAPTER selects a
+ * zero-based spine index for checking a particular epigraph. Output: build/screens/es-*.png
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w360dp-h640dp-xxhdpi")
@@ -56,7 +58,8 @@ class SpanishScreensTest {
 
     /** The first chapter with real body text. */
     private val index by lazy {
-        book.chapters.indices.firstOrNull { i -> book.blocks(i).sumOf { (it as? com.hanreader.app.epub.EpubBlock.Text)?.text?.length ?: 0 } > 3000 } ?: 0
+        System.getenv("HANREADER_ES_CHAPTER")?.toIntOrNull()?.takeIf { it in book.chapters.indices }
+            ?: book.chapters.indices.firstOrNull { i -> book.blocks(i).sumOf { (it as? com.hanreader.app.epub.EpubBlock.Text)?.text?.length ?: 0 } > 3000 } ?: 0
     }
 
     private fun shot(name: String) {
@@ -87,7 +90,12 @@ class SpanishScreensTest {
         )
     }
 
-    private fun on() = Unit
+    private val languageBefore = com.hanreader.app.lang.Languages.current
+
+    private fun on() { com.hanreader.app.lang.Languages.current = com.hanreader.app.lang.Languages.SPANISH }
+
+    @After
+    fun restoreLanguage() { com.hanreader.app.lang.Languages.current = languageBefore }
 
     @Test
     fun plainPage() {
