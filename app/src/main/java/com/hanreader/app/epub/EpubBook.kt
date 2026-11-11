@@ -101,7 +101,10 @@ class EpubBook(file: File) : BookSource {
         return null
     }
 
-    override fun bytes(path: String): ByteArray? = zip.getEntry(path)?.let { e -> zip.getInputStream(e).use { it.readBytes() } }
+    /** A file of the book; null if absent or larger than [BookLimits.MAX_ENTRY] (a broken or malicious archive). */
+    override fun bytes(path: String): ByteArray? = zip.getEntry(path)?.let { e ->
+        runCatching { zip.getInputStream(e).use { BookLimits.read(it, BookLimits.MAX_ENTRY) } }.getOrNull()
+    }
 
     override fun close() = zip.close()
 

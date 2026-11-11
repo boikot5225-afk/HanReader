@@ -116,6 +116,41 @@ class EdgeCasesTest {
         emptyTxt.chapters.forEach { emptyTxt.blocks(it.index) }
     }
 
+    /** Huge or malicious files are refused with a message instead of exhausting memory. */
+    @Test
+    fun hugeFilesAreRefused() {
+        // A 70 MB text book (sparse file: no real disk use) is refused before it is read.
+        val huge = File(tmp, "huge.txt")
+        java.io.RandomAccessFile(huge, "rw").use { it.setLength(com.hanreader.app.epub.BookLimits.MAX_TEXT + 10L * 1024 * 1024) }
+        val e = runCatching { BookFiles.open(huge, com.hanreader.app.epub.BookFormat.TXT) }.exceptionOrNull()
+        assertTrue(e.toString(), e is com.hanreader.app.epub.EpubException && e.message!!.contains("слишком большая"))
+        huge.delete()
+        // A zip bomb: a chapter of 50 MB of spaces, a few kilobytes compressed. The chapter is skipped.
+        val bomb = File(tmp, "bomb.epub")
+        ZipOutputStream(bomb.outputStream()).use { z ->
+            fun put(n: String, t: String) { z.putNextEntry(ZipEntry(n)); z.write(t.toByteArray()); z.closeEntry() }
+            put("mimetype", "application/epub+zip")
+            put("META-INF/container.xml", """<container><rootfiles><rootfile full-path="c.opf"/></rootfiles></container>""")
+            put("c.opf", """<package xmlns:dc="http://purl.org/dc/elements/1.1/"><metadata><dc:title>炸</dc:title></metadata><manifest>
+                <item id="a" href="a.xhtml" media-type="application/xhtml+xml"/><item id="b" href="b.xhtml" media-type="application/xhtml+xml"/></manifest>
+                <spine><itemref idref="a"/><itemref idref="b"/></spine></package>""")
+            put("a.xhtml", "<html><body><p>第一章。</p></body></html>")
+            z.putNextEntry(ZipEntry("b.xhtml"))
+            val spaces = ByteArray(1 shl 20) { ' '.code.toByte() }
+            repeat(50) { z.write(spaces) }
+            z.closeEntry()
+        }
+        assertTrue(bomb.length() < 1_000_000)
+        EpubBook(bomb).use { b ->
+            assertNull(b.bytes("b.xhtml"))
+            b.chapters.forEach { c -> b.blocks(c.index) }
+        }
+        // Reading with a limit stops past it.
+        val r = runCatching { com.hanreader.app.epub.BookLimits.read(ByteArray(2000).inputStream(), 1000) }.exceptionOrNull()
+        assertTrue(r is com.hanreader.app.epub.EpubException)
+        assertEquals(500, com.hanreader.app.epub.BookLimits.read(ByteArray(500).inputStream(), 1000).size)
+    }
+
     /** A book the app accepts must have something to open: an empty one has no chapter 0. */
     @Test
     fun booksWithoutChapters() {

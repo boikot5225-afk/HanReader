@@ -64,7 +64,7 @@ object DocxBook {
     fun open(file: File, fallbackTitle: String): BookSource {
         val zip = ZipFile(file)
         try {
-            fun text(name: String) = zip.getEntry(name)?.let { e -> zip.getInputStream(e).use { it.readBytes().toString(Charsets.UTF_8) } }
+            fun text(name: String) = zip.getEntry(name)?.let { e -> zip.getInputStream(e).use { BookLimits.read(it, BookLimits.MAX_TEXT, "Текст документа").toString(Charsets.UTF_8) } }
             val doc = Jsoup.parse(text("word/document.xml") ?: throw EpubException("В DOCX нет текста"), "", Parser.xmlParser())
             val styles = text("word/styles.xml")?.let { Jsoup.parse(it, "", Parser.xmlParser()) }
             // Style id -> is it a heading/title (by id, by name, or by outline level).
@@ -104,7 +104,7 @@ object DocxBook {
             val author = core?.selectFirst("dc|creator")?.text()?.trim().orEmpty()
             val images = rels.values.toSet()
             return object : BookSource by ParagraphBook(title, author, paragraphs, { path ->
-                if (path in images) zip.getEntry(path)?.let { e -> zip.getInputStream(e).use { it.readBytes() } } else null
+                if (path in images) zip.getEntry(path)?.let { e -> runCatching { zip.getInputStream(e).use { BookLimits.read(it, BookLimits.MAX_ENTRY) } }.getOrNull() } else null
             }) {
                 override fun close() = zip.close()
             }
@@ -134,6 +134,7 @@ object DocBook {
     fun isCompoundFile(head: ByteArray) = head.size >= 8 && (0 until 8).all { head[it] == SIGNATURE[it] }
 
     fun open(file: File, fallbackTitle: String): BookSource {
+        BookLimits.checkText(file)
         val text = extractText(file.readBytes())
         val paragraphs = text.split('\r', '\u000C', '\u0007').map { DocParagraph(it.replace('\u000B', '\n'), heading = false) }
         return ParagraphBook(fallbackTitle, "", paragraphs) { null }

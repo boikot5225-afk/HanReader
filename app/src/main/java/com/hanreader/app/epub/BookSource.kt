@@ -27,6 +27,55 @@ interface BookSource : Closeable {
 
 enum class BookFormat(val extension: String) { EPUB("epub"), FB2("fb2"), FB2_ZIP("fb2.zip"), TXT("txt"), DOCX("docx"), DOC("doc") }
 
+/**
+ * Size limits that keep a huge or malicious file from exhausting the app's memory: the phone gives
+ * an app a few hundred megabytes, and a plain-text book is read whole. A zip entry may declare a
+ * false size, so entries are counted while they are read.
+ */
+object BookLimits {
+    /** Any book file (EPUB and DOCX may carry many images). */
+    const val MAX_FILE = 200L * 1024 * 1024
+    /** A book read into memory whole: TXT, FB2, DOC, the FB2 inside a zip. ~30 million characters. */
+    const val MAX_TEXT = 60L * 1024 * 1024
+    /** One file inside an EPUB or DOCX (a chapter, an image). */
+    const val MAX_ENTRY = 40L * 1024 * 1024
+
+    fun mb(bytes: Long) = (bytes + 1024 * 1024 - 1) / (1024 * 1024)
+
+    /** Reads [input] whole, failing with a readable message past [max] bytes. */
+    fun read(input: java.io.InputStream, max: Long, what: String = "Файл"): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(1 shl 16)
+        var total = 0L
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            total += n
+            if (total > max) throw EpubException("$what слишком большой: больше ${mb(max)} МБ")
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
+    }
+
+    /** Copies [input] to [out], failing past [MAX_FILE] bytes. */
+    fun copy(input: java.io.InputStream, out: java.io.OutputStream) {
+        val buf = ByteArray(1 shl 16)
+        var total = 0L
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            total += n
+            if (total > MAX_FILE) throw EpubException("Файл слишком большой: больше ${mb(MAX_FILE)} МБ")
+            out.write(buf, 0, n)
+        }
+    }
+
+    /** A whole-file book larger than [MAX_TEXT] is refused before it is read. */
+    fun checkText(file: File) {
+        if (file.length() > MAX_TEXT) throw EpubException("Книга слишком большая: ${mb(file.length())} МБ, можно до ${mb(MAX_TEXT)} МБ. Разделите её на части")
+    }
+}
+
 object BookFiles {
     /** Recognises the format from the file's content: a name from Telegram or a file manager may lie. */
     fun sniff(file: File): BookFormat? {
@@ -55,12 +104,12 @@ object BookFiles {
 
     fun open(file: File, format: BookFormat): BookSource = when (format) {
         BookFormat.EPUB -> EpubBook(file)
-        BookFormat.FB2 -> Fb2Book(file.readBytes(), file.nameWithoutExtension)
+        BookFormat.FB2 -> { BookLimits.checkText(file); Fb2Book(file.readBytes(), file.nameWithoutExtension) }
         BookFormat.FB2_ZIP -> ZipFile(file).use { z ->
             val e = z.entries().asSequence().first { it.name.endsWith(".fb2", ignoreCase = true) }
-            Fb2Book(z.getInputStream(e).use { it.readBytes() }, file.name.substringBefore('.'))
+            Fb2Book(z.getInputStream(e).use { BookLimits.read(it, BookLimits.MAX_TEXT, "Текст книги") }, file.name.substringBefore('.'))
         }
-        BookFormat.TXT -> TxtBook(file.readBytes(), file.nameWithoutExtension)
+        BookFormat.TXT -> { BookLimits.checkText(file); TxtBook(file.readBytes(), file.nameWithoutExtension) }
         BookFormat.DOCX -> DocxBook.open(file, file.nameWithoutExtension)
         BookFormat.DOC -> DocBook.open(file, file.nameWithoutExtension)
     }
