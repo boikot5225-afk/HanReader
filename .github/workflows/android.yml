@@ -142,6 +142,7 @@ jobs:
           gh run watch "$RUN_ID" --exit-status --interval 10
           gh run view "$RUN_ID" --json name,headBranch,headSha,conclusion > build.json
           jq -e --arg branch "$SOURCE_BRANCH" '.name == "HanReader Android CI" and .headBranch == $branch and .conclusion == "success"' build.json
+          test "$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq .object.sha)" = "$(jq -r .headSha build.json)"
           echo "SOURCE_SHA=$(jq -r .headSha build.json)" >> "$GITHUB_ENV"
       - name: Download tested APK
         shell: bash
@@ -152,4 +153,8 @@ jobs:
         shell: bash
         run: |
           printf 'HanReader ES: исправлено отображение цитат и эпиграфов EPUB.\n\nПроверенная сборка из ветки %s, коммит %s.\n' "$SOURCE_BRANCH" "$SOURCE_SHA" > notes.md
-          gh release create "$RELEASE_TAG" HanReader-ES-epigraph.apk --target "$SOURCE_SHA" --title 'HanReader ES — исправление цитат' --notes-file notes.md --prerelease --latest=false
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" HanReader-ES-epigraph.apk --clobber
+          else
+            gh release create "$RELEASE_TAG" HanReader-ES-epigraph.apk --verify-tag --title 'HanReader ES — исправление цитат' --notes-file notes.md --prerelease --latest=false
+          fi
