@@ -482,7 +482,7 @@ fun RubyParagraph(
                 drawText(
                     p.hanLayout,
                     // A footnote mark in the accent colour: tap it to read the note.
-                    color = if (noteOf(block, p.token) != null) colors.saved else if (metrics.tonedHan(t)) Color.Unspecified else colors.text,
+                    color = if (noteOf(block, p.token) != null) colors.note else if (metrics.tonedHan(t)) Color.Unspecified else colors.text,
                     topLeft = Offset(p.x + (inner - hanW) / 2f, p.lineTop + laid.hanTop)
                 )
                 if (spoken != null && p.token in spoken) {
@@ -535,7 +535,13 @@ data class RubyColors(
     val unknownLine: Color = Color(0xFFC62828),
     val recommendedLine: Color = Color(0xFF1E5BB8),
     val gloss: Color = Color(0xFF6B6459)
-)
+) {
+    /**
+     * The colour of a footnote mark: the theme's accent, or the colour of the underline of unknown
+     * words where the accent is the text colour (the black theme), so a mark never looks like a plain digit.
+     */
+    val note: Color get() = if (saved != text) saved else unknownLine
+}
 
 /** Text styles of the reader from the appearance settings and the theme. */
 @Composable
