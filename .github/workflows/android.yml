@@ -2,8 +2,9 @@ name: HanReader Android CI
 on:
   push:
     # main and the working branches: every change gets a tested APK.
-    # experiment/** and claude/**: tests and an APK artifact only, never the public beta.
-    branches: [main, 'ccr-*', 'experiment/**', 'claude/**']
+    # es (the Spanish app, Amauta Reader), experiment/** and claude/**: tests and an APK artifact only,
+    # never the public beta of the Chinese app.
+    branches: [main, 'ccr-*', es, 'experiment/**', 'claude/**']
   workflow_dispatch:
     inputs:
       publish_run_id:
