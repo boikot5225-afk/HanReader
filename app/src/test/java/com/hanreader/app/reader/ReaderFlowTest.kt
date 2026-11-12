@@ -28,6 +28,12 @@ import java.util.zip.ZipOutputStream
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class ReaderFlowTest {
+    /** A whole Chinese book is read with the Chinese dictionaries, which only the Chinese app packs. */
+    @org.junit.Before
+    fun onlyInTheChineseApp() {
+        org.junit.Assume.assumeTrue(com.hanreader.app.lang.Languages.CHINESE in com.hanreader.app.lang.Languages.AVAILABLE)
+    }
+
     private val app: Application = ApplicationProvider.getApplicationContext()
 
     private fun waitFor(timeoutMs: Long = 30_000, condition: () -> Boolean) {
@@ -115,8 +121,6 @@ class ReaderFlowTest {
 
     @Test
     fun levelMarksAndManualMarks() {
-        // HSK levels come from the app's Chinese data, which only the Chinese app packs.
-        org.junit.Assume.assumeTrue(com.hanreader.app.lang.Languages.CHINESE in com.hanreader.app.lang.Languages.AVAILABLE)
         val vm = ReaderViewModel(app)
         val dao = LexiconDatabase.get(app).knownWordDao()
         var r: Result<Int>? = null
