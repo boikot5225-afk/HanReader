@@ -28,7 +28,7 @@ object CrashLog {
             val p = app.packageManager.getPackageInfo(app.packageName, 0)
             "${p.versionName} (${if (Build.VERSION.SDK_INT >= 28) p.longVersionCode else @Suppress("DEPRECATION") p.versionCode.toLong()})"
         }.getOrDefault("?")
-        header = "HanReader $version\nAndroid ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n" +
+        header = "${BuildConfig.APP_NAME} $version\nAndroid ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n" +
             "Устройство: ${Build.MANUFACTURER} ${Build.MODEL}\n"
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->

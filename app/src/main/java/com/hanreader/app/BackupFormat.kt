@@ -181,14 +181,14 @@ object BackupFormat {
         val root = try {
             JSONObject(text)
         } catch (e: JSONException) {
-            throw BackupFormatException("Это не файл резервной копии HanReader.")
+            throw BackupFormatException("Это не файл резервной копии ${BuildConfig.APP_NAME}.")
         }
         if (root.optString("format") != FORMAT) {
-            throw BackupFormatException("Это не файл резервной копии HanReader.")
+            throw BackupFormatException("Это не файл резервной копии ${BuildConfig.APP_NAME}.")
         }
         val version = root.optInt("version", -1)
         if (version < 1 || version > VERSION) {
-            throw BackupFormatException("Копия создана более новой версией HanReader. Обнови приложение.")
+            throw BackupFormatException("Копия создана более новой версией ${BuildConfig.APP_NAME}. Обнови приложение.")
         }
         try {
             val cardsJson = root.getJSONArray("cards")

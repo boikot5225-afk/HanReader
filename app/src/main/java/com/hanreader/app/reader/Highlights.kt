@@ -141,7 +141,7 @@ object Highlights {
     fun markdown(title: String, author: String?, list: List<Highlight>): String = buildString {
         append("# ").append(title).append('\n')
         if (!author.isNullOrBlank()) append('\n').append(author).append('\n')
-        append("\nВыделения и заметки из HanReader: ").append(list.size).append('\n')
+        append("\nВыделения и заметки из ${com.hanreader.app.BuildConfig.APP_NAME}: ").append(list.size).append('\n')
         var chapter = -1
         for (h in list.sortedWith(compareBy({ it.chapterIndex }, { it.blockIndex }, { it.startChar }))) {
             if (h.chapterIndex != chapter) {

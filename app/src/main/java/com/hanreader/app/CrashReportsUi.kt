@@ -31,7 +31,7 @@ const val DEVELOPER_TELEGRAM = "@SainJust"
 fun shareCrashReports(context: Context) {
     val send = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, "HanReader: отчёт о сбое")
+        putExtra(Intent.EXTRA_SUBJECT, "${BuildConfig.APP_NAME}: отчёт о сбое")
         // Mail apps fill in the developer's address; Telegram and others ignore it (@SainJust).
         putExtra(Intent.EXTRA_EMAIL, arrayOf(DEVELOPER_EMAIL))
         putExtra(Intent.EXTRA_TEXT, CrashLog.text(context).take(200_000))

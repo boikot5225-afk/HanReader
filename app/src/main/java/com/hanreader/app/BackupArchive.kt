@@ -63,7 +63,7 @@ object BackupArchive {
                 }
             }
         }
-        val backup = BackupFormat.decode(json ?: throw BackupFormatException("Это не файл резервной копии HanReader."))
+        val backup = BackupFormat.decode(json ?: throw BackupFormatException("Это не файл резервной копии ${BuildConfig.APP_NAME}."))
         backup.library?.books?.forEach { b ->
             if (b.fileName !in files) throw BackupFormatException("Файл копии повреждён: нет файла книги «${b.title}»")
         }

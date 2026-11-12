@@ -30,7 +30,7 @@ class CrashLogTest {
         assertTrue(CrashLog.hasCrash(app))
         assertEquals(2, CrashLog.reports(app).size)
         val text = CrashLog.text(app)
-        assertTrue(text, text.contains("HanReader ") && text.contains("Android "))
+        assertTrue(text, text.contains(BuildConfig.APP_NAME + " ") && text.contains("Android "))
         assertTrue(text, text.contains("Тип: вылет") && text.contains("ClassCastException"))
         assertTrue(text, text.contains("Тип: ошибка без вылета") && text.contains("Открытие главы 3"))
 

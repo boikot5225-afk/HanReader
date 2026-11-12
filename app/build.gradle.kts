@@ -11,7 +11,10 @@ android {
         // Experimental branch (another language): a separate app id, so this test build installs
         // next to the regular HanReader and never touches its books and words.
         applicationId = "com.hanreader.app.es"
-        manifestPlaceholders["appLabel"] = "HanReader ES"
+        // The name people see: under the icon, in «О приложении», in mails and messages.
+        val appName = "Amauta Reader"
+        manifestPlaceholders["appLabel"] = appName
+        buildConfigField("String", "APP_NAME", "\"$appName\"")
         minSdk = 26
         targetSdk = 36
         versionCode = 38

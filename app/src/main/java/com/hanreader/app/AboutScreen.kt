@@ -37,11 +37,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 
-/** The app's name: «汉读 HanReader» for the Chinese app, the launcher name for another. */
+/** The app's name: «汉读 HanReader» for the Chinese app, BuildConfig.APP_NAME for another. */
 @Composable
 internal fun appTitle(): String =
     if (com.hanreader.app.lang.Languages.default == com.hanreader.app.lang.Languages.CHINESE) "汉读 HanReader"
-    else androidx.compose.ui.platform.LocalContext.current.let { it.applicationInfo.loadLabel(it.packageManager).toString() }
+    else BuildConfig.APP_NAME
 
 /** One source the app is built from: what it gives, who made it, its licence, the file with the details. */
 internal data class Credit(val what: String, val source: String, val license: String, val file: String, val language: String? = null)
@@ -75,7 +75,7 @@ fun AboutSection() {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Overline("О приложении")
         LinkRow(
-            title = "HanReader $version",
+            title = "${BuildConfig.APP_NAME} $version",
             subtitle = "Источники данных, лицензии, конфиденциальность",
             onClick = { open = true }
         )
@@ -109,7 +109,7 @@ fun ContactRows() {
     val context = LocalContext.current
     ContactRow(
         label = "Почта", value = DEVELOPER_EMAIL,
-        open = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$DEVELOPER_EMAIL")).putExtra(Intent.EXTRA_SUBJECT, "HanReader ${appVersion(context)}")
+        open = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$DEVELOPER_EMAIL")).putExtra(Intent.EXTRA_SUBJECT, "${BuildConfig.APP_NAME} ${appVersion(context)}")
     )
     ContactRow(
         label = "Telegram", value = DEVELOPER_TELEGRAM,
