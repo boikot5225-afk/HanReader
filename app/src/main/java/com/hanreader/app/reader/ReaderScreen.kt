@@ -149,6 +149,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     var showToc by remember { mutableStateOf(false) }
     var showPrepare by remember { mutableStateOf(false) }
     var selection by remember { mutableStateOf<Selection?>(null) }
+    /** The text of a tapped footnote, shown in a sheet. */
+    var noteText by remember { mutableStateOf<String?>(null) }
     // The menu over the text: hidden while reading, a tap in the middle shows it.
     var chrome by remember { mutableStateOf(false) }
     BackHandler { if (chrome) chrome = false else onClose() }
@@ -257,6 +259,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit = { block, i, lines ->
         val (hlMarked, hlNoted) = remember(block, highlightsHere[i]) { Highlights.tokens(block, highlightsHere[i]) }
         RubyParagraph(
+            onNote = { noteText = it; chrome = false },
             marked = hlMarked,
             noted = hlNoted,
             block = block,
@@ -562,6 +565,15 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onRemove = { vm.removeHighlight(it.id); selection = null },
             onDismiss = { selection = null }
         )
+    }
+    noteText?.let { text ->
+        ModalBottomSheet(onDismissRequest = { noteText = null }) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Сноска", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Text(text, style = MaterialTheme.typography.bodyLarge)
+            }
+        }
     }
     if (sel != null && block != null && eng != null && chapter != null && (!sel.phrase || asWord)) {
         WordSheet(

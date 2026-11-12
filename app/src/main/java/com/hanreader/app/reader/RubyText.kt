@@ -308,7 +308,9 @@ fun RubyParagraph(
     /** Tokens being read aloud right now: underlined boldly. */
     spoken: IntRange? = null,
     /** Tokens whose translation is drawn; null: every one in [glossFor]. */
-    glossOnly: Set<Int>? = null
+    glossOnly: Set<Int>? = null,
+    /** A tap on a footnote mark (the «4» of «Villa4»): shows the note's text. */
+    onNote: ((String) -> Unit)? = null
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val density = LocalDensity.current
@@ -329,11 +331,13 @@ fun RubyParagraph(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val pos = down.position + Offset(0f, offsetY)
-                    val hit = laid.items.firstOrNull {
+                    val under = laid.items.firstOrNull {
                         laid.lineOf(it) in shown &&
                             pos.x >= it.x && pos.x < it.x + it.width &&
                             pos.y >= it.lineTop && pos.y < it.lineTop + laid.hanTop + laid.hanHeight + lineGapPx
-                    }?.takeIf { block.tokens[it.token].kind == TokenKind.HAN }
+                    }
+                    val note = under?.let { p -> noteOf(block, p.token) }?.takeIf { onNote != null }
+                    val hit = under?.takeIf { block.tokens[it.token].kind == TokenKind.HAN || note != null }
                     if (hit == null && onRange == null) return@awaitEachGesture
                     // A tap, a swipe (left to the page) or, held still, a long press that starts a selection.
                     var tapped = false
@@ -349,6 +353,7 @@ fun RubyParagraph(
                         }
                         @Suppress("UNREACHABLE_CODE") false
                     } == null
+                    if (tapped && note != null) { onNote?.invoke(note.text); return@awaitEachGesture }
                     if (tapped && hit != null) { onTap(hit.token); return@awaitEachGesture }
                     if (!held || onRange == null) return@awaitEachGesture
                     val anchor = laid.tokenNear(pos, shown) ?: return@awaitEachGesture
@@ -411,7 +416,8 @@ fun RubyParagraph(
                 }
                 drawText(
                     p.hanLayout,
-                    color = if (metrics.tonedHan(t)) Color.Unspecified else colors.text,
+                    // A footnote mark in the accent colour: tap it to read the note.
+                    color = if (noteOf(block, p.token) != null) colors.note else if (metrics.tonedHan(t)) Color.Unspecified else colors.text,
                     topLeft = Offset(p.x + (inner - hanW) / 2f, p.lineTop + laid.hanTop)
                 )
                 if (spoken != null && p.token in spoken) {
@@ -445,6 +451,13 @@ fun RubyParagraph(
     }
 }
 
+/** The footnote whose mark holds token [token] of [block], or null. */
+internal fun noteOf(block: ReaderBlock.Text, token: Int): ReaderNote? {
+    if (block.notes.isEmpty()) return null
+    val t = block.tokens.getOrNull(token) ?: return null
+    return block.notes.firstOrNull { t.start >= it.start && t.end <= it.end }
+}
+
 data class RubyColors(
     val text: Color,
     val pinyin: Color,
@@ -457,7 +470,13 @@ data class RubyColors(
     val unknownLine: Color = Color(0xFFC62828),
     val recommendedLine: Color = Color(0xFF1E5BB8),
     val gloss: Color = Color(0xFF6B6459)
-)
+) {
+    /**
+     * The colour of a footnote mark: the theme's accent, or the colour of the underline of unknown
+     * words where the accent is the text colour (the black theme), so a mark never looks like a plain digit.
+     */
+    val note: Color get() = if (saved != text) saved else unknownLine
+}
 
 /** Text styles of the reader from the appearance settings and the theme. */
 @Composable
