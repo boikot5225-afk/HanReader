@@ -100,7 +100,7 @@ internal fun VoiceChoices(
             TextButton(onClick = onListen, enabled = url.isNotBlank()) { Text("▶ Послушать") }
             if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             Text(
-                "Для озвучки текст предложения отправляется на сервер HanReader. Больше ничего не передаётся; " +
+                "Для озвучки текст предложения отправляется на сервер ${com.hanreader.app.BuildConfig.APP_NAME}. Больше ничего не передаётся; " +
                     "готовые записи хранятся на телефоне и повторно не скачиваются.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
             )

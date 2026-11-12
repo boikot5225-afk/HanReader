@@ -4,14 +4,16 @@ import android.app.Application
 import android.net.Uri
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeUp
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.hanreader.app.lang.Languages
 import com.hanreader.app.reader.ReaderViewModel
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -28,7 +30,13 @@ import java.util.concurrent.TimeUnit
  */
 @RunWith(AndroidJUnit4::class)
 class SmokeTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val compose = createEmptyComposeRule()
+
+    /** The demo book is Chinese: the app is set to read Chinese before it starts (it opens in its first language). */
+    private fun setLanguage(app: Application, tag: String) {
+        app.getSharedPreferences("language", android.content.Context.MODE_PRIVATE).edit().putString("studyLanguage", tag).commit()
+        Languages.init(app)
+    }
 
     private fun importDemoBook() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -47,7 +55,11 @@ class SmokeTest {
     @Test
     fun readABook() {
         // The demo book is Chinese: only for an app that reads Chinese.
-        org.junit.Assume.assumeTrue(com.hanreader.app.lang.Languages.CHINESE in com.hanreader.app.lang.Languages.AVAILABLE)
+        org.junit.Assume.assumeTrue(Languages.CHINESE in Languages.AVAILABLE)
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as Application
+        setLanguage(app, Languages.CHINESE.tag)
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        try {
         importDemoBook()
         // The library shows the book; open it.
         compose.waitUntil(30_000) { compose.onAllNodes(hasText("蓝色的书")).fetchSemanticsNodes().isNotEmpty() }
@@ -65,5 +77,9 @@ class SmokeTest {
         compose.waitUntil(15_000) { compose.onAllNodes(hasContentDescription("Настройки")).fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodes(hasContentDescription("Настройки"))[0].performClick()
         compose.waitUntil(15_000) { compose.onAllNodes(hasText("Готово")).fetchSemanticsNodes().isNotEmpty() }
+        } finally {
+            scenario.close()
+            setLanguage(app, Languages.default.tag)
+        }
     }
 }

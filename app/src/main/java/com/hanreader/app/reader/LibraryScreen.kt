@@ -139,7 +139,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            (if (com.hanreader.app.lang.Languages.current.readingTitle != null) "Над словами появится пиньинь. " else "") + "Нажми на слово — увидишь перевод и сохранишь его в карточки вместе с предложением из книги. Книгу можно открыть и прямо из файлового менеджера или Telegram: «Открыть с помощью» → HanReader.",
+                            (if (com.hanreader.app.lang.Languages.current.readingTitle != null) "Над словами появится пиньинь. " else "") + "Нажми на слово — увидишь перевод и сохранишь его в карточки вместе с предложением из книги. Книгу можно открыть и прямо из файлового менеджера или Telegram: «Открыть с помощью» → ${com.hanreader.app.BuildConfig.APP_NAME}.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
