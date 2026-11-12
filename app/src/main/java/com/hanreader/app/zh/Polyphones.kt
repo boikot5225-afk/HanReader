@@ -16,7 +16,21 @@ object Polyphones {
         if (t.kind != TokenKind.HAN || t.text.length != 1) return null
         val prev = tokens.getOrNull(i - 1)?.takeIf { it.kind == TokenKind.HAN }?.text
         val next = tokens.getOrNull(i + 1)?.takeIf { it.kind == TokenKind.HAN }?.text
+        // 把他当朋友, 拿书当枕头: «принимать за», dàng — decided by a 把 / 拿 earlier in the clause.
+        if (t.text == "当" && earlierInClause(tokens, i, setOf("把", "拿", "将"))) return "dàng"
         return rule(t.text[0], prev, next)
+    }
+
+    /** One of [words] is among the few tokens before [i] in the same clause. */
+    private fun earlierInClause(tokens: List<ZhToken>, i: Int, words: Set<String>): Boolean {
+        var k = i - 1
+        while (k >= 0 && k >= i - 6) {
+            val t = tokens[k]
+            if (t.kind == TokenKind.PUNCT) return false
+            if (t.text in words) return true
+            k--
+        }
+        return false
     }
 
     /**
@@ -62,7 +76,7 @@ object Polyphones {
             '倒' -> if (next != null && next[0] in "在地下") "dǎo" else null
             '背' -> if (next != null && next[0] in "起包走回") "bēi" else null
             '量' -> if (prev?.endsWith("一") == true || next != null && (next[0] in "一了体血身尺" || next == "量")) "liáng" else null
-            '假' -> if (prev != null && (prev.last() in "放请休度暑寒病婚产" || prev.length >= 2 && prev.last() == '天' && prev[0] in COUNTERS)) "jià" else null
+            '假' -> if (prev != null && (prev.last() in "放请休度暑寒病婚产" || prev == "天" || prev.length >= 2 && prev.last() == '天' && prev[0] in COUNTERS)) "jià" else null
             '着' -> if (prev != null && next != null && prev.last() in "猜点烧摸够睡找" && next[0] == '了') "zháo" else null
             '了' -> if (prev == "不") "liǎo" else null
             '削' -> "xiāo"
@@ -72,6 +86,18 @@ object Polyphones {
             '盛' -> if (next != null && next[0] in "饭汤水满粥菜了") "chéng" else null
             '扇' -> if (next != null && next[0] in "了着风他她我你" && (prev == null || prev.last() !in COUNTERS)) "shān" else null
             '担' -> if (prev != null && prev.last() in COUNTERS) "dàn" else null
+            // 为 wéi after «выбрать, назвать, стать» (选为, 称为); 中 zhòng after «попасть» (打中); 冲着 chòng;
+            // 涨红 zhàng; 卷 juàn after a number; 缝 féng «шить» / fèng «щель»; 铺 pū «стелить» / pù after
+            // a number; 看孩子 kān; 转圈 zhuàn.
+            '为' -> if (prev != null && prev.last() in "选称视定改变化作成分认列评封拜奉尊推任命转划译立奉誉") "wéi" else null
+            '中' -> if (prev != null && prev.last() in "打射猜考选击投砸押" && (next == null || next[0] !in "间国央心学部文午")) "zhòng" else null
+            '冲' -> if (next == "着") "chòng" else null
+            '涨' -> if (next != null && next[0] in "红紫") "zhàng" else null
+            '卷' -> if (prev != null && prev.last() in COUNTERS + "第") "juàn" else null
+            '缝' -> if (prev != null && prev.last() in COUNTERS + "道条") "fèng" else if (next != null && next[0] in "儿隙") "fèng" else "féng"
+            '铺' -> if (prev != null && prev.last() in COUNTERS) "pù" else "pū"
+            '看' -> if (next != null && (next.startsWith("孩") || next == "小孩" || next == "家" || next == "守")) "kān" else null
+            '转' -> if (next != null && next[0] == '圈') "zhuàn" else null
             else -> null
         }
     }

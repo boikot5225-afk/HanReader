@@ -35,7 +35,8 @@ import com.hanreader.app.zh.TokenKind
 
 /**
  * A word or phrase of the chapter worth a second look at its end: [key] is what «Знаю» and the
- * cards are about (Spanish: the dictionary word or the phrase, «hablar», «dar cuenta de»), [shown]
+ * cards are about (Spanish: the dictionary word or the phrase, «hablar», «dar cuenta de»; Chinese:
+ * the word itself, a chengyu or proverb is a «phrase»), [shown]
  * how it first stood in the text, [block]/[token] where.
  */
 data class SummaryItem(
@@ -94,6 +95,15 @@ object ChapterSummary {
             for ((ti, t) in tokens.withIndex()) {
                 if (t.kind != TokenKind.HAN) continue
                 val key = keyOf(t, engine) ?: continue
+                if (engine is ZhEngine) {
+                    // Chinese: set expressions (chengyu, proverbs) are listed apart from words.
+                    val a = acc.getOrPut(key) {
+                        Acc(key, b.text.substring(t.start, t.end), idiomKind(engine.lookup(key)?.gloss) != null, bi, ti)
+                    }
+                    a.count++
+                    if (glossFor == null || glossOf(glossFor, t, bi) != null) a.hinted++
+                    continue
+                }
                 val phrase = ' ' in key
                 if (!phrase && (t.text.firstOrNull()?.isUpperCase() == true && ti > 0)) continue // a name inside a sentence
                 val a = acc.getOrPut(key) {
@@ -211,7 +221,7 @@ private fun SummaryRow(
     val block = chapter.blocks[item.block] as ReaderBlock.Text
     val t = block.tokens[item.token]
     val translation = remember(item.key) {
-        (if (item.phrase) engine.glossShort(t.text, item.key) else engine.cardTranslation(t.text, t.pinyin.takeIf { it.isNotEmpty() })
+        (if (item.phrase && engine !is ZhEngine) engine.glossShort(t.text, item.key) else engine.cardTranslation(t.text, t.pinyin.takeIf { it.isNotEmpty() })
             ?: engine.glossShort(t.text, t.pinyin.takeIf { it.isNotEmpty() })).orEmpty()
     }
     val sentence = remember(item.key) { ChapterBuilder.sentence(block.text, t.start, t.start + item.shown.length) }

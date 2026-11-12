@@ -203,12 +203,12 @@ object Languages {
     val ALL = listOf(CHINESE, SPANISH)
 
     /**
-     * The languages this app reads (BuildConfig.LANGUAGES: "es" for the Spanish app, "zh" for the
-     * Chinese one); the first is the one it opens with.
+     * The languages this app reads, in the order of BuildConfig.LANGUAGES ("es,zh": Spanish and
+     * Chinese); the first is the one it opens with.
      */
     val AVAILABLE: List<LanguageInfo> by lazy {
         val tags = com.hanreader.app.BuildConfig.LANGUAGES.split(',').map { it.trim() }
-        ALL.filter { it.tag.substringBefore('-') in tags }.ifEmpty { ALL }
+        tags.mapNotNull { t -> ALL.firstOrNull { it.tag.substringBefore('-') == t } }.distinct().ifEmpty { ALL }
     }
 
     /** The language a book or setting falls back to: the app's first one. */

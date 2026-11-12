@@ -13,14 +13,15 @@ class BookLanguagesTest {
         assertEquals(Languages.CHINESE, BookLanguages.recognize(TxtBook("他在 New York 住了三年，每天都去公园散步。".toByteArray(), "x")))
     }
 
-    /** The Spanish app reads Spanish only: a Chinese book is still added, as a Spanish one, never hidden. */
+    /** Amauta Reader reads Spanish and Chinese and opens in Spanish; a new book is read in the language of its text. */
     @Test
     fun anAppReadsItsOwnLanguages() {
-        assertEquals(listOf(Languages.SPANISH), Languages.AVAILABLE)
+        assertEquals(listOf(Languages.SPANISH, Languages.CHINESE), Languages.AVAILABLE)
+        assertEquals(Languages.SPANISH, Languages.default)
         val was = Languages.current
         Languages.current = Languages.SPANISH
         try {
-            assertEquals(Languages.SPANISH, BookLanguages.detect(TxtBook("第一章 雨夜\n那天晚上一直在下雨。".toByteArray(), "x")))
+            assertEquals(Languages.CHINESE, BookLanguages.detect(TxtBook("第一章 雨夜\n那天晚上一直在下雨。".toByteArray(), "x")))
         } finally {
             Languages.current = was
         }

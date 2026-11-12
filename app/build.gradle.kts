@@ -17,13 +17,18 @@ android {
         buildConfigField("String", "APP_NAME", "\"$appName\"")
         minSdk = 26
         targetSdk = 36
-        versionCode = 38
-        versionName = "0.18.0"
-        // The languages this app reads: Spanish only. The Chinese module stays in the code (one code
-        // base with the Chinese app), but its dictionaries are not packed (androidResources below).
-        buildConfigField("String", "LANGUAGES", "\"es\"")
+        versionCode = 43
+        versionName = "0.23.0"
+        // The languages this app reads, the first is the default: Spanish and Chinese.
+        buildConfigField("String", "LANGUAGES", "\"es,zh\"")
         // Instrumented tests (app/src/androidTest) on emulators in CI.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Default neural voice server (reader can change it in the voice menu): gradle property,
+        // else environment variable, else none. HANREADER_VOICE_TOKEN is a CI secret.
+        fun setting(name: String) = (providers.gradleProperty(name).orNull ?: providers.environmentVariable(name).orNull ?: "")
+            .replace("\\", "").replace("\"", "")
+        buildConfigField("String", "VOICE_URL", "\"${setting("HANREADER_VOICE_URL")}\"")
+        buildConfigField("String", "VOICE_TOKEN", "\"${setting("HANREADER_VOICE_TOKEN")}\"")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -34,8 +39,6 @@ android {
     // zh/lexicon.dat is gzip data: store it as is. (A ".gz" asset would be silently unpacked by the build.)
     androidResources {
         noCompress += "dat"
-        // The Chinese dictionaries (assets/zh, 20 MB) stay out of the Spanish app; tests read them from the sources.
-        ignoreAssetsPatterns += listOf("!.svn", "!.git", "!.ds_store", "!*.scc", ".*", "<dir>_*", "!CVS", "!thumbs.db", "!picasa.ini", "!*~", "<dir>zh")
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
@@ -46,6 +49,9 @@ android {
             }
             providers.environmentVariable("HANREADER_TEST_EPUB").orNull?.let {
                 test.environment("HANREADER_TEST_EPUB", it)
+            }
+            for (name in listOf("HANREADER_SEG_IN", "HANREADER_SEG_OUT")) {
+                providers.environmentVariable(name).orNull?.let { test.environment(name, it) }
             }
             providers.environmentVariable("HANREADER_STORE_SHOTS").orNull?.let {
                 test.environment("HANREADER_STORE_SHOTS", it)

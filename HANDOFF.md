@@ -1,6 +1,6 @@
 # HanReader — передача дел следующей сессии
 
-Состояние на 8 ноября 2026, версия **0.18.0** (versionCode 38), ветка `ccr-954eeb21-p65jbl`.
+Состояние на 8 ноября 2026, версия **0.22.0** (versionCode 42), ветка `ccr-954eeb21-p65jbl`.
 
 ## Владелец и договорённости
 
@@ -14,7 +14,7 @@
 
 ## Что это за приложение
 
-Android-читалка китайских книг (Kotlin, Jetpack Compose, Room), выросла из Lexicon. Всё офлайн, без разрешения на интернет.
+Android-читалка китайских книг (Kotlin, Jetpack Compose, Room), выросла из Lexicon. Всё офлайн; разрешение INTERNET есть только ради нейросетевого голоса (по умолчанию выключен).
 Основное: EPUB/FB2/TXT/DOCX/DOC, вставка текста и «Поделиться»/меню выделения; свой движок: сегментация Jieba-подобная (`zh/ZhSegmenter.kt`), пиньинь над словами на Canvas (`reader/RubyText.kt`), разбивка на страницы (`reader/Pagination.kt`); словари CC-CEDICT + русский Викисловарь + машинный перевод DeepSeek (`assets/zh/ru_ai.tsv`, `ru_chars.tsv` — значения иероглифов по чтениям); HSK-уровни, «Знаю/Не знаю», рекомендации i+1, подсказки над словами (угасают после 3 встреч), карточки SRS, выделения и заметки, чтение вслух (TTS по предложениям), статистика (серия, минуты, прочитано знаков, понимание книг), оценка сложности книги, цвета тонов, упрощённые/традиционные (OpenCC), свои значения слов, ручное разделение склеенных слов, подсказки грамматики (43 конструкции, `zh/Grammar.kt`, в карточке слова-маркера), полная резервная копия ZIP, отчёты о сбоях (локально, отправка вручную), экран «О приложении» с лицензиями.
 
 База Room: **версия 13** (схемы в `app/schemas`, `MigrationTest` поднимает базу с версии 4).
@@ -24,7 +24,7 @@ Android-читалка китайских книг (Kotlin, Jetpack Compose, Roo
 - Окружение «HanReader Android»: доступ к dl.google.com, kaikki.org (если сессия стартовала в «Default» — переключить через switch_environment); секрет для api.deepseek.com сохранён в настройках среды (ключ в командах — заглушка `proxy-injected`).
 - Android SDK: `/opt/android-sdk` (`local.properties`, не в git). В новой машине его нет: скачать commandlinetools с dl.google.com, `sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"`.
 - Maven Central отвечает 429: `~/.gradle/init.d/mirror.gradle` подменяет repo.maven.apache.org / repo1.maven.org на `https://maven-central.storage-download.googleapis.com/maven2/`; `~/.gradle/gradle.properties` — `robolectricRepoUrl` на то же зеркало. Первый прогон — без `--offline`.
-- Тесты: `gradle :app:testDebugUnitTest --offline -q` (160 тестов, 6 пропускаются: замеры на книгах и скриншоты для магазина). Robolectric; скриншоты UI рисуются через `decorView.draw`.
+- Тесты: `gradle :app:testDebugUnitTest --offline -q` (185+ тестов, 7 пропускаются: замеры на книгах и скриншоты для магазина). Robolectric; скриншоты UI рисуются через `decorView.draw`.
 - APK: `gradle clean :app:assembleDebug --offline -q` (всегда `clean`).
 
 ## GitHub (boikot5225-afk/HanReader, публичный)
@@ -34,11 +34,46 @@ Android-читалка китайских книг (Kotlin, Jetpack Compose, Roo
 - Сайт: GitHub Pages из `docs/` (`index.html`, `privacy.html` собирается `tools/build_site.py` из `PRIVACY.md`). Адрес https://boikot5225-afk.github.io/HanReader/ — владелец должен включить Pages (Settings → Pages → ветка `ccr-954eeb21-p65jbl`, папка `/docs`); проверить, включён ли.
 - Ключ подписи из облака удалён, есть только у владельца и в секретах GitHub. Релизный APK для RuStore — артефакт `hanreader-signed-release-apk` последней сборки.
 
+## Сервер владельца (FastVPS)
+
+- Ubuntu 24.04 + FASTPANEL, 3 vCPU / 6 ГБ / 60 ГБ, IP 45.67.129.73 (из облачной сессии недоступен — команды выполняет владелец и присылает скриншоты).
+- Docker: `selfhost-tts-stt-1` (FastAPI, Kokoro TTS v1.0 + misaki[zh] и faster-whisper; 127.0.0.1:8080; `/v1/audio/speech`, `/v1/audio/transcriptions`, `/health`; лимит памяти 3 ГБ), плюс чужие для HanReader сервисы владельца (mtproto-proxy, mao-jewelry-orders, lenfer-wms-proxy, amnezia-awg2) — не трогать.
+- Голос снаружи: Cloudflare Tunnel `tts-stt` (служба cloudflared, /etc/cloudflared/config.yml): https://tts.saintjust.space → 127.0.0.1:8080. Тем же адресом пользуется Reader AI (Firebase-функция ttsAudio, секреты SELFHOST_TTS_STT_URL / SELFHOST_TOKEN, при сбое — OpenRouter). Сервис требует `Authorization: Bearer <SELFHOST_TOKEN>`. Сборка HanReader: адрес прописан в android.yml, ключ — секрет GitHub `HANREADER_VOICE_KEY` (добавляет владелец). Порты 80/443 держит nginx FASTPANEL; `tools/server/setup_voice_proxy.sh` (отдельный адрес через nginx с ключом HanReader) — запасной вариант, не запускался.
+- Идеи дальше: проверка произношения через Whisper (STT уже есть на сервере), ИИ-разбор предложения (S1).
+
 ## Магазин
 
 - RuStore: приложение на модерации (APK, без PEPK). Материалы: `store/LISTING_ru.md`, `store/icon-512.png`, `store/screens/` (1080×1920).
 - После модерации: заменить «Скоро в RuStore» на сайте (`docs/index.html`) и в README настоящей ссылкой.
 - Возможная проблема: сообщения о запрете монетизации/публикации для физлиц и самозанятых в RuStore (проверить, если модерация откажет), правила проверки разработчиков Google с 30.09.2026.
+
+## Словарь (0.20.0)
+
+- lexicon.dat = CC-CEDICT + Jieba + английский Викисловарь (kaikki.org): `tools/extract_wikt_zh.py` → `tools/merge_wikt_zh.py` (значения 12,6 тыс. слов без значения, 1,6 тыс. новых идиом/пословиц; список — `data/zh/wikt_added.tsv`), затем `tools/build_lexicon_bin.py`. Пометки в английском: `(idiom)`, `(proverb)`, `(xiehouyu)` → метка в карточке (`idiomKind`).
+- ru_ai.tsv (133 тыс.): `tools/dict_worklist.py` → `tools/translate_zh_ru.py` (виды word / name / idiom) → `tools/update_ru_ai.py`; весь ru_ai проверен `tools/verify_ru_wiktionary.py --source ru_ai.tsv` (1,5 тыс. исправлений, в основном «вариант X» → значение). Для идиом приложение показывает ru_ai раньше Викисловаря.
+- Счётные слова: `zh/measure.tsv` (`tools/extract_measure_words.py`), строка «Счётное слово» в карточке.
+- Без русского остались ~50 связанных иероглифов (咐, 徨…): модель отвечает с иероглифами, фильтр отбрасывает.
+- Исходники для повторной сборки (kaikki Chinese .jsonl.gz, ~156 МБ) в репозиторий не кладутся — скачиваются с kaikki.org.
+
+## Сегментатор и словарь (0.21.0)
+
+- Замер разбивки: эталон — 6 тыс. современных предложений из Викисловаря, размеченных моделью (в scratchpad, не в репо); `SegmentDumpTest` (HANREADER_SEG_IN/OUT) + `tools/seg_eval.py`. F1 0,806 → 0,819.
+- lexicon.bin: бит 29 «рыхлое» сочетание (Jieba без значения, начинается/кончается служебным словом или два словарных слова) — сегментатор его не склеивает. Контекстные правила — `ZhSegmenter.refine`.
+- Китайские имена книги: `ChineseNames` в BookVocabulary.kt (версия анализа 3).
+- Значения: `tools/order_senses_ru.py` (итоговая статья) → `tools/rank_senses_ru.py` (только порядок) → `tools/update_ru_ai.py … --all`. Приложение показывает ru_ai раньше Викисловаря.
+- Лимиты файлов: `BookLimits` (BookSource.kt).
+- Сборка в RuStore — 0.14.4 (31), подпись релизная `59345a3b…d97859`, без INTERNET, не debuggable (проверено 11.11).
+
+## Перенесено из испанских веток (0.22.0)
+
+Ветки `claude/language-plugin-architecture-i2t572` (языковая розетка + испанский) и `es` (Amauta Reader, испанский) — другой продукт, не сливать. Из них в китайскую версию перенесены только общие доработки, вручную, без розетки:
+- сноски EPUB (463906c, 7ecb6e9); оформление цитат и эпиграфов из CSS (fc08995, 5a71a24);
+- «Сомневаюсь в переводе» (6208930, `Doubts.kt`, список в библиотеке);
+- своё значение «здесь / в этой книге / везде» (b756587, `ContextMeanings.kt`, ключи «@книга|…» в user_meanings);
+- часы в читалке, выделение во всей книге с одной заметкой (58cca59, f369a59; глава −1 в highlights);
+- «Итог главы» (7275adc, `ChapterSummary.kt`; выражения — чэнъюи и пословицы словаря);
+- угасание подсказок от места, где начал читать (81f3ddc).
+Не перенесено (испанское или архитектура розетки): язык книги и раздельные библиотеки, подсчёты по языкам, сокращения с точкой, выравнивание по пробелам, испанские словари и грамматика, имя Amauta Reader.
 
 ## Известные ограничения
 

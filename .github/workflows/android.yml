@@ -2,9 +2,9 @@ name: HanReader Android CI
 on:
   push:
     # main and the working branches: every change gets a tested APK.
-    # es (the Spanish app, Amauta Reader), experiment/** and claude/**: tests and an APK artifact only,
+    # es (the Spanish app), amauta (Amauta Reader: Spanish and Chinese), experiment/** and claude/**: tests and an APK artifact only,
     # never the public beta of the Chinese app.
-    branches: [main, 'ccr-*', es, 'experiment/**', 'claude/**']
+    branches: [main, 'ccr-*', es, amauta, 'experiment/**', 'claude/**']
   workflow_dispatch:
     inputs:
       publish_run_id:
@@ -23,6 +23,10 @@ jobs:
   build:
     if: inputs.publish_run_id == ''
     runs-on: ubuntu-latest
+    # Neural voice server built into the app (the reader can change it in «Голос»); the key is a secret.
+    env:
+      HANREADER_VOICE_URL: https://tts.saintjust.space
+      HANREADER_VOICE_TOKEN: ${{ secrets.HANREADER_VOICE_KEY }}
     permissions:
       # write: to publish the beta APK as a release asset.
       contents: write

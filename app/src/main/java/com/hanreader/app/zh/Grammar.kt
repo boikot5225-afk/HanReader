@@ -54,6 +54,7 @@ object Grammar {
     }
 
     private const val COUNTERS = "这那哪每几一两半二三四五六七八九十百千"
+    private const val NUMBER_CHARS = "零〇一二两三四五六七八九十0123456789"
     private val MEASURES = setOf("个", "次", "天", "年", "本", "件", "张", "只", "条", "位", "种", "点", "些", "下", "会儿", "直", "样", "起", "共", "切", "定", "般")
 
     private fun p(vararg words: String) = words.toSet()
@@ -80,7 +81,11 @@ object Grammar {
             "A 比 B + качество",
             "Сравнение: «A 比 B 高» — A выше, чем B. Перед качеством не ставят 很; степень разницы — после него: 高一点, 高得多.",
             "今天比昨天冷。", "Сегодня холоднее, чем вчера.",
-            listOf(p("比")), check = { t, pos -> pos[0] > 0 && pos[0] < t.lastIndex }
+            // Not a score or a ratio (三比二, 一比一).
+            listOf(p("比")), check = { t, pos ->
+                pos[0] > 0 && pos[0] < t.lastIndex &&
+                    t[pos[0] - 1].lastOrNull()?.let { it in NUMBER_CHARS } != true && t[pos[0] + 1].firstOrNull()?.let { it in NUMBER_CHARS } != true
+            }
         ),
         GrammarPoint(
             "跟 … 一样 — такой же, как",

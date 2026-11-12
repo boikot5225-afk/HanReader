@@ -25,12 +25,10 @@ private fun variable(res: Int, vararg weights: FontWeight): FontFamily = FontFam
 )
 
 object AppFonts {
-    // The Spanish app (Amauta Reader) packs no Chinese fonts (13 MB): the Chinese faces, never
-    // offered for Spanish, fall back to the phone's own serif and sans.
-    val NotoSerifSc: FontFamily = FontFamily.Serif
-    val NotoSansSc: FontFamily = FontFamily.SansSerif
-    val WenKai: FontFamily = FontFamily.Serif
-    val Fangsong: FontFamily = FontFamily.Serif
+    val NotoSerifSc: FontFamily = variable(R.font.noto_serif_sc, FontWeight.Normal, FontWeight.SemiBold)
+    val NotoSansSc: FontFamily = variable(R.font.noto_sans_sc, FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold)
+    val WenKai: FontFamily = FontFamily(Font(R.font.lxgw_wenkai, FontWeight.Normal))
+    val Fangsong: FontFamily = FontFamily(Font(R.font.zhuque_fangsong, FontWeight.Normal))
     val Oswald: FontFamily = variable(R.font.oswald, FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold)
     val PlexMono: FontFamily = FontFamily(
         Font(R.font.plex_mono_regular, FontWeight.Normal),

@@ -12,7 +12,9 @@ tools/clean_ru_wiktionary.py turns the verdicts into data/zh/ru_fixes.tsv and ap
 
 The API key comes from DEEPSEEK_API_KEY; in a Claude cloud session the network proxy inserts it.
 
-Usage: python3 tools/verify_ru_wiktionary.py --out ru_verdicts.jsonl [--limit 200] [--threads 8]
+Also checks the machine translation: --source ru_ai.tsv (senses separated by "; ").
+
+Usage: python3 tools/verify_ru_wiktionary.py --out ru_verdicts.jsonl [--source ru.tsv|ru_ai.tsv] [--limit 200] [--threads 8]
 """
 import argparse
 import concurrent.futures
@@ -33,7 +35,7 @@ BATCH = 40
 
 SYSTEM = (
     "Ты редактор китайско-русского словаря. Тебе дают записи: китайское слово, пиньинь и английские "
-    "значения из CC-CEDICT (если есть) и русское значение из Викисловаря. Проверь русское значение. "
+    "значения из CC-CEDICT (если есть) и русское значение из словаря. Проверь русское значение. "
     "Оно ВЕРНО, если передаёт основное или одно из основных значений слова, даже если неполно или "
     "стилистически неидеально. Оно НЕВЕРНО, если: означает другое слово или другой смысл; содержит "
     "служебный текст вместо значения (ключ, число черт, метод ввода, иероглифы вместо перевода); не на "
@@ -46,9 +48,9 @@ SYSTEM = (
 )
 
 
-def load_entries():
+def load_entries(source="ru.tsv"):
     ru = []
-    for line in open(os.path.join(ASSETS, "ru.tsv"), encoding="utf-8"):
+    for line in open(os.path.join(ASSETS, source), encoding="utf-8"):
         w, m = line.rstrip("\n").split("\t", 1)
         ru.append((w, m))
     cedict = {}
@@ -98,7 +100,7 @@ def ask(batch, cedict):
                     ru = " ".join(str(it.get("ru", "")).split()).strip(" ;")
                     out.append({"w": w, "ok": False, "ru": ru})
             return out
-        except (urllib.error.URLError, TimeoutError, KeyError, ValueError, json.JSONDecodeError) as e:
+        except (urllib.error.URLError, TimeoutError, KeyError, ValueError, json.JSONDecodeError, OSError) as e:
             print(f"retry {attempt + 1}: {e}", file=sys.stderr)
             time.sleep(2 ** attempt)
     return []
@@ -109,8 +111,9 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--limit", type=int, default=0, help="check only this many words (a random sample)")
     ap.add_argument("--threads", type=int, default=8)
+    ap.add_argument("--source", default="ru.tsv")
     a = ap.parse_args()
-    ru, cedict = load_entries()
+    ru, cedict = load_entries(a.source)
     done = set()
     if os.path.exists(a.out):
         for line in open(a.out, encoding="utf-8"):

@@ -247,7 +247,12 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     val stamp = System.currentTimeMillis()
                     val temp = File(booksDir, "import-$stamp.tmp")
                     val input = app.contentResolver.openInputStream(uri) ?: error("Не удалось открыть файл")
-                    input.use { src -> temp.outputStream().use { src.copyTo(it, 1 shl 16) } }
+                    try {
+                        input.use { src -> temp.outputStream().use { com.hanreader.app.epub.BookLimits.copy(src, it) } }
+                    } catch (e: Exception) {
+                        temp.delete()
+                        throw e
+                    }
                     importFile(temp, stamp, displayName(uri))
                 }
             })

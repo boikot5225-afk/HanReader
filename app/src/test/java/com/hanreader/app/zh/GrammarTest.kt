@@ -25,6 +25,13 @@ class GrammarTest {
     }
 
     @Test
+    fun aScoreIsNotAComparison() {
+        assertTrue("A" in titles("今天比昨天冷。"))
+        assertTrue("A" !in titles("比分是三比二。"))
+        assertTrue("A" !in titles("比例是一比一。"))
+    }
+
+    @Test
     fun partsInOrderAndNear() {
         assertTrue("虽然" in titles("虽然天很冷，可是我们还是出去了。"))
         assertTrue("因为" !in titles("所以我说，因为你。"))

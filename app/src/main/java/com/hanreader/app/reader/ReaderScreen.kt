@@ -247,7 +247,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
     // Short translations above the pinyin: over unknown words or over recommended ones.
-    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, known) {
+    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, bookWide, known) {
         val eng = engine
         val zhless = eng != null && eng !is ZhEngine
         val words = when (appearance.gloss) {
@@ -328,7 +328,6 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         val (hlMarked, hlNoted) = remember(block, highlightsHere[i]) { Highlights.tokens(block, highlightsHere[i]) }
         val dashed = remember(block, bookWide) { Highlights.bookTokens(block, bookWide) }
         RubyParagraph(
-            blockIndex = i,
             dashed = dashed,
             onNote = { noteText = it; chrome = false },
             marked = hlMarked,
@@ -354,6 +353,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             lines = lines,
             glossFor = glossFor,
             glossOnly = glossTokens?.let { it[i] ?: emptySet() },
+            blockIndex = i,
             unknownMarks = if (appearance.markUnknown) unknownSet else null,
             noMarks = remember(block, names, engine) { engine?.let { VocabularyStats.nameTokens(block, names, it) } ?: emptySet() },
             recommendedMarks = if (appearance.markRecommended) recommendedSet else null,
@@ -1577,6 +1577,10 @@ private fun WordSheet(
                     }
                 }
             }
+            // A set expression: said before its meaning, since it is not read word by word.
+            idiomKind(entry?.gloss)?.let {
+                Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            }
             OwnMeaning(word, own, suggestions = remember(word, russian, es) {
                 (russian + es.drop(1).flatMap { it.entry.ru.take(2) }).map { it.replace(Regex("^\\([^)]*\\)\\s*"), "") }.distinct().take(8)
             }) { scope, text, previous ->
@@ -1594,6 +1598,11 @@ private fun WordSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+            val measureWords = remember(word) { zh?.measureWords(word).orEmpty() }
+            if (measureWords.isNotEmpty()) {
+                Text("Счётное слово: " + measureWords.joinToString(" · "), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             DoubtRow(word, cardWord, translation, sentence, doubtSource)
             if (otherReadings.isNotEmpty()) {
@@ -1769,9 +1778,6 @@ private fun WordSheet(
                     Text(if (isSaved) "Добавить пример к карточке" else "Сохранить в карточки", style = MaterialTheme.typography.titleMedium)
                 }
             }
-            if (entry?.gloss?.contains("(idiom)") == true) {
-                Text("成语 · идиома", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
             val lexiconName = zh?.nameKind(word)
             val isUserName = word in userNames
             if (lexiconName != null || isUserName) {
@@ -1831,6 +1837,15 @@ private fun ConjugationTable(c: Map<String, Map<String, List<String>>>) {
     }
 }
 
+/** The kind of set expression a dictionary meaning marks, CC-CEDICT style: chengyu, proverb, xiehouyu. */
+internal fun idiomKind(gloss: String?): String? = when {
+    gloss == null -> null
+    gloss.contains("(xiehouyu)") -> "歇后语 · иносказание: первая часть намекает на смысл второй"
+    gloss.contains("(proverb)") -> "谚语 · пословица"
+    gloss.contains("(idiom)") -> "成语 · идиома: смысл не складывается из слов"
+    else -> null
+}
+
 /** A grammar construction the tapped word belongs to: its pattern, what it means, an example. */
 @Composable
 private fun GrammarNote(point: com.hanreader.app.zh.GrammarPoint) {
@@ -1871,6 +1886,8 @@ internal fun KnownToggle(known: Boolean, onKnown: (Boolean) -> Unit, modifier: M
 /** The read-aloud player over the text: previous / pause-play / next sentence, speed, stop. */
 @Composable
 private fun ReadAloudBar(r: ReadAloud, modifier: Modifier = Modifier) {
+    var voiceMenu by remember { mutableStateOf(false) }
+    if (voiceMenu) VoiceDialog(onDismiss = { voiceMenu = false })
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -1887,6 +1904,7 @@ private fun ReadAloudBar(r: ReadAloud, modifier: Modifier = Modifier) {
                 }
                 IconButton(onClick = r::next) { Icon(LexiconIcons.SkipForward, contentDescription = "Следующее предложение") }
                 Spacer(Modifier.weight(1f))
+                TextButton(onClick = { voiceMenu = true }) { Text("Голос") }
                 TextButton(onClick = {
                     val i = ReadAloud.RATES.indexOfFirst { it >= r.rate - 0.01f }.let { if (it < 0) 0 else it }
                     r.changeRate(ReadAloud.RATES[(i + 1) % ReadAloud.RATES.size])
@@ -1901,7 +1919,7 @@ private fun ReadAloudBar(r: ReadAloud, modifier: Modifier = Modifier) {
     }
 }
 
-/** The reader's own meaning: shown first; added, edited or removed in place. */
+/** The reader's own meaning: shown first; added, edited or removed in place, for this place, this book or every book. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun OwnMeaning(

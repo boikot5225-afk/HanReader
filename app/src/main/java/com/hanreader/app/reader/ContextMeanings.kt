@@ -31,6 +31,9 @@ object ContextMeanings {
         else -> engine.lemma(t.text)
     }
 
+    /** A key of a place or a book, not a word: such meanings are not listed as words. */
+    fun isScoped(key: String) = key.startsWith("@")
+
     /** This chapter's meanings for one place: «<block>:<start>» -> meaning. */
     fun herein(all: Map<String, String>, book: Long, chapter: Int): Map<String, String> {
         val prefix = "@$book|o|$chapter:"
@@ -46,7 +49,7 @@ object ContextMeanings {
     /**
      * Adds the reader's meanings of this chapter to the hints [glossFor]: a place by «@<block>:<start>»
      * (shown even over a known word: the reader asked for it), a book meaning over each of the words
-     * it is for that gets a hint ([hinted]).
+     * it is for that gets a hint ([hinted]; Chinese: a book meaning replaces the meaning of every reading).
      */
     fun addTo(glossFor: MutableMap<String, String>, chapter: ChapterContent, here: Map<String, String>, book: Map<String, String>,
               engine: LanguageModule, hinted: Set<String>) {
@@ -56,7 +59,12 @@ object ContextMeanings {
                 if (t.kind != TokenKind.HAN) continue
                 here["$bi:${t.start}"]?.let { glossFor["@$bi:${t.start}"] = it; continue }
                 if (book.isEmpty() || t.text !in hinted || t.pinyin == com.hanreader.app.es.EsEngine.IN_PHRASE) continue
-                book[keyOf(t, engine)]?.let { m -> glossFor[if (t.pinyin.isEmpty()) t.text else t.text + "|" + t.pinyin] = m }
+                val m = book[keyOf(t, engine)] ?: continue
+                if (engine is ZhEngine) {
+                    // Chinese: a book meaning replaces the meaning of every reading of the word.
+                    glossFor[t.text] = m
+                    if (t.pinyin.isNotEmpty()) glossFor[t.text + "|" + t.pinyin] = m
+                } else glossFor[if (t.pinyin.isEmpty()) t.text else t.text + "|" + t.pinyin] = m
             }
         }
     }

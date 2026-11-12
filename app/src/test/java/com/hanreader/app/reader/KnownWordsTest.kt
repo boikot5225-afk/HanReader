@@ -80,16 +80,19 @@ class KnownWordsTest {
     }
 
     @Test
-    fun aiTranslationFillsGapsAndWiktionaryWins() {
+    fun editedEntryFirstWiktionaryFillsGaps() {
         val engine = ZhEngine(
             ZhSegmenterTest.dict, 0, hsk,
-            russian = mapOf("他们" to "они"),
-            russianAi = mapOf("终于" to "наконец; в конце концов", "他们" to "они (ИИ)")
+            russian = mapOf("他们" to "они", "图书" to "книги"),
+            russianAi = mapOf("终于" to "наконец; в конце концов", "他们" to "они; их")
         )
         assertEquals(listOf("наконец", "в конце концов"), engine.russianSenses("终于"))
         assertEquals(ZhEngine.RussianSource.AI, engine.russianSource("终于"))
-        assertEquals(listOf("они"), engine.russianSenses("他们"))
-        assertEquals(ZhEngine.RussianSource.WIKTIONARY, engine.russianSource("他们"))
+        // The edited entry (ordered by use, made from both sources) comes first.
+        assertEquals(listOf("они", "их"), engine.russianSenses("他们"))
+        assertEquals(ZhEngine.RussianSource.AI, engine.russianSource("他们"))
+        assertEquals(listOf("книги"), engine.russianSenses("图书"))
+        assertEquals(ZhEngine.RussianSource.WIKTIONARY, engine.russianSource("图书"))
         assertEquals("наконец; в конце концов", engine.cardTranslation("终于"))
         assertEquals(null, engine.russianSource("图书馆"))
     }
@@ -108,7 +111,8 @@ class KnownWordsTest {
         val ru = File("src/main/assets/zh/ru.tsv").bufferedReader().useLines { ZhEngine.parseRussian(it) }
         val ruAi = File("src/main/assets/zh/ru_ai.tsv").bufferedReader().useLines { ZhEngine.parseRussian(it) }
         val engine = ZhEngine(ZhSegmenterTest.dict, 0, hsk, ru, ruAi)
-        for (w in listOf("革命党", "一件", "城里")) {
+        // Without any meaning: the parts' meanings joined.
+        for (w in listOf("一万步", "一两声", "一个包")) {
             assertTrue("$w should have no meaning of its own", ZhSegmenterTest.dict.lookup(w)?.hasDefinition != true)
             val parts = engine.compose(w)!!.map { it.word }
             assertEquals(w, parts.joinToString(""))
@@ -116,7 +120,9 @@ class KnownWordsTest {
             assertTrue(engine.glossShort(w)!!.contains(" + "))
             assertTrue(engine.cardTranslation(w)!!.contains(" + "))
         }
-        assertEquals(listOf("革命", "党"), engine.compose("革命党")!!.map { it.word })
+        // A frequent combination with a Russian meaning of its own keeps its parts for the breakdown.
+        assertEquals(listOf("桌", "上"), engine.compose("桌上")!!.map { it.word })
+        assertEquals("на столе", engine.cardTranslation("桌上"))
         assertNull(engine.compose("图书馆")) // has its own meaning
         assertNull(engine.compose("我")) // one character
     }

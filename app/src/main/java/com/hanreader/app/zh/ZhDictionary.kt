@@ -97,12 +97,18 @@ class ZhDictionary private constructor(private val b: ByteBuffer) {
     fun freq(word: String): Int = index(word).let { if (it < 0) -1 else b.getInt(freqs + it * 4) }
 
     /** HSK frequency rank: 0 when unranked, -1 when absent. */
-    fun rank(word: String): Int = index(word).let { if (it < 0) -1 else b.getInt(ranks + it * 4) and HAS_DEF.inv() }
+    fun rank(word: String): Int = index(word).let { if (it < 0) -1 else b.getInt(ranks + it * 4) and FLAGS.inv() }
+
+    /**
+     * A Jieba combination without a meaning that is not a name (一个, 放在, 是因为): known, with
+     * its count, but its parts are the words. The segmenter does not keep it whole.
+     */
+    fun isLoose(word: String): Boolean = index(word).let { it >= 0 && b.getInt(ranks + it * 4) and LOOSE != 0 }
 
     fun lookup(word: String): ZhEntry? {
         val i = index(word)
         if (i < 0) return null
-        return ZhEntry(word, utf8(pyOff, py, i), utf8(glOff, gl, i), b.getInt(ranks + i * 4) and HAS_DEF.inv(), b.getInt(freqs + i * 4))
+        return ZhEntry(word, utf8(pyOff, py, i), utf8(glOff, gl, i), b.getInt(ranks + i * 4) and FLAGS.inv(), b.getInt(freqs + i * 4))
     }
 
     /** Every word in sorted order (tests, tools). */
@@ -115,6 +121,8 @@ class ZhDictionary private constructor(private val b: ByteBuffer) {
     companion object {
         private const val VERSION = 1
         private const val HAS_DEF = 1 shl 30
+        private const val LOOSE = 1 shl 29
+        private const val FLAGS = HAS_DEF or LOOSE
 
         private fun pad4(n: Int) = (n + 3) and 3.inv()
 

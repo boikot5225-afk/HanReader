@@ -49,15 +49,16 @@ internal data class Credit(val what: String, val source: String, val license: St
 internal val CREDITS = listOf(
     Credit("Китайско-английский словарь", "CC-CEDICT, MDBG", "CC BY-SA 4.0", "CC-CEDICT_NOTICE.txt", "zh"),
     Credit("Русские значения", "Русский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "RU_WIKTIONARY_NOTICE.txt", "zh"),
+    Credit("Идиомы, пословицы и слова", "Английский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "EN_WIKTIONARY_NOTICE.txt", "zh"),
     Credit("Испанский словарь", "Русский и английский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "ES_WIKTIONARY_NOTICE.txt", "es"),
-    Credit("Машинный перевод значений на русский", "производная от CC-CEDICT, перевод DeepSeek", "CC BY-SA 4.0", "RU_AI_NOTICE.txt", "zh"),
+    Credit("Машинный перевод значений на русский", "производная от CC-CEDICT и Викисловаря, перевод DeepSeek", "CC BY-SA 4.0", "RU_AI_NOTICE.txt", "zh"),
     Credit("Разбивка текста на слова", "Jieba 0.42.1", "MIT", "JIEBA_NOTICE.txt", "zh"),
     Credit("Имена собственные", "разметка словаря Jieba", "MIT", "NAMES_NOTICE.txt", "zh"),
     Credit("Чтения пиньинь", "pypinyin 0.53.0", "MIT", "PYPINYIN_NOTICE.txt", "zh"),
     Credit("Уровни HSK 3.0 и 2.0", "Complete HSK Vocabulary; hskhsk.com", "MIT", "HSK_LEVELS_NOTICE.txt", "zh"),
     Credit("Частоты слов HSK", "Complete HSK Vocabulary", "MIT", "HSK_FREQUENCY_NOTICE.txt", "zh"),
     Credit("Упрощённые и традиционные иероглифы", "OpenCC", "Apache 2.0", "OPENCC_NOTICE.txt", "zh"),
-    Credit("Шрифты", "Literata, Lora, Inter, Cormorant, Oswald, IBM Plex Mono", "SIL OFL 1.1", "FONTS_NOTICE.txt"),
+    Credit("Шрифты", "Literata, Lora, Noto, LXGW WenKai, Zhuque Fangsong, Inter и др.", "SIL OFL 1.1", "FONTS_NOTICE.txt"),
     Credit("Библиотеки", "Kotlin, AndroidX, jsoup", "Apache 2.0, MIT", "LIBRARIES_NOTICE.txt"),
 )
 
@@ -164,7 +165,8 @@ fun AboutDialog(onClose: () -> Unit) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("${appTitle()} $version", style = MaterialTheme.typography.headlineSmall, fontFamily = WordFont)
                 Text(
-                    (if (com.hanreader.app.lang.Languages.current.readingTitle != null) "Читалка китайских книг с пиньинем, словарём и карточками."
+                    (if (com.hanreader.app.lang.Languages.AVAILABLE.size > 1) "Читалка книг на испанском и китайском со словарём, разбором грамматики, пиньинем и карточками."
+                        else if (com.hanreader.app.lang.Languages.current.readingTitle != null) "Читалка китайских книг с пиньинем, словарём и карточками."
                         else "Читалка книг на испанском со словарём, разбором грамматики и карточками.") + " Работает без интернета и не собирает личные данные.",
                     style = MaterialTheme.typography.bodyMedium
                 )

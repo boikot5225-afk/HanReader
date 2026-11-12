@@ -73,7 +73,62 @@ class ZhSegmenter(private val dict: ZhDictionary) {
                 }
             }
         }
-        return out
+        return if (blocked.isEmpty() && extra.isEmpty()) refine(out) else refine(out, extra)
+    }
+
+    /**
+     * Context rules over the most probable path: words that are right on their own but wrong
+     * in this place. Word counts cannot see the neighbours; these rules do.
+     *  - 把门 / 把手 / 把头 before a verb are 把 + noun (他把门关上), not «сторожить ворота», «ручка».
+     *  - 才能 before a verb is 才 + 能 (才能来), not «талант» (他的才能).
+     *  - 的话 is «если» only before a comma; elsewhere it is 的 + 话 (你说的话).
+     *  - 就要 is «вот-вот» only with a 了 later in the clause; else 就 + 要.
+     *  - a numeral with a measure word is two words (一个, 两只, 几张), as with any other numeral;
+     *    这本书 is 这 + 本 + 书.
+     * Words the reader keeps whole ([extra]) are left alone.
+     */
+    private fun refine(tokens: List<ZhToken>, extra: Set<String> = emptySet()): List<ZhToken> {
+        var out: ArrayList<ZhToken>? = null
+        for ((i, t) in tokens.withIndex()) {
+            val cut = if (t.kind == TokenKind.HAN && t.text.length in 2..3 && t.text !in extra) splitAt(tokens, i) else 0
+            if (cut == 0) { out?.add(t); continue }
+            if (out == null) out = ArrayList<ZhToken>(tokens.size + 8).apply { addAll(tokens.subList(0, i)) }
+            val a = t.text.substring(0, cut)
+            val b = t.text.substring(cut)
+            out.add(ZhToken(a, t.start, t.start + cut, TokenKind.HAN, dict.lookup(a)))
+            out.add(ZhToken(b, t.start + cut, t.end, TokenKind.HAN, dict.lookup(b)))
+        }
+        return out ?: tokens
+    }
+
+    /** Where token [i] is cut in two by a context rule, or 0. */
+    private fun splitAt(tokens: List<ZhToken>, i: Int): Int {
+        val w = tokens[i].text
+        val prev = tokens.getOrNull(i - 1)?.takeIf { it.kind == TokenKind.HAN }?.text
+        val next = tokens.getOrNull(i + 1)?.takeIf { it.kind == TokenKind.HAN }?.text
+        return when {
+            w in BA_NOUNS ->
+                if (next != null && next[0] !in "的是很也都坏" && (prev == null || prev.last() !in "的个这那只副门")) 1 else 0
+            w == "才能" ->
+                if (next != null && next[0] !in "的和与及或是也都很" && (prev == null || prev.last() !in "的有无其之种项")) 1 else 0
+            w == "的话" -> if (tokens.getOrNull(i + 1)?.text?.firstOrNull()?.let { it in "，,：:" } == true) 0 else 1
+            w == "就要" -> if (laterInClause(tokens, i, "了")) 0 else 1
+            w in AFTER_COUNT -> if (prev != null && (prev.last() in COUNT_CHARS || prev.last() in "这那哪")) 1 else 0
+            w.length == 2 && w[0] in COUNT_CHARS && w[1] in MEASURE_CHARS && w !in NUMERAL_WORDS -> 1
+            else -> 0
+        }
+    }
+
+    /** [word] is among the tokens after [i], before the clause ends. */
+    private fun laterInClause(tokens: List<ZhToken>, i: Int, word: String): Boolean {
+        var k = i + 1
+        while (k < tokens.size && k <= i + 8) {
+            val t = tokens[k]
+            if (t.kind == TokenKind.PUNCT && t.text[0] in "，。！？；,.!?;、：:") return false
+            if (t.text == word) return true
+            k++
+        }
+        return false
     }
 
     /** The end of the emoji sequence starting at [from]: pairs joined by ZWJ, variation selectors, skin tones. */
@@ -103,7 +158,7 @@ class ZhSegmenter(private val dict: ZhDictionary) {
             val limit = minOf(maxLen, n - i)
             for (len in 2..limit) {
                 val w = text.substring(base, base + len)
-                if (dict.contains(w) && w !in blocked) relax(best, back, i, len, cost(w))
+                if (dict.contains(w) && !dict.isLoose(w) && w !in blocked) relax(best, back, i, len, cost(w))
             }
             if (extra.isNotEmpty()) {
                 for (len in 2..minOf(MAX_WORD, n - i)) {
@@ -174,6 +229,14 @@ class ZhSegmenter(private val dict: ZhDictionary) {
         private const val UNKNOWN_FREQ = 0.5
         private const val NUMBER_FREQ = 200.0
         private const val EXTRA_FREQ = 5_000.0
+        /** Dictionary words that are 把 + noun before a verb. */
+        private val BA_NOUNS = setOf("把门", "把手", "把头")
+        /** Measure word + noun after a numeral or demonstrative: 这 本 书, 一 个 人 (not 本书 «эта книга», 个人 «личный»). */
+        private val AFTER_COUNT = setOf("本书", "个人")
+        private const val COUNT_CHARS = "一二三四五六七八九十两几每半"
+        private const val MEASURE_CHARS = "个名种句次家口对把张只条位件本颗杯段块片首篇部座辆台场双份群批项层间支根匹封棵朵顿遍趟番碗瓶盒包串排套架枚粒滴届章页束堆扇幅阵笔届所"
+        /** Numeral + measure-looking pairs that are words of their own. */
+        private val NUMERAL_WORDS = setOf("一把手", "一口", "一家", "一阵", "一番", "一场", "一对", "一层", "一笔", "半场", "十分", "百分", "千万", "万分", "两口", "一所", "一部", "一片", "一段", "一块", "一句", "一份", "一批", "一项", "一套", "一群")
         private const val NUMERALS = "零〇一二三四五六七八九十百千万亿两"
         private const val UNITS = "年月日号点分秒岁"
     }

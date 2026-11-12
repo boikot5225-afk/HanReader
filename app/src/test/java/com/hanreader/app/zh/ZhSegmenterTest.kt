@@ -27,6 +27,19 @@ class ZhSegmenterTest {
         assertEquals("Zhōng guó", e!!.pinyin)
     }
 
+    /** Chengyu and sayings from the English Wiktionary are whole words with a reading per character. */
+    @Test
+    fun wiktionarySayingsAreWholeWords() {
+        assertEquals(listOf("他们", "一决胜负"), words("他们一决胜负"))
+        assertEquals(listOf("你", "别", "跟", "他", "一个鼻孔出气"), words("你别跟他一个鼻孔出气"))
+        assertEquals(listOf("一方水土养一方人"), words("一方水土养一方人"))
+        val e = dict.lookup("一决胜负")!!
+        assertTrue(e.gloss.startsWith("(idiom)"))
+        assertEquals(4, e.pinyin.split(' ').size)
+        // A word the segmenter knew without a meaning now has one.
+        assertTrue(dict.lookup("一举成名")!!.hasDefinition)
+    }
+
     /** The binary lexicon holds exactly what the source TSV (data/zh/lexicon.dat) holds. */
     @Test
     fun binaryLexiconMatchesTheSource() {
@@ -73,6 +86,30 @@ class ZhSegmenterTest {
             "章" to "zhāng", "德" to "dé"
         )
         expected.forEach { (word, reading) -> assertEquals(word, reading, dict.lookup(word)!!.pinyin) }
+    }
+
+    /**
+     * The sentence set in src/test/resources/segmentation.tsv: words in context (把门 as 把 + 门
+     * before a verb, 才能 as 才 + 能, numerals apart from measure words). Lines starting with "?"
+     * are known hard cases: counted, not required.
+     */
+    @Test
+    fun sentenceSet() {
+        val lines = javaClass.classLoader!!.getResourceAsStream("segmentation.tsv")!!.bufferedReader().readLines()
+            .filter { it.isNotBlank() && !it.startsWith("#") }
+        assertTrue(lines.size >= 60)
+        val failures = ArrayList<String>()
+        var hard = 0
+        var hardPassed = 0
+        for (line in lines) {
+            val optional = line.startsWith("?")
+            val (sentence, expected) = line.removePrefix("?").split("\t")
+            val got = words(sentence).joinToString(" ")
+            if (optional) { hard++; if (got == expected) hardPassed++ }
+            else if (got != expected) failures += "$sentence\n    expected $expected\n    got      $got"
+        }
+        println("Segmentation set: ${lines.size - hard - failures.size}/${lines.size - hard} pass, hard cases $hardPassed/$hard")
+        assertTrue(failures.joinToString("\n", "\n"), failures.isEmpty())
     }
 
     /** Regression cases carried over from Reader AI (data/zh_lexical_regressions.json). */

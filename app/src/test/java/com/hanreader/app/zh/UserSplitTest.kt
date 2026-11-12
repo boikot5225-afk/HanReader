@@ -11,11 +11,11 @@ class UserSplitTest {
 
     @Test
     fun splitWord() {
-        val text = "她把头转向窗口。"
+        val text = "他将来北京看窗口。"
         val before = words(text)
-        assertTrue("the dictionary glues it: $before", "把头" in before)
-        val after = words(text, setOf("把头"))
-        assertTrue(after.toString(), "把头" !in after && "把" in after && "头" in after)
+        assertTrue("the dictionary glues it: $before", "将来" in before)
+        val after = words(text, setOf("将来"))
+        assertTrue(after.toString(), "将来" !in after && "将" in after && "来" in after)
         assertTrue("other words stay whole: $after", "窗口" in after)
         // The same characters elsewhere are not affected by other splits.
         assertEquals(before, words(text, setOf("窗户")))
