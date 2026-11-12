@@ -42,6 +42,41 @@ import java.io.File
 class PaginationTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
+    @Test
+    fun quotationGeometryAndCompactSpacingAgreeWithPagination() {
+        val style = com.hanreader.app.epub.EpubTextStyle(inset = true, indent = false, alignment = "right")
+        val first = block("他回来了。\n暖暖的灯光。\n看书。").copy(style = style)
+        val next = first.copy(style = style.copy(compactBefore = true))
+        var checked = false
+        compose.setContent {
+            val a = Appearance()
+            val theme = ReaderTheme.CLASSIC.spec
+            val m = rememberRubyMetrics(rememberTextMeasurer(cacheSize = 0), a, theme, theme.defaultHanFont.family)
+            LaunchedEffect(Unit) {
+                val width = 340f
+                val quote = layout(first.tokens, width, m, false, false, null, 0f, 4f, true, true, style = style)
+                assertEquals(3, quote.lineCount)
+                val inset = minOf(m.emWidth * 1.4f, width * 0.12f)
+                assertTrue(quote.items.all { it.x >= inset - 0.1f })
+                for (line in quote.items.groupBy { it.lineTop }.values) {
+                    assertEquals(width - inset, line.maxOf { it.x + it.width }, 0.1f)
+                }
+                val hinted = layout(first.tokens, width, m, false, false, null, 0f, 4f, true, true,
+                    glossFor = first.tokens.associate { it.text to "Очень длинная подсказка перевода" }, style = style)
+                assertTrue(hinted.glosses.isNotEmpty())
+                assertTrue(hinted.glosses.all { it.x >= 0f && it.x + it.layout.size.width <= width + 0.1f })
+                val ch = chapter.copy(blocks = listOf(first, next, first))
+                val spec = PageSpec(width, 4000f, 24f, 0f, false, 0f, 4f, false, null, true, true)
+                val pages = Paginator.paginate(ch, m, spec) { null }
+                val items = pages.single().items.filterIsInstance<PageItem.Lines>()
+                assertEquals(listOf(false, false, true), items.map { it.spacingBefore })
+                assertEquals(quote.lineCount, items.first().lines.count())
+                checked = true
+            }
+        }
+        compose.waitUntil(20_000) { checked }
+    }
+
     private val engine = ZhEngine(ZhSegmenterTest.dict, 0)
     private val sentences = listOf(
         "那天晚上一直在下雨。", "街灯很暗，他站在旧书店门口，等一个不会来的人。",
