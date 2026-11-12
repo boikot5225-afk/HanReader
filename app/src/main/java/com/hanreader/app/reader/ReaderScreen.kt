@@ -214,7 +214,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
     // Short translations above the pinyin: over unknown words or over recommended ones.
-    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings) {
+    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, book.entity.id) {
         val eng = engine
         val words = when (appearance.gloss) {
             GlossMode.OFF -> null
@@ -234,6 +234,9 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                     }
                 }
             }
+            // The reader's meanings for this book and for single places win over the dictionary's.
+            if (chapter != null) ContextMeanings.addTo(this, chapter, ContextMeanings.herein(userMeanings, book.entity.id, chapter.index),
+                ContextMeanings.ofBook(userMeanings, book.entity.id), words)
         }
     }
     // Fading translations: a word's first few appearances carry it, the later ones only the underline.
@@ -279,6 +282,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             lines = lines,
             glossFor = glossFor,
             glossOnly = glossTokens?.let { it[i] ?: emptySet() },
+            blockIndex = i,
             unknownMarks = if (appearance.markUnknown) unknownSet else null,
             noMarks = remember(block, names, engine) { engine?.let { VocabularyStats.nameTokens(block, names, it) } ?: emptySet() },
             recommendedMarks = if (appearance.markRecommended) recommendedSet else null,
@@ -596,7 +600,14 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             },
             onNote = { h, note -> vm.updateHighlight(h.copy(note = note)) },
             onRemoveHighlight = { vm.removeHighlight(it.id) },
-            userMeaning = userMeanings[block.text.substring(block.tokens[sel.first].start, block.tokens[sel.last].end)],
+            userMeanings = userMeanings,
+            meaningKey = { scope, w ->
+                when (scope) {
+                    MeaningScope.HERE -> ContextMeanings.here(book.entity.id, chapter.index, sel.block, block.tokens[sel.first].start)
+                    MeaningScope.BOOK -> ContextMeanings.inBook(book.entity.id, w)
+                    MeaningScope.EVERYWHERE -> w
+                }
+            },
             onUserMeaning = vm::setUserMeaning,
             userSplits = userSplits,
             onSplit = { w, split -> vm.setSplit(w, split); selection = null },
@@ -1267,8 +1278,9 @@ private fun WordSheet(
     onHighlight: (Int, com.hanreader.app.Highlight?) -> Unit,
     onNote: (com.hanreader.app.Highlight, String) -> Unit,
     onRemoveHighlight: (com.hanreader.app.Highlight) -> Unit,
-    /** The reader's own meaning of the word, if any, and how to change it (blank removes it). */
-    userMeaning: String? = null,
+    /** The reader's own meanings (see [ContextMeanings]), the key of this word for each scope, and how to change one (blank removes it). */
+    userMeanings: Map<String, String> = emptyMap(),
+    meaningKey: (MeaningScope, String) -> String = { _, w -> w },
     onUserMeaning: (String, String) -> Unit = { _, _ -> },
     /** Words the reader split, and how to split or join one. */
     userSplits: Set<String> = emptySet(),
@@ -1304,6 +1316,10 @@ private fun WordSheet(
             com.hanreader.app.zh.Grammar.at(tokens.subList(r.first, r.last + 1).map { it.text }, selection.first - r.first)
         }
     }
+    // The reader's own meaning: for this place, this book or every book; the nearest wins.
+    val meaningKeys = remember(word, selection) { MeaningScope.entries.associateWith { meaningKey(it, word) } }
+    val own = MeaningScope.entries.firstNotNullOfOrNull { sc -> userMeanings[meaningKeys.getValue(sc)]?.let { sc to it } }
+    val userMeaning = own?.second
     val translation = userMeaning ?: engine.cardTranslation(word, pageReading)
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
@@ -1377,7 +1393,10 @@ private fun WordSheet(
             idiomKind(entry?.gloss)?.let {
                 Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
-            OwnMeaning(word, userMeaning, onUserMeaning)
+            OwnMeaning(word, own, suggestions = remember(word, russian) { russian.distinct().take(8) }) { scope, text, previous ->
+                if (previous != null && previous != scope) onUserMeaning(meaningKeys.getValue(previous), "")
+                onUserMeaning(meaningKeys.getValue(scope), text)
+            }
             if (russian.isNotEmpty()) {
                 russian.forEachIndexed { i, sense ->
                     Text("${i + 1}. $sense", style = MaterialTheme.typography.bodyLarge)
@@ -1603,29 +1622,52 @@ private fun ReadAloudBar(r: ReadAloud, modifier: Modifier = Modifier) {
     }
 }
 
-/** The reader's own meaning: shown first; added, edited or removed in place. */
+/** The reader's own meaning: shown first; added, edited or removed in place, for this place, this book or every book. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OwnMeaning(word: String, meaning: String?, onChange: (String, String) -> Unit) {
+private fun OwnMeaning(
+    word: String,
+    /** The meaning set now and where it applies; null: none. */
+    own: Pair<MeaningScope, String>?,
+    /** Dictionary senses to pick with one tap. */
+    suggestions: List<String>,
+    /** (where, meaning — blank removes it, where it applied before) */
+    onChange: (MeaningScope, String, MeaningScope?) -> Unit
+) {
     var editing by remember(word) { mutableStateOf(false) }
-    var text by remember(word, meaning) { mutableStateOf(meaning.orEmpty()) }
+    var text by remember(word, own) { mutableStateOf(own?.second.orEmpty()) }
+    // A new meaning is for the whole book unless the reader says otherwise: a wrong sense usually is wrong everywhere in it.
+    var scope by remember(word, own) { mutableStateOf(own?.first ?: MeaningScope.BOOK) }
     if (editing) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             androidx.compose.material3.OutlinedTextField(
                 value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth(),
                 label = { Text("Моё значение") }, placeholder = { Text("например: держать в руках") },
                 shape = RoundedCornerShape(14.dp), maxLines = 4
             )
+            if (suggestions.isNotEmpty()) {
+                Text("Из словаря", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    suggestions.forEach { sg -> androidx.compose.material3.SuggestionChip(onClick = { text = sg }, label = { Text(sg) }) }
+                }
+            }
+            Text("Где показывать", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                MeaningScope.entries.forEach { sc ->
+                    androidx.compose.material3.FilterChip(selected = scope == sc, onClick = { scope = sc }, label = { Text(sc.title) })
+                }
+            }
             Row {
-                TextButton(onClick = { onChange(word, text); editing = false }) { Text("Сохранить") }
-                if (meaning != null) TextButton(onClick = { onChange(word, ""); editing = false }) { Text("Удалить") }
-                TextButton(onClick = { text = meaning.orEmpty(); editing = false }) { Text("Отмена") }
+                TextButton(onClick = { onChange(scope, text, own?.first); editing = false }, enabled = text.isNotBlank()) { Text("Сохранить") }
+                if (own != null) TextButton(onClick = { onChange(own.first, "", null); editing = false }) { Text("Удалить") }
+                TextButton(onClick = { text = own?.second.orEmpty(); scope = own?.first ?: MeaningScope.BOOK; editing = false }) { Text("Отмена") }
             }
         }
-    } else if (meaning != null) {
+    } else if (own != null) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Моё значение", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                Text(meaning, style = MaterialTheme.typography.bodyLarge)
+                Text("Моё значение · ${own.first.about}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(own.second, style = MaterialTheme.typography.bodyLarge)
             }
             TextButton(onClick = { editing = true }) { Text("Изменить") }
         }
