@@ -166,6 +166,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val bookmarks by bookmarksFlow.collectAsState(initial = emptyList())
     val highlightsFlow = remember(book.entity.id) { vm.highlights(book.entity.id) }
     val highlights by highlightsFlow.collectAsState(initial = emptyList())
+    // Words highlighted in the whole book (a name and who it is).
+    val bookWide = remember(highlights) { highlights.filter { it.chapterIndex == Highlights.BOOK_WIDE } }
 
     val sheetOpen = showAppearance || showToc || showPrepare || selection != null
     // Reading aloud: one sentence at a time, the page follows the voice.
@@ -224,7 +226,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
     // Short translations above the pinyin: over unknown words or over recommended ones.
-    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id) {
+    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, bookWide) {
         val eng = engine
         val zhless = eng != null && eng !is ZhEngine
         val words = when (appearance.gloss) {
@@ -264,6 +266,15 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             // The reader's meanings for this book and for single places win over the dictionary's.
             if (chapter != null) ContextMeanings.addTo(this, chapter, ContextMeanings.herein(userMeanings, book.entity.id, chapter.index),
                 ContextMeanings.ofBook(userMeanings, book.entity.id), eng, words)
+            // The note of a word highlighted in the whole book (who this is) over its first appearance in each paragraph.
+            chapter?.blocks?.forEachIndexed { bi, b ->
+                val t = b as? ReaderBlock.Text ?: return@forEachIndexed
+                for (h in bookWide) {
+                    if (h.note.isBlank()) continue
+                    val r = Highlights.occurrences(t, h.text).firstOrNull() ?: continue
+                    putIfAbsent("@$bi:${t.tokens[r.first].start}", h.note.trim().lineSequence().first())
+                }
+            }
         }
     }
     // Fading translations: a word's first few appearances carry it, the later ones only the underline.
@@ -289,7 +300,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
 
     val highlightsHere = remember(highlights, chapter?.index) { highlights.filter { it.chapterIndex == chapter?.index }.groupBy { it.blockIndex } }
     val paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit = { block, i, lines ->
-        val (hlMarked, hlNoted) = remember(block, highlightsHere[i]) { Highlights.tokens(block, highlightsHere[i]) }
+        val (hlMarked, hlNoted) = remember(block, highlightsHere[i], bookWide) { Highlights.tokens(block, highlightsHere[i], bookWide) }
         RubyParagraph(
             blockIndex = i,
             onNote = { noteText = it; chrome = false },
@@ -556,7 +567,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onHighlight = { h ->
                 showToc = false
                 highlight = null
-                jump(h.chapterIndex, h.blockIndex)
+                // A highlight of the whole book has no one place to open.
+                if (h.chapterIndex >= 0) jump(h.chapterIndex, h.blockIndex)
             },
             onRemoveHighlight = { vm.removeHighlight(it.id) },
             onExport = {
@@ -587,13 +599,15 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         PhraseSheet(
             text = block.shown.substring(start, end),
             reading = block.tokens.subList(sel.first, sel.last + 1).filter { it.kind == TokenKind.HAN }.joinToString(" ") { it.pinyin },
-            highlight = Highlights.at(highlights, chapter.index, sel.block, start, end),
+            highlight = Highlights.at(highlights, chapter.index, sel.block, start, end) ?: Highlights.bookWideAt(bookWide, block, start, end),
             canWiden = Highlights.sentence(block, sel.first, sel.last) != sel.first..sel.last,
             onSentence = { val r = Highlights.sentence(block, sel.first, sel.last); selection = sel.copy(first = r.first, last = r.last) },
-            onColor = { color, existing ->
+            onColor = { color, existing, whole ->
                 if (existing != null) vm.updateHighlight(existing.copy(color = color))
+                else if (whole) vm.addBookHighlight(block.shown.substring(start, end), color)
                 else vm.addHighlight(chapter, sel.block, start, end, color)
             },
+            onWholeBook = { h, on -> moveHighlight(vm, h, on, chapter, sel.block, start, end) },
             onNote = { h, note -> vm.updateHighlight(h.copy(note = note)) },
             onRemove = { vm.removeHighlight(it.id); selection = null },
             onDismiss = { selection = null }
@@ -620,11 +634,16 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             speaker = speaker,
             onKnown = vm::setKnown,
             onClearKnown = vm::clearKnown,
-            highlight = Highlights.at(highlights, chapter.index, sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end),
-            onHighlight = { color, existing ->
+            highlight = Highlights.at(highlights, chapter.index, sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end)
+                ?: Highlights.bookWideAt(bookWide, block, block.tokens[sel.first].start, block.tokens[sel.last].end),
+            onHighlight = { color, existing, whole ->
+                val start = block.tokens[sel.first].start
+                val end = block.tokens[sel.last].end
                 if (existing != null) vm.updateHighlight(existing.copy(color = color))
-                else vm.addHighlight(chapter, sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end, color)
+                else if (whole) vm.addBookHighlight(block.shown.substring(start, end), color)
+                else vm.addHighlight(chapter, sel.block, start, end, color)
             },
+            onHighlightWholeBook = { h, on -> moveHighlight(vm, h, on, chapter, sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end) },
             onNote = { h, note -> vm.updateHighlight(h.copy(note = note)) },
             onRemoveHighlight = { vm.removeHighlight(it.id) },
             userMeanings = userMeanings,
@@ -734,9 +753,33 @@ private fun RunningHeader(text: String, bookmarked: Boolean = false, indicator: 
     val spec = LocalThemeSpec.current
     Row(Modifier.fillMaxWidth().height(HEADER_H), verticalAlignment = Alignment.CenterVertically) {
         Text(text, Modifier.weight(1f), color = spec.muted, fontFamily = spec.display, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        ReaderClock(Modifier.padding(horizontal = 10.dp))
         if (bookmarked) Icon(LexiconIcons.BookmarkFilled, contentDescription = "Закладка", tint = spec.accent, modifier = Modifier.size(18.dp))
         indicator()
     }
+}
+
+/** Moves highlight [h] to the whole book ([on]) or back to the place [start, end) of [block], keeping its colour and note. */
+private fun moveHighlight(vm: ReaderViewModel, h: com.hanreader.app.Highlight?, on: Boolean, chapter: ChapterContent, block: Int, start: Int, end: Int) {
+    if (h == null || on == (h.chapterIndex == Highlights.BOOK_WIDE)) return
+    vm.removeHighlight(h.id)
+    if (on) vm.addBookHighlight(h.text, h.color, h.note) else vm.addHighlight(chapter, block, start, end, h.color, h.note)
+}
+
+/** The time, updated each minute: reading full screen hides the phone's own clock. */
+@Composable
+internal fun ReaderClock(modifier: Modifier = Modifier) {
+    val spec = LocalThemeSpec.current
+    val context = LocalContext.current
+    val now by produceState(System.currentTimeMillis()) {
+        while (true) {
+            value = System.currentTimeMillis()
+            delay(60_000 - value % 60_000)
+        }
+    }
+    // The phone's own format: 21:05, or 9:05 PM.
+    val text = remember(now) { android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(now)) }
+    Text(text, modifier, color = spec.muted, fontFamily = spec.display, fontSize = 12.sp, maxLines = 1)
 }
 
 /** «← Вернуться» after a jump by contents, search, bookmark or slider. */
@@ -1021,6 +1064,7 @@ private fun ScrollChapter(
                 )
             }
     }
+    Box(Modifier.fillMaxSize()) {
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onTap() } },
@@ -1047,6 +1091,12 @@ private fun ScrollChapter(
             Spacer(Modifier.height(appearance.paragraphSpacing.dp))
             footer()
         }
+    }
+    // The time at the top, in the strip above the text, on the page colour so scrolled text passes under it.
+    ReaderClock(
+        Modifier.align(Alignment.TopEnd).padding(top = bars.calculateTopPadding(), end = appearance.margin.dp)
+            .background(LocalThemeSpec.current.background).padding(horizontal = 4.dp, vertical = 1.dp)
+    )
     }
 }
 
@@ -1285,7 +1335,9 @@ private fun WordSheet(
     onKnown: (String, Boolean) -> Unit,
     onClearKnown: (String) -> Unit,
     highlight: com.hanreader.app.Highlight?,
-    onHighlight: (Int, com.hanreader.app.Highlight?) -> Unit,
+    /** (colour, the highlight there is, for the whole book) */
+    onHighlight: (Int, com.hanreader.app.Highlight?, Boolean) -> Unit,
+    onHighlightWholeBook: (com.hanreader.app.Highlight?, Boolean) -> Unit = { _, _ -> },
     onNote: (com.hanreader.app.Highlight, String) -> Unit,
     onRemoveHighlight: (com.hanreader.app.Highlight) -> Unit,
     /** The reader's own meanings (see [ContextMeanings]), the key of this word for each scope, and how to change one (blank removes it). */
@@ -1643,7 +1695,8 @@ private fun WordSheet(
             HighlightPanel(
                 current = highlight,
                 canWiden = sentenceRange != selection.first..selection.last,
-                onColor = { onHighlight(it, highlight) },
+                onColor = { c, whole -> onHighlight(c, highlight, whole) },
+                onWholeBook = { on -> onHighlightWholeBook(highlight, on) },
                 onSentence = { onChange(selection.copy(first = sentenceRange.first, last = sentenceRange.last, phrase = true, done = true)) },
                 onNote = { n -> highlight?.let { onNote(it, n) } },
                 onRemove = { highlight?.let(onRemoveHighlight) }
