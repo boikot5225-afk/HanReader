@@ -46,6 +46,8 @@ class SmokeTest {
 
     @Test
     fun readABook() {
+        // The demo book is Chinese: only for an app that reads Chinese.
+        org.junit.Assume.assumeTrue(com.hanreader.app.lang.Languages.CHINESE in com.hanreader.app.lang.Languages.AVAILABLE)
         importDemoBook()
         // The library shows the book; open it.
         compose.waitUntil(30_000) { compose.onAllNodes(hasText("蓝色的书")).fetchSemanticsNodes().isNotEmpty() }

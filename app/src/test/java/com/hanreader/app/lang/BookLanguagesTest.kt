@@ -7,10 +7,17 @@ import org.junit.Test
 class BookLanguagesTest {
     @Test
     fun languageFromTheText() {
-        assertEquals(Languages.CHINESE, BookLanguages.detect(TxtBook("第一章 雨夜\n那天晚上一直在下雨。".toByteArray(), "x")))
-        assertEquals(Languages.SPANISH, BookLanguages.detect(TxtBook("Capítulo 1\nLa lluvia había empezado poco después de medianoche.".toByteArray(), "x")))
+        assertEquals(Languages.CHINESE, BookLanguages.recognize(TxtBook("第一章 雨夜\n那天晚上一直在下雨。".toByteArray(), "x")))
+        assertEquals(Languages.SPANISH, BookLanguages.recognize(TxtBook("Capítulo 1\nLa lluvia había empezado poco después de medianoche.".toByteArray(), "x")))
         // A Chinese book with an English name in it is still Chinese.
-        assertEquals(Languages.CHINESE, BookLanguages.detect(TxtBook("他在 New York 住了三年，每天都去公园散步。".toByteArray(), "x")))
+        assertEquals(Languages.CHINESE, BookLanguages.recognize(TxtBook("他在 New York 住了三年，每天都去公园散步。".toByteArray(), "x")))
+    }
+
+    /** The Spanish app reads Spanish only: a Chinese book is still added, as a Spanish one, never hidden. */
+    @Test
+    fun anAppReadsItsOwnLanguages() {
+        assertEquals(listOf(Languages.SPANISH), Languages.AVAILABLE)
+        assertEquals(Languages.SPANISH, BookLanguages.detect(TxtBook("第一章 雨夜\n那天晚上一直在下雨。".toByteArray(), "x")))
     }
 
     @Test

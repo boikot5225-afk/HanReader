@@ -199,7 +199,20 @@ object Languages {
         ownsWord = { w -> w.isNotEmpty() && w.all { !it.isLetter() || Character.UnicodeScript.of(it.code) == Character.UnicodeScript.LATIN } && w.any { it.isLetter() } }
     )
 
+    /** Every language the code knows, in a fixed order (statistics keep their days by the index here). */
     val ALL = listOf(CHINESE, SPANISH)
+
+    /**
+     * The languages this app reads (BuildConfig.LANGUAGES: "es" for the Spanish app, "zh" for the
+     * Chinese one); the first is the one it opens with.
+     */
+    val AVAILABLE: List<LanguageInfo> by lazy {
+        val tags = com.hanreader.app.BuildConfig.LANGUAGES.split(',').map { it.trim() }
+        ALL.filter { it.tag.substringBefore('-') in tags }.ifEmpty { ALL }
+    }
+
+    /** The language a book or setting falls back to: the app's first one. */
+    val default: LanguageInfo get() = AVAILABLE.first()
 
     /** Chinese until [init] reads the setting (tests never call it). */
     @Volatile var current: LanguageInfo = CHINESE
@@ -210,7 +223,7 @@ object Languages {
 
     fun init(context: Context) {
         val tag = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null)
-        current = ALL.firstOrNull { it.tag == tag } ?: CHINESE
+        current = AVAILABLE.firstOrNull { it.tag == tag } ?: default
     }
 
     /** Saves [language] as the one to read; takes effect after a restart ([restart]). */

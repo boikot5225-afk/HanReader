@@ -16,6 +16,9 @@ android {
         targetSdk = 36
         versionCode = 38
         versionName = "0.18.0"
+        // The languages this app reads: Spanish only. The Chinese module stays in the code (one code
+        // base with the Chinese app), but its dictionaries are not packed (androidResources below).
+        buildConfigField("String", "LANGUAGES", "\"es\"")
         // Instrumented tests (app/src/androidTest) on emulators in CI.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -24,9 +27,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     // zh/lexicon.dat is gzip data: store it as is. (A ".gz" asset would be silently unpacked by the build.)
-    androidResources { noCompress += "dat" }
+    androidResources {
+        noCompress += "dat"
+        // The Chinese dictionaries (assets/zh, 20 MB) stay out of the Spanish app; tests read them from the sources.
+        ignoreAssetsPatterns += listOf("!.svn", "!.git", "!.ds_store", "!*.scc", ".*", "<dir>_*", "!CVS", "!thumbs.db", "!picasa.ini", "!*~", "<dir>zh")
+    }
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.all { test ->

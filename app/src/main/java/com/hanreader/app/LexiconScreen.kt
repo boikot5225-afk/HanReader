@@ -271,9 +271,11 @@ private fun TopBar(
 @Composable
 private fun AppTitle() {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("汉读", style = MaterialTheme.typography.titleLarge, fontFamily = WordFont, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.width(8.dp))
-        Text("HanReader", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (com.hanreader.app.lang.Languages.default == com.hanreader.app.lang.Languages.CHINESE) {
+            Text("汉读", style = MaterialTheme.typography.titleLarge, fontFamily = WordFont, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.width(8.dp))
+            Text("HanReader", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else Text(appTitle(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
     }
 }
 

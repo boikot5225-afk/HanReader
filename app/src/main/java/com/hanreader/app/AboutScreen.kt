@@ -37,20 +37,26 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 
+/** The app's name: «汉读 HanReader» for the Chinese app, the launcher name for another. */
+@Composable
+internal fun appTitle(): String =
+    if (com.hanreader.app.lang.Languages.default == com.hanreader.app.lang.Languages.CHINESE) "汉读 HanReader"
+    else androidx.compose.ui.platform.LocalContext.current.let { it.applicationInfo.loadLabel(it.packageManager).toString() }
+
 /** One source the app is built from: what it gives, who made it, its licence, the file with the details. */
-internal data class Credit(val what: String, val source: String, val license: String, val file: String)
+internal data class Credit(val what: String, val source: String, val license: String, val file: String, val language: String? = null)
 
 internal val CREDITS = listOf(
-    Credit("Китайско-английский словарь", "CC-CEDICT, MDBG", "CC BY-SA 4.0", "CC-CEDICT_NOTICE.txt"),
-    Credit("Русские значения", "Русский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "RU_WIKTIONARY_NOTICE.txt"),
-    Credit("Испанский словарь", "Русский и английский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "ES_WIKTIONARY_NOTICE.txt"),
-    Credit("Машинный перевод значений на русский", "производная от CC-CEDICT, перевод DeepSeek", "CC BY-SA 4.0", "RU_AI_NOTICE.txt"),
-    Credit("Разбивка текста на слова", "Jieba 0.42.1", "MIT", "JIEBA_NOTICE.txt"),
-    Credit("Имена собственные", "разметка словаря Jieba", "MIT", "NAMES_NOTICE.txt"),
-    Credit("Чтения пиньинь", "pypinyin 0.53.0", "MIT", "PYPINYIN_NOTICE.txt"),
-    Credit("Уровни HSK 3.0 и 2.0", "Complete HSK Vocabulary; hskhsk.com", "MIT", "HSK_LEVELS_NOTICE.txt"),
-    Credit("Частоты слов HSK", "Complete HSK Vocabulary", "MIT", "HSK_FREQUENCY_NOTICE.txt"),
-    Credit("Упрощённые и традиционные иероглифы", "OpenCC", "Apache 2.0", "OPENCC_NOTICE.txt"),
+    Credit("Китайско-английский словарь", "CC-CEDICT, MDBG", "CC BY-SA 4.0", "CC-CEDICT_NOTICE.txt", "zh"),
+    Credit("Русские значения", "Русский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "RU_WIKTIONARY_NOTICE.txt", "zh"),
+    Credit("Испанский словарь", "Русский и английский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "ES_WIKTIONARY_NOTICE.txt", "es"),
+    Credit("Машинный перевод значений на русский", "производная от CC-CEDICT, перевод DeepSeek", "CC BY-SA 4.0", "RU_AI_NOTICE.txt", "zh"),
+    Credit("Разбивка текста на слова", "Jieba 0.42.1", "MIT", "JIEBA_NOTICE.txt", "zh"),
+    Credit("Имена собственные", "разметка словаря Jieba", "MIT", "NAMES_NOTICE.txt", "zh"),
+    Credit("Чтения пиньинь", "pypinyin 0.53.0", "MIT", "PYPINYIN_NOTICE.txt", "zh"),
+    Credit("Уровни HSK 3.0 и 2.0", "Complete HSK Vocabulary; hskhsk.com", "MIT", "HSK_LEVELS_NOTICE.txt", "zh"),
+    Credit("Частоты слов HSK", "Complete HSK Vocabulary", "MIT", "HSK_FREQUENCY_NOTICE.txt", "zh"),
+    Credit("Упрощённые и традиционные иероглифы", "OpenCC", "Apache 2.0", "OPENCC_NOTICE.txt", "zh"),
     Credit("Шрифты", "Noto, LXGW WenKai, Zhuque Fangsong, Inter и др.", "SIL OFL 1.1", "FONTS_NOTICE.txt"),
     Credit("Библиотеки", "Kotlin, AndroidX, jsoup", "Apache 2.0, MIT", "LIBRARIES_NOTICE.txt"),
 )
@@ -156,9 +162,10 @@ fun AboutDialog(onClose: () -> Unit) {
                 return@Column
             }
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("汉读 HanReader $version", style = MaterialTheme.typography.headlineSmall, fontFamily = WordFont)
+                Text("${appTitle()} $version", style = MaterialTheme.typography.headlineSmall, fontFamily = WordFont)
                 Text(
-                    (if (com.hanreader.app.lang.Languages.current.readingTitle != null) "Читалка китайских книг с пиньинем, словарём и карточками." else "Читалка книг со словарём и карточками: китайский и (на пробу) испанский.") + " Работает без интернета и не собирает личные данные.",
+                    (if (com.hanreader.app.lang.Languages.current.readingTitle != null) "Читалка китайских книг с пиньинем, словарём и карточками."
+                        else "Читалка книг на испанском со словарём, разбором грамматики и карточками.") + " Работает без интернета и не собирает личные данные.",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Overline("Связь с разработчиком", Modifier.padding(top = 4.dp))
@@ -174,7 +181,8 @@ fun AboutDialog(onClose: () -> Unit) {
                     "Словари под лицензией CC BY-SA 4.0 входят в приложение в изменённом виде (сжатый формат, русский перевод) и распространяются под той же лицензией.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                CREDITS.forEach { c ->
+                // Only the sources of the languages this app reads.
+                CREDITS.filter { c -> c.language == null || com.hanreader.app.lang.Languages.AVAILABLE.any { it.tag.startsWith(c.language) } }.forEach { c ->
                     Column(Modifier.fillMaxWidth().clickable { shown = c.what to "licenses/${c.file}" }.padding(vertical = 6.dp)) {
                         Text(c.what, style = MaterialTheme.typography.titleSmall)
                         Text("${c.source} · ${c.license}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

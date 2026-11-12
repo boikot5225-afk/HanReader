@@ -105,7 +105,8 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item { LanguagePanel() }
+        // An app with one language has nothing to switch.
+        if (com.hanreader.app.lang.Languages.AVAILABLE.size > 1) item { LanguagePanel() }
         item {
             // Word levels (HSK) exist for Chinese only for now.
             KnownWordsPanel(known.size, levelMark, onChoose = { showLevel = true },
@@ -411,7 +412,7 @@ private fun LanguagePanel() {
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    com.hanreader.app.lang.Languages.ALL.forEach { l ->
+                    com.hanreader.app.lang.Languages.AVAILABLE.forEach { l ->
                         FilterChip(selected = l == current, onClick = {
                             choosing = false
                             if (l != current) {

@@ -69,7 +69,7 @@ El edificio de la aduana era una construcción antigua, de piedra gris, con vent
             compose.waitForIdle()
             scenario.close()
         } finally {
-            setLanguage(app, Languages.CHINESE.tag)
+            setLanguage(app, Languages.default.tag)
         }
     }
 }
