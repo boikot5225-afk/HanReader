@@ -233,7 +233,9 @@ data class Appearance(
     val script: ScriptMode = ScriptMode.AS_BOOK,
     val tones: ToneColors = ToneColors.OFF,
     /** The translation over a word fades after its first [GLOSS_REPEATS] appearances in a chapter. */
-    val glossFade: Boolean = true
+    val glossFade: Boolean = true,
+    /** At the end of a chapter: «Итог главы» with its words and phrases worth a second look. */
+    val chapterSummary: Boolean = true
 ) {
     fun hanFontFor(spec: ThemeSpec): HanFont = hanFont ?: spec.defaultHanFont
 
@@ -280,7 +282,8 @@ object AppearanceStore {
             gloss = GlossMode.entries.firstOrNull { it.name == p.getString("gloss", null) } ?: d.gloss,
             script = ScriptMode.entries.firstOrNull { it.name == p.getString("script", null) } ?: d.script,
             tones = ToneColors.entries.firstOrNull { it.name == p.getString("tones", null) } ?: d.tones,
-            glossFade = p.getBoolean("glossFade", d.glossFade)
+            glossFade = p.getBoolean("glossFade", d.glossFade),
+            chapterSummary = p.getBoolean("chapterSummary", d.chapterSummary)
         )
         appContext = context.applicationContext
     }
@@ -311,6 +314,7 @@ object AppearanceStore {
             putString("script", next.script.name)
             putString("tones", next.tones.name)
             putBoolean("glossFade", next.glossFade)
+            putBoolean("chapterSummary", next.chapterSummary)
             apply()
         }
     }

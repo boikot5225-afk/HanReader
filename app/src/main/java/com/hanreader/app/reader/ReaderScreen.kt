@@ -149,6 +149,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     var showAppearance by remember { mutableStateOf(false) }
     var showToc by remember { mutableStateOf(false) }
     var showPrepare by remember { mutableStateOf(false) }
+    // The end-of-chapter review, frozen while it is open (a word marked «Знаю» stays in the list).
+    var summaryOpen by remember { mutableStateOf<List<SummaryItem>?>(null) }
     var selection by remember { mutableStateOf<Selection?>(null) }
     /** The text of a tapped footnote, shown in a sheet. */
     var noteText by remember { mutableStateOf<String?>(null) }
@@ -172,7 +174,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // Words highlighted in the whole book (a name and who it is).
     val bookWide = remember(highlights) { highlights.filter { it.chapterIndex == Highlights.BOOK_WIDE } }
 
-    val sheetOpen = showAppearance || showToc || showPrepare || selection != null
+    val sheetOpen = showAppearance || showToc || showPrepare || selection != null || summaryOpen != null
     // Reading aloud: one sentence at a time, the page follows the voice.
     val readAloud = remember(context) { ReadAloud(context) }
     DisposableEffect(readAloud) { onDispose { readAloud.close() } }
@@ -219,7 +221,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
     // Short translations above the pinyin: over unknown words or over recommended ones.
-    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, book.entity.id, bookWide) {
+    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, book.entity.id, bookWide, known) {
         val eng = engine
         val words = when (appearance.gloss) {
             GlossMode.OFF -> null
@@ -266,6 +268,18 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     var jumpToPage by remember { mutableStateOf<((Int) -> Unit)?>(null) }
 
     val highlightsHere = remember(highlights, chapter?.index) { highlights.filter { it.chapterIndex == chapter?.index }.groupBy { it.blockIndex } }
+    // Words tapped in this chapter: they come first in its review.
+    val tappedHere = remember(chapter?.index) { androidx.compose.runtime.mutableStateListOf<String>() }
+    val summaryItems: List<SummaryItem> = remember(chapter, glossFor, known, saved, studying, names, tappedHere.size, appearance.chapterSummary) {
+        val eng = engine
+        if (chapter == null || eng == null || !appearance.chapterSummary) emptyList()
+        else ChapterSummary.items(
+            chapter, eng, glossFor, com.hanreader.app.Appearance.GLOSS_REPEATS,
+            isKnown = { word, key -> key in known || (' ' !in key && matcher.isKnown(word)) },
+            skip = { word, key -> key in saved || key in studying || word in names || key in names || VocabularyStats.isName(word, eng) },
+            tapped = tappedHere.toSet()
+        )
+    }
     val paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit = { block, i, lines ->
         val (hlMarked, hlNoted) = remember(block, highlightsHere[i]) { Highlights.tokens(block, highlightsHere[i]) }
         val dashed = remember(block, bookWide) { Highlights.bookTokens(block, bookWide) }
@@ -286,6 +300,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 // A word highlighted in the whole book with a note: the note first (who this is).
                 val note = if (t in dashed) Highlights.bookWideAt(bookWide, block, block.tokens[t].start, block.tokens[t].end)?.takeIf { it.note.isNotBlank() } else null
                 if (note != null) bookNote = Triple(note, i, t) else selection = Selection(i, t, t)
+                engine?.let { e -> ChapterSummary.keyOf(block.tokens[t], e)?.let { k -> if (k !in tappedHere) tappedHere += k } }
             },
             onRange = { a, b, done ->
                 chrome = false; highlight = null
@@ -411,6 +426,11 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                     }
                 },
                 footer = {
+                    if (summaryItems.isNotEmpty()) {
+                        Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
+                            ChapterSummaryPlaque(summaryItems) { summaryOpen = summaryItems }
+                        }
+                    }
                     ChapterFooter(
                         chapter = chapter, matcher = matcher, names = names, engine = engine, count = chapterCount,
                         engineMs = engine?.loadMs,
@@ -499,6 +519,11 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bars).padding(bottom = 36.dp, start = 16.dp, end = 16.dp)
             )
         }
+        // The last page of a chapter in page mode: its review.
+        if (summaryItems.isNotEmpty() && progress.pages && progress.count > 0 && progress.position >= progress.count - 1 &&
+            !chrome && back == null && !readAloud.active && appearance.mode == ReadingMode.PAGES) {
+            ChapterSummaryPlaque(summaryItems, Modifier.align(Alignment.BottomCenter).padding(bars).padding(bottom = 36.dp)) { summaryOpen = summaryItems }
+        }
         if (readAloud.active && !chrome) {
             ReadAloudBar(
                 readAloud,
@@ -507,6 +532,21 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         }
     }
 
+    val sumEngine = engine
+    val sumItems = summaryOpen
+    if (sumItems != null && chapter != null && sumEngine != null) {
+        ChapterSummarySheet(
+            chapter = chapter, items = sumItems, engine = sumEngine, percent = coverage?.takeIf { it.total > 0 }?.percent,
+            onKnown = vm::setKnown,
+            onSave = { item, translation, sentence ->
+                vm.saveWord(ReaderSave(
+                    word = item.key, reading = sumEngine.lookup(item.key)?.pinyin.orEmpty(), translation = translation, sentence = sentence,
+                    bookId = book.entity.id, bookTitle = book.entity.title, chapterIndex = chapter.index, chapterTitle = chapter.title
+                )) {}
+            },
+            onDismiss = { summaryOpen = null }
+        )
+    }
     val prepEngine = engine
     if (showPrepare && chapter != null && prepEngine != null) {
         PrepareChapterSheet(vm, book, chapter, prepEngine, onDismiss = { showPrepare = false })
