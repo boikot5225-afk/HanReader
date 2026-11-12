@@ -37,10 +37,9 @@ class BookHighlightsTest {
     @Test
     fun markedEverywhereWithItsNote() {
         val b = block("Arellano llegó. Luego Arellano se fue.")
-        val (marked, noted) = Highlights.tokens(b, null, listOf(wide("Arellano", "jefe del cártel de Tijuana")))
-        val words = marked.keys.map { b.tokens[it].text }
-        assertEquals(listOf("Arellano", "Arellano"), words)
-        assertEquals(2, noted.size)
+        val dashed = Highlights.bookTokens(b, listOf(wide("Arellano", "jefe del cártel de Tijuana")))
+        assertEquals(listOf("Arellano", "Arellano"), dashed.keys.sorted().map { b.tokens[it].text })
+        assertEquals(setOf(Highlights.color(2)), dashed.values.toSet())
         // The card of either appearance finds the highlight.
         val second = b.tokens.indexOfLast { it.text == "Arellano" }
         assertNotNull(Highlights.bookWideAt(listOf(wide("Arellano")), b, b.tokens[second].start, b.tokens[second].end))

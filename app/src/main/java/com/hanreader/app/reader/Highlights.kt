@@ -54,22 +54,27 @@ object Highlights {
 
     val Highlight.wholeBook: Boolean get() = chapterIndex == BOOK_WIDE
 
-    /** Tokens of [block] covered by [list] and by the book-wide highlights [book] (token -> colour), and the tokens that end a noted highlight. */
-    fun tokens(block: ReaderBlock.Text, list: List<Highlight>?, book: List<Highlight> = emptyList()): Pair<Map<Int, Color>, Set<Int>> {
-        if (list.isNullOrEmpty() && book.isEmpty()) return emptyMap<Int, Color>() to emptySet()
+    /** Tokens of [block] covered by [list] (token -> colour) and the tokens that end a noted highlight. */
+    fun tokens(block: ReaderBlock.Text, list: List<Highlight>?): Pair<Map<Int, Color>, Set<Int>> {
+        if (list.isNullOrEmpty()) return emptyMap<Int, Color>() to emptySet()
         val marked = HashMap<Int, Color>()
         val noted = HashSet<Int>()
-        for (h in book) for (range in occurrences(block, h.text)) {
-            for (k in range) marked[k] = color(h.color)
-            if (h.note.isNotBlank()) noted += range.last
-        }
-        // A highlight of this very place is drawn over the book-wide one.
-        for (h in list.orEmpty()) {
+        for (h in list) {
             val range = range(block, h.startChar, h.endChar) ?: continue
             for (k in range) marked[k] = color(h.color)
             if (h.note.isNotBlank()) noted += range.last
         }
         return marked to noted
+    }
+
+    /** Tokens of [block] where a book-wide highlight of [book] stands (token -> colour): drawn with a dashed underline. */
+    fun bookTokens(block: ReaderBlock.Text, book: List<Highlight>): Map<Int, Color> {
+        if (book.isEmpty()) return emptyMap()
+        val out = HashMap<Int, Color>()
+        for (h in book) for (range in occurrences(block, h.text)) for (k in range) {
+            if (block.tokens[k].kind == com.hanreader.app.zh.TokenKind.HAN) out[k] = color(h.color)
+        }
+        return out
     }
 
     /**

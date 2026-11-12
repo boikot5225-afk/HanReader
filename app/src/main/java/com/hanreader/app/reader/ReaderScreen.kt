@@ -38,6 +38,7 @@ import com.hanreader.app.ReadingMode
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -151,6 +152,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     var selection by remember { mutableStateOf<Selection?>(null) }
     /** The text of a tapped footnote, shown in a sheet. */
     var noteText by remember { mutableStateOf<String?>(null) }
+    // A tapped word highlighted in the whole book: its highlight, paragraph and token.
+    var bookNote by remember { mutableStateOf<Triple<com.hanreader.app.Highlight, Int, Int>?>(null) }
     // The menu over the text: hidden while reading, a tap in the middle shows it.
     var chrome by remember { mutableStateOf(false) }
     BackHandler { if (chrome) chrome = false else onClose() }
@@ -226,7 +229,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
     // Short translations above the pinyin: over unknown words or over recommended ones.
-    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, bookWide) {
+    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id) {
         val eng = engine
         val zhless = eng != null && eng !is ZhEngine
         val words = when (appearance.gloss) {
@@ -266,15 +269,6 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             // The reader's meanings for this book and for single places win over the dictionary's.
             if (chapter != null) ContextMeanings.addTo(this, chapter, ContextMeanings.herein(userMeanings, book.entity.id, chapter.index),
                 ContextMeanings.ofBook(userMeanings, book.entity.id), eng, words)
-            // The note of a word highlighted in the whole book (who this is) over its first appearance in each paragraph.
-            chapter?.blocks?.forEachIndexed { bi, b ->
-                val t = b as? ReaderBlock.Text ?: return@forEachIndexed
-                for (h in bookWide) {
-                    if (h.note.isBlank()) continue
-                    val r = Highlights.occurrences(t, h.text).firstOrNull() ?: continue
-                    putIfAbsent("@$bi:${t.tokens[r.first].start}", h.note.trim().lineSequence().first())
-                }
-            }
         }
     }
     // Fading translations: a word's first few appearances carry it, the later ones only the underline.
@@ -300,9 +294,11 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
 
     val highlightsHere = remember(highlights, chapter?.index) { highlights.filter { it.chapterIndex == chapter?.index }.groupBy { it.blockIndex } }
     val paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit = { block, i, lines ->
-        val (hlMarked, hlNoted) = remember(block, highlightsHere[i], bookWide) { Highlights.tokens(block, highlightsHere[i], bookWide) }
+        val (hlMarked, hlNoted) = remember(block, highlightsHere[i]) { Highlights.tokens(block, highlightsHere[i]) }
+        val dashed = remember(block, bookWide) { Highlights.bookTokens(block, bookWide) }
         RubyParagraph(
             blockIndex = i,
+            dashed = dashed,
             onNote = { noteText = it; chrome = false },
             marked = hlMarked,
             noted = hlNoted,
@@ -313,7 +309,12 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             saved = studying,
             selection = selection?.takeIf { it.block == i }?.let { it.first..it.last },
             colors = colors,
-            onTap = { t -> selection = Selection(i, t, t); chrome = false; highlight = null },
+            onTap = { t ->
+                chrome = false; highlight = null
+                // A word highlighted in the whole book with a note: the note first (who this is).
+                val note = if (t in dashed) Highlights.bookWideAt(bookWide, block, block.tokens[t].start, block.tokens[t].end)?.takeIf { it.note.isNotBlank() } else null
+                if (note != null) bookNote = Triple(note, i, t) else selection = Selection(i, t, t)
+            },
             onRange = { a, b, done ->
                 chrome = false; highlight = null
                 selection = Selection(i, minOf(a, b), maxOf(a, b), phrase = true, done = done)
@@ -612,6 +613,23 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onRemove = { vm.removeHighlight(it.id); selection = null },
             onDismiss = { selection = null }
         )
+    }
+    bookNote?.let { (h, bi, t) ->
+        ModalBottomSheet(onDismissRequest = { bookNote = null }) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(12.dp).clip(CircleShape).background(Highlights.color(h.color)))
+                    Spacer(Modifier.width(8.dp))
+                    Text(h.text, style = MaterialTheme.typography.titleMedium, fontFamily = WordFont)
+                }
+                Text(h.note, style = MaterialTheme.typography.bodyLarge)
+                Text(Highlights.BOOK_WIDE_TITLE, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = { bookNote = null; selection = Selection(bi, t, t) }, contentPadding = PaddingValues(0.dp)) {
+                    Text("Карточка слова · изменить заметку")
+                }
+            }
+        }
     }
     noteText?.let { text ->
         ModalBottomSheet(onDismissRequest = { noteText = null }) {
