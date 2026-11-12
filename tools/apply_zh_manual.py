@@ -16,6 +16,8 @@ The reader sends words whose translation was wrong or missing in a real book (th
 - "=reading" for a word: the senses of the word in that reading (重重 \t =zhòng zhòng: «тяжело»,
   =chóng chóng: «слой за слоем»), kept with the characters' readings; the reading on the page
   (set by the dictionary or by zh/Polyphones.kt) picks them, the first is the default.
+- "-" as the reading: not a word, a Jieba combination without a meaning that the segmenter
+  should not keep whole (文传 in 人以文传, 文以人传); it is removed from the dictionary.
 - "!reading" for a defined word replaces its reading in the dictionary (地方 \t !dì fang).
   A defined word the segmenter never keeps whole (Jieba frequency 0, 起作用) gets a frequency.
 - The note column is for people (where the word was met); "#" starts a comment line.
@@ -58,7 +60,9 @@ def main():
     rows = read_manual()
     # By reading: characters, and words whose meaning depends on the reading ("=zhòng zhòng").
     chars = [(w, r.lstrip("=").replace(" ", ""), ru, en, n) for w, r, ru, en, n in rows if len(w) == 1 or r.startswith("=")]
-    words = [r for r in rows if len(r[0]) > 1 and not r[1].startswith("=")]
+    # "-": not a word here, a Jieba combination the segmenter should cut (文传 in 人以文传).
+    cuts = [r for r in rows if r[1] == "-"]
+    words = [r for r in rows if len(r[0]) > 1 and not r[1].startswith("=") and r[1] != "-"]
 
     # Characters by reading.
     lines = [l.rstrip("\n").split("\t") for l in open(RU_CHARS, encoding="utf-8")]
@@ -94,6 +98,13 @@ def main():
             p = line.rstrip("\n").split("\t")
             lex[p[0]] = p
     changed = 0
+    for w, _, _, _, n in cuts:
+        e = lex.get(w)
+        if e is not None and len(e) > 2 and e[2]:
+            sys.exit(f"manual.tsv:{n}: {w} has a meaning in the dictionary: it is a word, not cut")
+        if e is not None:
+            del lex[w]
+            changed += 1
     for w, reading, _, en, n in words:
         e = lex.get(w)
         if e is not None and len(e) > 2 and e[2]:

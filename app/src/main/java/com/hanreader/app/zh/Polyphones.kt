@@ -96,6 +96,9 @@ object Polyphones {
             // 涨红 zhàng; 卷 juàn after a number; 缝 féng «шить» / fèng «щель»; 铺 pū «стелить» / pù after
             // a number; 看孩子 kān; 转圈 zhuàn.
             '为' -> if (prev != null && prev.last() in "选称视定改变化作成分认列评封拜奉尊推任命转划译立奉誉") "wéi" else null
+            // 传 zhuàn «жизнеописание» after «написать, составить» and «это, большое, внутреннее» (做传, 立本传,
+            // 大传, 内传) and as the topic (传的名目, 的传的); chuán «передавать» elsewhere (人以文传, 传进).
+            '传' -> if (prev != null && prev.last() in "做作立写列为本大内" || (prev == null || prev == "的") && next == "的") "zhuàn" else null
             '中' -> if (prev != null && prev.last() in "打射猜考选击投砸押" && (next == null || next[0] !in "间国央心学部文午")) "zhòng" else null
             // 冲 chòng «к, в сторону» before 着 or a person (冲我笑).
             '冲' -> if (next == "着" || next != null && next in setOf("我", "你", "他", "她", "它", "我们", "你们", "他们", "她们", "咱们", "大家")) "chòng" else null

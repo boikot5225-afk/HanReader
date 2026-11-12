@@ -202,7 +202,7 @@ class ZhEngine(
      * «орнитол.», «перен. разг.» are dropped (a short note over the text has no room for them).
      */
     private fun cleanSense(x: String): String? = x.replace(Regex("\\([^)]*\\)|\\[[^]]*]|（[^）]*）"), " ")
-        .trim().replace(Regex("^([а-яёa-z]{2,12}\\.\\s*)+", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("\\s+"), " ").trim().replace(Regex("^([а-яёa-z]{2,12}\\.\\s*)+", RegexOption.IGNORE_CASE), "")
         .split(',', ';', '；', '，').map { it.trim() }.firstOrNull { it.isNotEmpty() }
 
     /**
@@ -231,7 +231,8 @@ class ZhEngine(
      * A few words to write above an unknown word: the first Russian sense (first part, without
      * remarks in brackets or subject labels), else the first English sense; null if none.
      */
-    override fun glossShort(word: String, reading: String?): String? = firstSense(word, reading) ?: composedGloss(word)
+    override fun glossShort(word: String, reading: String?): String? =
+        firstSense(word, reading) ?: com.hanreader.app.zh.ZhNumbers.gloss(word) ?: composedGloss(word)
 
     /**
      * The meaning stored on a flash card: Russian when available (first two senses), otherwise
@@ -240,7 +241,8 @@ class ZhEngine(
     override fun cardTranslation(word: String, reading: String?): String? {
         val ru = russianSenses(word, reading)
         if (ru.isNotEmpty()) return ru.take(2).joinToString("; ")
-        return dictionary.lookup(word)?.takeIf { it.hasDefinition }?.shortGloss() ?: composedGloss(word)
+        return dictionary.lookup(word)?.takeIf { it.hasDefinition }?.shortGloss()
+            ?: com.hanreader.app.zh.ZhNumbers.gloss(word) ?: composedGloss(word)
     }
 
 

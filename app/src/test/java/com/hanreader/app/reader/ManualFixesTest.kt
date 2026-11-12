@@ -25,6 +25,7 @@ class ManualFixesTest {
     fun manualFileIsApplied() {
         val manual = File("../data/zh/manual.tsv").readLines().filter { it.isNotBlank() && !it.startsWith("#") }.map { it.split("\t") }
         for (p in manual) {
+            if (p[1] == "-") { assertTrue(p[0], ZhSegmenterTest.dict.lookup(p[0]) == null); continue }
             val byReading = p[0].length == 1 || p[1].startsWith("=")
             val senses = engine.russianSenses(p[0], p[1].removePrefix("=").replace(" ", "").takeIf { byReading })
             assertEquals(p[0], p[2].split(";").first().trim(), senses.firstOrNull())
