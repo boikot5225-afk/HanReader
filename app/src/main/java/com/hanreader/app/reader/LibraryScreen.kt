@@ -107,6 +107,8 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
     ) {
         // An app with one language has nothing to switch.
         if (com.hanreader.app.lang.Languages.AVAILABLE.size > 1) item { LanguagePanel() }
+        // Translations marked «Сомневаюсь в переводе»: shown only while there are some.
+        item { DoubtsPanel() }
         item {
             // Word levels (HSK) exist for Chinese only for now.
             KnownWordsPanel(known.size, levelMark, onChoose = { showLevel = true },
@@ -494,6 +496,38 @@ private fun ActivityPanel(vm: ReaderViewModel, onOpen: () -> Unit) {
                 )
             }
             Icon(LexiconIcons.ChevronDown, contentDescription = null, modifier = Modifier.graphicsLayer(rotationZ = -90f))
+        }
+    }
+}
+
+/** «Переводы под вопросом: 5» — send them in one message, copy them, or clear the list. */
+@Composable
+private fun DoubtsPanel() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val count by Doubts.count.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(Unit) { if (count < 0) Doubts.all(context) }
+    if (count <= 0) return
+    var copied by remember { mutableStateOf(false) }
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    fun text() = Doubts.message(com.hanreader.app.BuildConfig.APP_NAME, Doubts.all(context))
+    Panel(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 10.dp, bottom = 6.dp)) {
+            Text("Переводы под вопросом: $count", style = MaterialTheme.typography.titleMedium)
+            Text("Отправь их разработчику одним сообщением — значения проверят и поправят в словаре.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row {
+                TextButton(onClick = {
+                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_TEXT, text())
+                    }
+                    runCatching { context.startActivity(android.content.Intent.createChooser(send, "Отправить переводы под вопросом")) }
+                }) { Text("Отправить") }
+                TextButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(text())); copied = true }) {
+                    Text(if (copied) "Скопировано" else "Копировать")
+                }
+                TextButton(onClick = { Doubts.clear(context) }) { Text("Очистить") }
+            }
         }
     }
 }

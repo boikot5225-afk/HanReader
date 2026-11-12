@@ -273,6 +273,8 @@ class EsEngineTest {
         assertEquals("давно", gloss("Hace tiempo que no lo veo.", "Hace"))
         assertEquals("сообщать о", gloss("Los informes daban cuenta de fiestas monstruo.", "daban"))
         assertEquals("частные самолёты", gloss("Llegaban en reactores particulares.", "reactores"))
+        assertEquals("адресованный", gloss("Había escrito una carta dirigida a Ramón.", "dirigida"))
+        assertEquals("попасть в", gloss("Los jóvenes habían caído en una trifulca.", "caído"))
     }
 
     @Test
