@@ -46,4 +46,14 @@ class GrammarTest {
         assertEquals(listOf("虽然"), Grammar.at(t, dan).map { it.point.title.substringBefore(" ") })
         assertTrue(Grammar.at(t, t.indexOf("高兴")).isEmpty())
     }
+
+    @Test
+    fun yaoInAComparisonIsNotWant() {
+        val t = tokens("他理发的次数要比同学还要多。")
+        val first = t.indexOf("要")
+        val second = t.lastIndexOf("要")
+        assertTrue(Grammar.at(t, first).any { it.point.title.startsWith("要比") })
+        assertTrue(Grammar.at(t, second).any { it.point.title.startsWith("比 … 还要") })
+        assertTrue(Grammar.at(tokens("我要去商店。"), 1).isEmpty())
+    }
 }
