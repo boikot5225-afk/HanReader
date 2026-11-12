@@ -10,12 +10,18 @@ package com.hanreader.app.zh
  * reading is right (地方 dìfang, 得到 dédào, 长大 zhǎngdà).
  */
 object Polyphones {
+    private val LOCAL_NOUNS = setOf("政府", "官员", "干部", "法院", "法规", "经济", "财政", "部队", "保护", "主义", "戏", "志", "性", "政权", "当局", "领导", "选举", "特色", "口音", "风味", "小吃")
     /** The reading of token [i] if its context decides it; null keeps the dictionary's. */
     fun reading(tokens: List<ZhToken>, i: Int): String? {
         val t = tokens[i]
-        if (t.kind != TokenKind.HAN || t.text.length != 1) return null
+        if (t.kind != TokenKind.HAN) return null
         val prev = tokens.getOrNull(i - 1)?.takeIf { it.kind == TokenKind.HAN }?.text
         val next = tokens.getOrNull(i + 1)?.takeIf { it.kind == TokenKind.HAN }?.text
+        // 重重地坐下 zhòngzhòng «тяжело»; elsewhere chóngchóng «слой за слоем» (困难重重).
+        if (t.text == "重重") return if (next == "地") "zhòng zhòng" else null
+        // 地方 dìfang «место»; dìfāng «местный» before an institution (地方政府, 地方官员).
+        if (t.text == "地方") return if (next != null && next in LOCAL_NOUNS) "dì fāng" else null
+        if (t.text.length != 1) return null
         // 把他当朋友, 拿书当枕头: «принимать за», dàng — decided by a 把 / 拿 earlier in the clause.
         if (t.text == "当" && earlierInClause(tokens, i, setOf("把", "拿", "将"))) return "dàng"
         return rule(t.text[0], prev, next)
@@ -93,7 +99,8 @@ object Polyphones {
             '中' -> if (prev != null && prev.last() in "打射猜考选击投砸押" && (next == null || next[0] !in "间国央心学部文午")) "zhòng" else null
             // 冲 chòng «к, в сторону» before 着 or a person (冲我笑).
             '冲' -> if (next == "着" || next != null && next in setOf("我", "你", "他", "她", "它", "我们", "你们", "他们", "她们", "咱们", "大家")) "chòng" else null
-            '涨' -> if (next != null && next[0] in "红紫") "zhàng" else null
+            // 涨红, 脸涨得通红: zhàng «наливаться кровью».
+            '涨' -> if (next != null && next[0] in "红紫" || prev != null && prev.last() == '脸') "zhàng" else null
             '卷' -> if (prev != null && prev.last() in COUNTERS + "第") "juàn" else null
             '缝' -> if (prev != null && prev.last() in COUNTERS + "道条") "fèng" else if (next != null && next[0] in "儿隙") "fèng" else "féng"
             '铺' -> if (prev != null && prev.last() in COUNTERS) "pù" else "pū"

@@ -113,6 +113,10 @@ class ZhSegmenter(private val dict: ZhDictionary) {
                 if (next != null && next[0] !in "的和与及或是也都很" && (prev == null || prev.last() !in "的有无其之种项")) 1 else 0
             w == "的话" -> if (tokens.getOrNull(i + 1)?.text?.firstOrNull()?.let { it in "，,：:" } == true) 0 else 1
             w == "就要" -> if (laterInClause(tokens, i, "了")) 0 else 1
+            // 却说 «теперь обратимся к» opens a passage; after a subject it is 却 + 说 (哈利却说他像…).
+            w == "却说" -> if (prev != null) 1 else 0
+            // 可不 «ещё бы» stands alone; before a word it is 可 + 不 (这可不容易 «вот уж нелегко»).
+            w == "可不" -> if (next != null) 1 else 0
             w in AFTER_COUNT -> if (prev != null && (prev.last() in COUNT_CHARS || prev.last() in "这那哪")) 1 else 0
             w.length == 2 && w[0] in COUNT_CHARS && w[1] in MEASURE_CHARS && w !in NUMERAL_WORDS -> 1
             else -> 0

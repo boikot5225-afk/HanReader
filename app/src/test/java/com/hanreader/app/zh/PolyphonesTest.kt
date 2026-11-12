@@ -41,8 +41,19 @@ class PolyphonesTest {
     @Test
     fun inWordsTheDictionaryDecides() {
         val block = ChapterBuilder.build(TxtBook("这个地方很好，我得到了一本书。".toByteArray(), "x"), 0, engine).blocks.first() as ReaderBlock.Text
-        assertEquals("dìfāng", block.tokens.first { it.text == "地方" }.pinyin.lowercase())
+        // 地方 «место» is dìfang; dìfāng «местный» only before 政府 and the like.
+        assertEquals("dìfang", block.tokens.first { it.text == "地方" }.pinyin.lowercase())
         assertEquals("dédào", block.tokens.first { it.text == "得到" }.pinyin.lowercase())
+        val local = ChapterBuilder.build(TxtBook("地方政府决定修路。".toByteArray(), "x"), 0, engine).blocks.first() as ReaderBlock.Text
+        assertEquals("dìfāng", local.tokens.first { it.text == "地方" }.pinyin.lowercase())
+    }
+
+    @Test
+    fun contextReadsWordsToo() {
+        val sit = ChapterBuilder.build(TxtBook("他重重地坐下来。".toByteArray(), "x"), 0, engine).blocks.first() as ReaderBlock.Text
+        assertEquals("zhòngzhòng", sit.tokens.first { it.text == "重重" }.pinyin.lowercase())
+        val face = ChapterBuilder.build(TxtBook("他的脸涨得通红。".toByteArray(), "x"), 0, engine).blocks.first() as ReaderBlock.Text
+        assertEquals("zhàng", face.tokens.first { it.text == "涨" }.pinyin.lowercase())
     }
 
     /**
