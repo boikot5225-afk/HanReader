@@ -260,6 +260,8 @@ data class Appearance(
     val tones: ToneColors = ToneColors.OFF,
     /** The translation over a word fades after its first [GLOSS_REPEATS] appearances in a chapter. */
     val glossFade: Boolean = true,
+    /** At the end of a chapter: «Итог главы» with its words and phrases worth a second look. */
+    val chapterSummary: Boolean = true,
     /** Spanish: the variant whose regional senses come first (Spain, Latin America) or none. */
     val esVariant: com.hanreader.app.es.EsVariant = com.hanreader.app.es.EsVariant.ANY
 ) {
@@ -312,6 +314,7 @@ object AppearanceStore {
             script = ScriptMode.entries.firstOrNull { it.name == p.getString("script", null) } ?: d.script,
             tones = ToneColors.entries.firstOrNull { it.name == p.getString("tones", null) } ?: d.tones,
             glossFade = p.getBoolean("glossFade", d.glossFade),
+            chapterSummary = p.getBoolean("chapterSummary", d.chapterSummary),
             esVariant = com.hanreader.app.es.EsVariant.entries.firstOrNull { it.name == p.getString("esVariant", null) } ?: d.esVariant
         )
         appContext = context.applicationContext
@@ -344,6 +347,7 @@ object AppearanceStore {
             putString("script", next.script.name)
             putString("tones", next.tones.name)
             putBoolean("glossFade", next.glossFade)
+            putBoolean("chapterSummary", next.chapterSummary)
             putString("esVariant", next.esVariant.name)
             apply()
         }
