@@ -91,7 +91,8 @@ object Polyphones {
             // a number; 看孩子 kān; 转圈 zhuàn.
             '为' -> if (prev != null && prev.last() in "选称视定改变化作成分认列评封拜奉尊推任命转划译立奉誉") "wéi" else null
             '中' -> if (prev != null && prev.last() in "打射猜考选击投砸押" && (next == null || next[0] !in "间国央心学部文午")) "zhòng" else null
-            '冲' -> if (next == "着") "chòng" else null
+            // 冲 chòng «к, в сторону» before 着 or a person (冲我笑).
+            '冲' -> if (next == "着" || next != null && next in setOf("我", "你", "他", "她", "它", "我们", "你们", "他们", "她们", "咱们", "大家")) "chòng" else null
             '涨' -> if (next != null && next[0] in "红紫") "zhàng" else null
             '卷' -> if (prev != null && prev.last() in COUNTERS + "第") "juàn" else null
             '缝' -> if (prev != null && prev.last() in COUNTERS + "道条") "fèng" else if (next != null && next[0] in "儿隙") "fèng" else "féng"

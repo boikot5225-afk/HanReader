@@ -245,7 +245,9 @@ private fun TopBar(
     onSettings: () -> Unit,
     message: String
 ) {
-    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)) {
+    // An opaque bar: the library scrolls under it, and the title must not lie over the panels.
+    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)
+        .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AppTitle()
             Spacer(Modifier.weight(1f))

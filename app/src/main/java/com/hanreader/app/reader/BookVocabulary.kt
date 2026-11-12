@@ -106,7 +106,9 @@ object ChineseNames {
      * Name candidates of one paragraph: for each surname token followed by single-character
      * tokens, the two-character candidate and the three-character one (either may be null).
      */
-    fun <T> candidates(tokens: List<T>, text: (T) -> String, isHan: (T) -> Boolean): List<Pair<String?, String?>> {
+    fun <T> candidates(tokens: List<T>, text: (T) -> String, isHan: (T) -> Boolean,
+                       /** A dictionary proper name (卫东 Wèi dōng): after a surname, it is a given name (程卫东). */
+                       isProper: (T) -> Boolean = { false }): List<Pair<String?, String?>> {
         val out = ArrayList<Pair<String?, String?>>()
         fun single(i: Int): Char? = tokens.getOrNull(i)?.takeIf { isHan(it) && text(it).length == 1 }?.let { text(it)[0] }
         for (i in tokens.indices) {
@@ -116,6 +118,8 @@ object ChineseNames {
             // 一张纸, 这位老师: a measure word, not a surname.
             val before = tokens.getOrNull(i - 1)?.takeIf { isHan(it) }?.let { text(it) }
             if (before != null && before.last() in BEFORE_MEASURE) continue
+            val given = tokens.getOrNull(i + 1)?.takeIf { isHan(it) && text(it).length == 2 && isProper(it) }
+            if (given != null) { out += null to "$s${text(given)}"; continue }
             val a = single(i + 1)?.takeIf { it !in STOP } ?: continue
             val b = single(i + 2)?.takeIf { it !in STOP }
             out += (if (plain) "$s$a" else null) to (b?.let { "$s$a$it" })
@@ -180,7 +184,7 @@ object BookAnalyzer {
                     val name = r.joinToString("") { seg[it].text }
                     runs.getOrPut(name) { intArrayOf(0, c.index) }[0]++
                 }
-                for ((a, b) in ChineseNames.candidates(seg, { it.text }, { it.kind == TokenKind.HAN })) {
+                for ((a, b) in ChineseNames.candidates(seg, { it.text }, { it.kind == TokenKind.HAN }, { dict.lookup(it.text)?.pinyin?.firstOrNull()?.isUpperCase() == true })) {
                     a?.let { two.getOrPut(it) { intArrayOf(0, c.index) }[0]++ }
                     b?.let { three.getOrPut(it) { intArrayOf(0, c.index) }[0]++ }
                 }

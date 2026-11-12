@@ -154,29 +154,38 @@ class ZhEngine(
 
     /**
      * A word the dictionary does not define (a Jieba combination like 革命党 or 一件), split into
-     * the fewest defined dictionary words, longest first: 革命 + 党. Null if the word has a meaning
-     * of its own, is a single character, or cannot be covered by defined words.
+     * the fewest defined dictionary words; of equal splits, the one with the longest first word
+     * (尖叫 + 声, not 尖 + 叫声). A doubled word (顺顺当当, 研究研究) is its base word (顺当, 研究).
+     * Null if the word has a meaning of its own, is a single character, or cannot be covered by
+     * defined words.
      */
     fun compose(word: String): List<ZhEntry>? {
         if (word.length < 2 || dictionary.lookup(word)?.hasDefinition == true) return null
+        reduplicated(word)?.let { base -> dictionary.lookup(base)?.takeIf { it.hasDefinition }?.let { return listOf(it) } }
         val n = word.length
+        // best[i]: the fewest words covering word[i..]; next[i]: the length of the first of them.
         val best = IntArray(n + 1) { Int.MAX_VALUE }
-        val back = IntArray(n + 1)
-        best[0] = 0
-        for (i in 0 until n) {
-            if (best[i] == Int.MAX_VALUE) continue
+        val next = IntArray(n + 1)
+        best[n] = 0
+        for (i in n - 1 downTo 0) {
             for (len in minOf(n - i, dictionary.maxWordLength) downTo 1) {
-                if (len == n) continue
-                val part = word.substring(i, i + len)
-                if (dictionary.lookup(part)?.hasDefinition != true) continue
-                if (best[i] + 1 < best[i + len]) { best[i + len] = best[i] + 1; back[i + len] = len }
+                if (len == n || best[i + len] == Int.MAX_VALUE) continue
+                if (dictionary.lookup(word.substring(i, i + len))?.hasDefinition != true) continue
+                if (best[i + len] + 1 < best[i]) { best[i] = best[i + len] + 1; next[i] = len }
             }
         }
-        if (best[n] == Int.MAX_VALUE) return null
+        if (best[0] == Int.MAX_VALUE) return null
         val parts = ArrayList<ZhEntry>()
-        var k = n
-        while (k > 0) { val len = back[k]; parts += dictionary.lookup(word.substring(k - len, k))!!; k -= len }
-        return parts.reversed()
+        var k = 0
+        while (k < n) { val len = next[k]; parts += dictionary.lookup(word.substring(k, k + len))!!; k += len }
+        return parts
+    }
+
+    /** The base of a doubled word: AABB -> AB (顺顺当当 -> 顺当), ABAB -> AB (研究研究 -> 研究); else null. */
+    private fun reduplicated(word: String): String? = when {
+        word.length == 4 && word[0] == word[1] && word[2] == word[3] && word[0] != word[2] -> "${word[0]}${word[2]}"
+        word.length == 4 && word[0] == word[2] && word[1] == word[3] && word[0] != word[1] -> word.substring(0, 2)
+        else -> null
     }
 
     /** The first short sense of a defined word, Russian if possible. */
