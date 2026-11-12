@@ -61,7 +61,11 @@ jobs:
           profile: ${{ matrix.profile }}
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: gradle :app:connectedDebugAndroidTest --stacktrace
+          # On a failure: the emulator's warnings and errors go to this log (the report is only an artifact).
+          script: gradle :app:connectedDebugAndroidTest --stacktrace || (adb logcat -d -v time '*:W' | grep -v -E 'chatty|netd|wificond' | tail -n 300; exit 1)
+      - name: Failed test details
+        if: failure()
+        run: find app/build/outputs/androidTest-results -name '*.xml' -exec grep -l '<failure' {} + | xargs -r cat | head -c 60000
       - name: Test report
         if: always()
         uses: actions/upload-artifact@v4

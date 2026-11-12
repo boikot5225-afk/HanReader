@@ -62,21 +62,21 @@ class SmokeTest {
         try {
         importDemoBook()
         // The library shows the book; open it.
-        compose.waitUntil(30_000) { compose.onAllNodes(hasText("蓝色的书")).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitOrExplain("hasText(蓝色的书)", 30_000) { compose.onAllNodes(hasText("蓝色的书")).fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodes(hasText("蓝色的书"))[0].performClick()
         // The reader: the running header with the chapter title (the text itself is drawn, not semantic).
-        compose.waitUntil(60_000) { compose.onAllNodes(hasText("第一章　雨夜书店")).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitOrExplain("hasText(第一章　雨夜书店)", 60_000) { compose.onAllNodes(hasText("第一章　雨夜书店")).fetchSemanticsNodes().isNotEmpty() }
         // Swipes start inside the screen: from the very edge, Android 10+ takes them as the system Back gesture.
         compose.onRoot().performTouchInput { swipeLeft(startX = width * 0.8f, endX = width * 0.2f) }
         compose.waitForIdle()
         // A vertical swipe opens the menu.
         compose.onRoot().performTouchInput { swipeUp(startY = height * 0.7f, endY = height * 0.3f) }
-        compose.waitUntil(15_000) { compose.onAllNodes(hasContentDescription("Назад в библиотеку")).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitOrExplain("hasContentDescription(Назад в библиотеку)", 15_000) { compose.onAllNodes(hasContentDescription("Назад в библиотеку")).fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodes(hasContentDescription("Назад в библиотеку"))[0].performClick()
         // Back in the library: the settings and «О приложении».
-        compose.waitUntil(15_000) { compose.onAllNodes(hasContentDescription("Настройки")).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitOrExplain("hasContentDescription(Настройки)", 15_000) { compose.onAllNodes(hasContentDescription("Настройки")).fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodes(hasContentDescription("Настройки"))[0].performClick()
-        compose.waitUntil(15_000) { compose.onAllNodes(hasText("Готово")).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitOrExplain("hasText(Готово)", 15_000) { compose.onAllNodes(hasText("Готово")).fetchSemanticsNodes().isNotEmpty() }
         } finally {
             scenario.close()
             setLanguage(app, Languages.default.tag)

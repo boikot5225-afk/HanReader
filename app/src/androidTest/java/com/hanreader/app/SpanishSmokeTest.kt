@@ -61,10 +61,10 @@ El edificio de la aduana era una construcción antigua, de piedra gris, con vent
             instrumentation.runOnMainSync { ReaderViewModel(app).importBook(Uri.fromFile(file)) { result = it; done.countDown() } }
             assertTrue("import finished", done.await(60, TimeUnit.SECONDS))
             assertTrue("imported: $result", result!!.isSuccess)
-            compose.waitUntil(30_000) { compose.onAllNodes(hasText("La lluvia")).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitOrExplain("hasText(La lluvia)", 30_000) { compose.onAllNodes(hasText("La lluvia")).fetchSemanticsNodes().isNotEmpty() }
             compose.onAllNodes(hasText("La lluvia"))[0].performClick()
             // The reader: the running header with the chapter title (the dictionary has loaded).
-            compose.waitUntil(60_000) { compose.onAllNodes(hasText("Capítulo 1")).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitOrExplain("hasText(Capítulo 1)", 60_000) { compose.onAllNodes(hasText("Capítulo 1")).fetchSemanticsNodes().isNotEmpty() }
             compose.onRoot().performTouchInput { swipeLeft(startX = width * 0.8f, endX = width * 0.2f) }
             compose.waitForIdle()
             scenario.close()
