@@ -603,6 +603,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             recommendations = recommended.associateBy { it.word },
             userNames = userNames,
             onUserName = { w, on -> vm.setUserName(w, on); selection = null },
+            doubtSource = book.entity.title + " · " + chapter.title,
             onSave = { word, reading, translation, sentence, done ->
                 vm.saveWord(
                     ReaderSave(
@@ -692,6 +693,26 @@ private fun RunningHeader(text: String, bookmarked: Boolean = false, indicator: 
         Text(text, Modifier.weight(1f), color = spec.muted, fontFamily = spec.display, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (bookmarked) Icon(LexiconIcons.BookmarkFilled, contentDescription = "Закладка", tint = spec.accent, modifier = Modifier.size(18.dp))
         indicator()
+    }
+}
+
+/** «Сомневаюсь в переводе»: puts the word, its meaning here and its sentence on the list sent from the library. */
+@Composable
+private fun DoubtRow(word: String, key: String, shown: String, sentence: String, source: String) {
+    val context = LocalContext.current
+    var doubted by remember(word, sentence) { mutableStateOf(Doubts.has(context, word, sentence)) }
+    TextButton(
+        onClick = {
+            if (doubted) Doubts.remove(context, word, sentence)
+            else Doubts.add(context, Doubts.Doubt(word, key, shown, sentence, source))
+            doubted = !doubted
+        },
+        contentPadding = PaddingValues(0.dp)
+    ) {
+        Text(
+            if (doubted) "⚑ Под вопросом — отправить можно из библиотеки · убрать" else "⚑ Сомневаюсь в переводе",
+            style = MaterialTheme.typography.bodySmall
+        )
     }
 }
 
@@ -1255,7 +1276,9 @@ private fun WordSheet(
     onSave: (String, String, String, String, (Result<Boolean>) -> Unit) -> Unit,
     recommendations: Map<String, Recommendation> = emptyMap(),
     userNames: Set<String> = emptySet(),
-    onUserName: (String, Boolean) -> Unit = { _, _ -> }
+    onUserName: (String, Boolean) -> Unit = { _, _ -> },
+    /** Where the word stands, for a doubted translation: «El narco · 5. Magnates». */
+    doubtSource: String = ""
 ) {
     val tokens = block.tokens
     val first = tokens[selection.first]
@@ -1370,6 +1393,7 @@ private fun WordSheet(
                 Text("Счётное слово: " + measureWords.joinToString(" · "), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            DoubtRow(word, word, translation, sentence, doubtSource)
             if (otherReadings.isNotEmpty()) {
                 Text("Другие чтения", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 otherReadings.take(3).forEach { (p, ru) ->
