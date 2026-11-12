@@ -63,6 +63,8 @@ class SmokeTest {
         importDemoBook()
         // The library shows the book; open it.
         compose.waitOrExplain("hasText(蓝色的书)", 30_000) { compose.onAllNodes(hasText("蓝色的书")).fetchSemanticsNodes().isNotEmpty() }
+        // On a small screen the card can sit under the bottom bar: scroll the library to its end first.
+        repeat(3) { compose.onRoot().performTouchInput { swipeUp(startY = height * 0.7f, endY = height * 0.3f) }; compose.waitForIdle() }
         compose.onAllNodes(hasText("蓝色的书"))[0].performClick()
         // The reader: the running header with the chapter title (the text itself is drawn, not semantic).
         compose.waitOrExplain("hasText(第一章　雨夜书店)", 60_000) { compose.onAllNodes(hasText("第一章　雨夜书店")).fetchSemanticsNodes().isNotEmpty() }

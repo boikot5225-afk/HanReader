@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -62,6 +63,8 @@ El edificio de la aduana era una construcción antigua, de piedra gris, con vent
             assertTrue("import finished", done.await(60, TimeUnit.SECONDS))
             assertTrue("imported: $result", result!!.isSuccess)
             compose.waitOrExplain("hasText(La lluvia)", 30_000) { compose.onAllNodes(hasText("La lluvia")).fetchSemanticsNodes().isNotEmpty() }
+            // On a small screen the card can sit under the bottom bar: scroll the library to its end first.
+            repeat(3) { compose.onRoot().performTouchInput { swipeUp(startY = height * 0.7f, endY = height * 0.3f) }; compose.waitForIdle() }
             compose.onAllNodes(hasText("La lluvia"))[0].performClick()
             // The reader: the running header with the chapter title (the dictionary has loaded).
             compose.waitOrExplain("hasText(Capítulo 1)", 60_000) { compose.onAllNodes(hasText("Capítulo 1")).fetchSemanticsNodes().isNotEmpty() }
