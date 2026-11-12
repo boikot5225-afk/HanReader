@@ -17,7 +17,13 @@ class BookLanguagesTest {
     @Test
     fun anAppReadsItsOwnLanguages() {
         assertEquals(listOf(Languages.SPANISH), Languages.AVAILABLE)
-        assertEquals(Languages.SPANISH, BookLanguages.detect(TxtBook("第一章 雨夜\n那天晚上一直在下雨。".toByteArray(), "x")))
+        val was = Languages.current
+        Languages.current = Languages.SPANISH
+        try {
+            assertEquals(Languages.SPANISH, BookLanguages.detect(TxtBook("第一章 雨夜\n那天晚上一直在下雨。".toByteArray(), "x")))
+        } finally {
+            Languages.current = was
+        }
     }
 
     @Test

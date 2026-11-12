@@ -22,7 +22,7 @@ class BackupArchiveTest {
     @Test
     fun damagedFiles() {
         val notBackup = assertThrows(BackupFormatException::class.java) { read(zip("a.txt" to "x".toByteArray())) }
-        assertTrue(notBackup.message!!, notBackup.message!!.contains("HanReader"))
+        assertTrue(notBackup.message!!, notBackup.message!!.contains(BuildConfig.APP_NAME))
         // Cut in the middle: a clear error, not a crash.
         val whole = zip("backup.json" to BackupFormat.encode(Backup(1, emptyList(), emptyList(), emptyList())).toByteArray())
         assertThrows(Exception::class.java) { read(whole.copyOf(whole.size / 2)) }

@@ -17,7 +17,7 @@ object BookLanguages {
     val changes = kotlinx.coroutines.flow.MutableStateFlow(0)
 
     fun of(context: Context, bookId: Long): String =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(bookId.toString(), null) ?: Languages.default.tag
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(bookId.toString(), null) ?: Languages.current.tag
 
     fun set(context: Context, bookId: Long, tag: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(bookId.toString(), tag).apply()
@@ -36,8 +36,9 @@ object BookLanguages {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(bookId.toString()).apply()
     }
 
-    /** The language a new book is read in: the one of its text, if this app reads it; else the app's own. */
-    fun detect(book: BookSource): LanguageInfo = recognize(book).takeIf { it in Languages.AVAILABLE } ?: Languages.default
+    /** The language a new book is read in: the one of its text, if this app reads it; else the one being read. */
+    fun detect(book: BookSource): LanguageInfo =
+        recognize(book).takeIf { it in Languages.AVAILABLE || it == Languages.current } ?: Languages.current
 
     /** Chinese when a good share of the letters in the first chapters are Chinese characters, else Spanish. */
     fun recognize(book: BookSource): LanguageInfo {

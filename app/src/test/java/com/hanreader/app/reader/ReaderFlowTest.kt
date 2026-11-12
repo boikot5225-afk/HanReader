@@ -115,6 +115,8 @@ class ReaderFlowTest {
 
     @Test
     fun levelMarksAndManualMarks() {
+        // HSK levels come from the app's Chinese data, which only the Chinese app packs.
+        org.junit.Assume.assumeTrue(com.hanreader.app.lang.Languages.CHINESE in com.hanreader.app.lang.Languages.AVAILABLE)
         val vm = ReaderViewModel(app)
         val dao = LexiconDatabase.get(app).knownWordDao()
         var r: Result<Int>? = null
