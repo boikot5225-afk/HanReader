@@ -236,10 +236,12 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             }
         }
     }
-    // Fading translations: a word's first few appearances in the chapter carry it, the later ones only the underline.
-    val glossTokens: Map<Int, Set<Int>>? = remember(glossFor, chapter, appearance.glossFade) {
+    // Fading translations: a word's first few appearances carry it, the later ones only the underline.
+    // Counted from where reading started in this chapter (the place the book opened at), not from its start.
+    val fadeFrom = remember(chapter?.index) { if (chapter != null && book.entity.chapterIndex == chapter.index) book.entity.blockIndex else 0 }
+    val glossTokens: Map<Int, Set<Int>>? = remember(glossFor, chapter, appearance.glossFade, fadeFrom) {
         val g = glossFor
-        if (g == null || chapter == null || !appearance.glossFade) null else fadingGlosses(chapter, g, com.hanreader.app.Appearance.GLOSS_REPEATS)
+        if (g == null || chapter == null || !appearance.glossFade) null else fadingGlosses(chapter, g, com.hanreader.app.Appearance.GLOSS_REPEATS, fadeFrom)
     }
     val hidePinyinFor = when (pinyinMode) {
         PinyinMode.UNKNOWN -> knownHere

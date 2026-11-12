@@ -559,13 +559,19 @@ object Tones {
  * Fading translations: for each paragraph, the tokens whose translation is still drawn — a word's
  * first [repeats] appearances in the chapter, in reading order; later ones keep only the underline.
  */
-internal fun fadingGlosses(chapter: ChapterContent, glossFor: Map<String, String>, repeats: Int): Map<Int, Set<Int>> {
+/**
+ * Tokens that keep their translation: a word's first [repeats] appearances counted from block
+ * [fromBlock], where reading started in this chapter (a book opened in the middle of a chapter
+ * shows the translations from there, not after appearances the reader never saw). Blocks before
+ * it keep all their translations.
+ */
+internal fun fadingGlosses(chapter: ChapterContent, glossFor: Map<String, String>, repeats: Int, fromBlock: Int = 0): Map<Int, Set<Int>> {
     val out = HashMap<Int, Set<Int>>()
     val seen = HashMap<String, Int>()
     chapter.blocks.forEachIndexed { bi, b ->
         val keep = HashSet<Int>()
         (b as? ReaderBlock.Text)?.tokens?.forEachIndexed { ti, t ->
-            if (t.kind == TokenKind.HAN && glossOf(glossFor, t) != null && seen.merge(t.text, 1, Int::plus)!! <= repeats) keep += ti
+            if (t.kind == TokenKind.HAN && glossOf(glossFor, t) != null && (bi < fromBlock || seen.merge(t.text, 1, Int::plus)!! <= repeats)) keep += ti
         }
         out[bi] = keep
     }
