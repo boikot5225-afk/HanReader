@@ -463,11 +463,14 @@ class ZhEngine(
         @Volatile private var full: CompletableDeferred<ZhEngine>? = null
         @Volatile private var core: CompletableDeferred<ZhEngine>? = null
 
+        /** Lets the loaded dictionaries go (another language is read now); the next [warmUp] loads them again. */
+        fun release() { synchronized(this) { full = null; core = null } }
+
         /** The complete engine: dictionary plus Russian meanings, HSK levels and names. */
-        fun warmUp(context: Context): CompletableDeferred<ZhEngine> { start(context); return full!! }
+        fun warmUp(context: Context): CompletableDeferred<ZhEngine> = synchronized(this) { start(context); full!! }
 
         /** The dictionary alone, ready in milliseconds: enough to segment and show a chapter. */
-        fun core(context: Context): CompletableDeferred<ZhEngine> { start(context); return core!! }
+        fun core(context: Context): CompletableDeferred<ZhEngine> = synchronized(this) { start(context); core!! }
 
         private fun start(context: Context) {
             if (full != null) return

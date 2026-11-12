@@ -240,17 +240,21 @@ object Languages {
     }
 }
 
-/** Loads the module of [Languages.current] once per process. */
+/**
+ * Loads the module of [Languages.current] once per process. The dictionaries of one language take
+ * tens of megabytes: loading one lets the other language's go, so a switch without a restart (tests,
+ * a backup restored) never keeps both on a small phone.
+ */
 object LanguageEngines {
     /** The complete module: everything it knows (Chinese: Russian meanings, HSK, names). */
     fun warmUp(context: Context): Deferred<LanguageModule> = when (Languages.current) {
-        Languages.SPANISH -> com.hanreader.app.es.EsEngine.warmUp(context)
-        else -> com.hanreader.app.reader.ZhEngine.warmUp(context)
+        Languages.SPANISH -> { com.hanreader.app.reader.ZhEngine.release(); com.hanreader.app.es.EsEngine.warmUp(context) }
+        else -> { com.hanreader.app.es.EsEngine.release(); com.hanreader.app.reader.ZhEngine.warmUp(context) }
     }
 
     /** Enough to build and show a chapter, as soon as possible (Chinese: the dictionary alone). */
     fun core(context: Context): Deferred<LanguageModule> = when (Languages.current) {
-        Languages.SPANISH -> com.hanreader.app.es.EsEngine.warmUp(context)
-        else -> com.hanreader.app.reader.ZhEngine.core(context)
+        Languages.SPANISH -> { com.hanreader.app.reader.ZhEngine.release(); com.hanreader.app.es.EsEngine.warmUp(context) }
+        else -> { com.hanreader.app.es.EsEngine.release(); com.hanreader.app.reader.ZhEngine.core(context) }
     }
 }

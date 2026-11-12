@@ -659,6 +659,9 @@ class EsEngine(
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         @Volatile private var loading: CompletableDeferred<EsEngine>? = null
 
+        /** Lets the loaded dictionary go (another language is read now); the next [warmUp] loads it again. */
+        fun release() { synchronized(this) { loading = null } }
+
         /** Loads the dictionary once per process in the background (mapped from app storage). */
         fun warmUp(context: Context): CompletableDeferred<EsEngine> {
             loading?.let { return it }
