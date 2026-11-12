@@ -1,6 +1,6 @@
 # HanReader — передача дел следующей сессии
 
-Состояние на 8 ноября 2026, версия **0.21.0** (versionCode 41), ветка `ccr-954eeb21-p65jbl`.
+Состояние на 8 ноября 2026, версия **0.22.0** (versionCode 42), ветка `ccr-954eeb21-p65jbl`.
 
 ## Владелец и договорённости
 
@@ -24,7 +24,7 @@ Android-читалка китайских книг (Kotlin, Jetpack Compose, Roo
 - Окружение «HanReader Android»: доступ к dl.google.com, kaikki.org (если сессия стартовала в «Default» — переключить через switch_environment); секрет для api.deepseek.com сохранён в настройках среды (ключ в командах — заглушка `proxy-injected`).
 - Android SDK: `/opt/android-sdk` (`local.properties`, не в git). В новой машине его нет: скачать commandlinetools с dl.google.com, `sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"`.
 - Maven Central отвечает 429: `~/.gradle/init.d/mirror.gradle` подменяет repo.maven.apache.org / repo1.maven.org на `https://maven-central.storage-download.googleapis.com/maven2/`; `~/.gradle/gradle.properties` — `robolectricRepoUrl` на то же зеркало. Первый прогон — без `--offline`.
-- Тесты: `gradle :app:testDebugUnitTest --offline -q` (175 тестов, 7 пропускаются: замеры на книгах и скриншоты для магазина). Robolectric; скриншоты UI рисуются через `decorView.draw`.
+- Тесты: `gradle :app:testDebugUnitTest --offline -q` (185+ тестов, 7 пропускаются: замеры на книгах и скриншоты для магазина). Robolectric; скриншоты UI рисуются через `decorView.draw`.
 - APK: `gradle clean :app:assembleDebug --offline -q` (всегда `clean`).
 
 ## GitHub (boikot5225-afk/HanReader, публичный)
@@ -63,6 +63,17 @@ Android-читалка китайских книг (Kotlin, Jetpack Compose, Roo
 - Значения: `tools/order_senses_ru.py` (итоговая статья) → `tools/rank_senses_ru.py` (только порядок) → `tools/update_ru_ai.py … --all`. Приложение показывает ru_ai раньше Викисловаря.
 - Лимиты файлов: `BookLimits` (BookSource.kt).
 - Сборка в RuStore — 0.14.4 (31), подпись релизная `59345a3b…d97859`, без INTERNET, не debuggable (проверено 11.11).
+
+## Перенесено из испанских веток (0.22.0)
+
+Ветки `claude/language-plugin-architecture-i2t572` (языковая розетка + испанский) и `es` (Amauta Reader, испанский) — другой продукт, не сливать. Из них в китайскую версию перенесены только общие доработки, вручную, без розетки:
+- сноски EPUB (463906c, 7ecb6e9); оформление цитат и эпиграфов из CSS (fc08995, 5a71a24);
+- «Сомневаюсь в переводе» (6208930, `Doubts.kt`, список в библиотеке);
+- своё значение «здесь / в этой книге / везде» (b756587, `ContextMeanings.kt`, ключи «@книга|…» в user_meanings);
+- часы в читалке, выделение во всей книге с одной заметкой (58cca59, f369a59; глава −1 в highlights);
+- «Итог главы» (7275adc, `ChapterSummary.kt`; выражения — чэнъюи и пословицы словаря);
+- угасание подсказок от места, где начал читать (81f3ddc).
+Не перенесено (испанское или архитектура розетки): язык книги и раздельные библиотеки, подсчёты по языкам, сокращения с точкой, выравнивание по пробелам, испанские словари и грамматика, имя Amauta Reader.
 
 ## Известные ограничения
 
