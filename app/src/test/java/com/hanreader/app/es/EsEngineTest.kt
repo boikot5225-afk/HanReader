@@ -271,6 +271,8 @@ class EsEngineTest {
         assertEquals("обнародовать", gloss("La noticia se hizo pública ayer.", "hizo"))
         assertEquals("генпрокурор", gloss("El fiscal general habló.", "fiscal"))
         assertEquals("давно", gloss("Hace tiempo que no lo veo.", "Hace"))
+        assertEquals("сообщать о", gloss("Los informes daban cuenta de fiestas monstruo.", "daban"))
+        assertEquals("частные самолёты", gloss("Llegaban en reactores particulares.", "reactores"))
     }
 
     @Test
