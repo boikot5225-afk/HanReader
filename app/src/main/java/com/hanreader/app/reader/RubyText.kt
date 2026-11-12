@@ -343,7 +343,9 @@ fun RubyParagraph(
     /** The paragraph's index in its chapter, for the reader's meanings of one place; -1: none. */
     blockIndex: Int = -1,
     /** A tap on a footnote mark (the «4» of «Villa4»): shows the note's text. */
-    onNote: ((String) -> Unit)? = null
+    onNote: ((String) -> Unit)? = null,
+    /** Words highlighted in the whole book: token -> colour of the dashed line under them. */
+    dashed: Map<Int, Color> = emptyMap()
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val density = LocalDensity.current
@@ -468,6 +470,14 @@ fun RubyParagraph(
                     recommendedMarks != null && t.text in recommendedMarks -> colors.recommendedLine
                     unknownMarks != null && t.text in unknownMarks -> colors.unknownLine
                     else -> null
+                }
+                // A word highlighted in the whole book: a dashed line under it, below the line of unknown words.
+                dashed[p.token]?.let { c ->
+                    val yDash = p.lineTop + laid.hanTop + laid.hanHeight + 5f
+                    drawLine(
+                        c, Offset(p.x + (inner - hanW) / 2f, yDash), Offset(p.x + (inner + hanW) / 2f, yDash), strokeWidth = 4f,
+                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 7f))
+                    )
                 }
                 if (lineColor != null) {
                     val yLine = p.lineTop + laid.hanTop + laid.hanHeight - 2f

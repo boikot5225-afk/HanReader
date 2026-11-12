@@ -531,7 +531,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun highlights(bookId: Long) = highlightDao.observe(bookId)
 
     /** Highlights characters [start, end) of paragraph [block]. */
-    fun addHighlight(chapter: ChapterContent, block: Int, start: Int, end: Int, color: Int) {
+    fun addHighlight(chapter: ChapterContent, block: Int, start: Int, end: Int, color: Int, note: String = "") {
         val o = _open.value ?: return
         val b = chapter.blocks.getOrNull(block) as? ReaderBlock.Text ?: return
         if (start < 0 || end > b.shown.length || start >= end) return
@@ -539,8 +539,24 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             highlightDao.insert(
                 com.hanreader.app.Highlight(
                     bookId = o.entity.id, chapterIndex = chapter.index, blockIndex = block,
-                    startChar = start, endChar = end, color = color,
+                    startChar = start, endChar = end, color = color, note = note,
                     text = b.shown.substring(start, end), chapterTitle = chapter.title
+                )
+            )
+        }
+    }
+
+    /** Highlights [text] everywhere in the open book (a name and who it is): see [Highlights.BOOK_WIDE]. */
+    fun addBookHighlight(text: String, color: Int, note: String = "") {
+        val o = _open.value ?: return
+        val t = text.trim()
+        if (t.isEmpty()) return
+        viewModelScope.launch {
+            highlightDao.insert(
+                com.hanreader.app.Highlight(
+                    bookId = o.entity.id, chapterIndex = Highlights.BOOK_WIDE, blockIndex = 0,
+                    startChar = 0, endChar = 0, color = color, note = note,
+                    text = t, chapterTitle = Highlights.BOOK_WIDE_TITLE
                 )
             )
         }

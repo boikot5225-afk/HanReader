@@ -45,6 +45,15 @@ object Highlights {
 
     fun color(i: Int) = COLORS[i.coerceIn(0, COLORS.lastIndex)]
 
+    /**
+     * [Highlight.chapterIndex] of a highlight of a word or phrase in the whole book (a name and who it
+     * is): every place where [Highlight.text] stands is marked. It keeps no place: block and characters are 0.
+     */
+    const val BOOK_WIDE = -1
+    const val BOOK_WIDE_TITLE = "Во всей книге"
+
+    val Highlight.wholeBook: Boolean get() = chapterIndex == BOOK_WIDE
+
     /** Tokens of [block] covered by [list] (token -> colour) and the tokens that end a noted highlight. */
     fun tokens(block: ReaderBlock.Text, list: List<Highlight>?): Pair<Map<Int, Color>, Set<Int>> {
         if (list.isNullOrEmpty()) return emptyMap<Int, Color>() to emptySet()
@@ -56,6 +65,47 @@ object Highlights {
             if (h.note.isNotBlank()) noted += range.last
         }
         return marked to noted
+    }
+
+    /** Tokens of [block] where a book-wide highlight of [book] stands (token -> colour): drawn with a dashed underline. */
+    fun bookTokens(block: ReaderBlock.Text, book: List<Highlight>): Map<Int, Color> {
+        if (book.isEmpty()) return emptyMap()
+        val out = HashMap<Int, Color>()
+        for (h in book) for (range in occurrences(block, h.text)) for (k in range) {
+            if (block.tokens[k].kind == com.hanreader.app.zh.TokenKind.HAN) out[k] = color(h.color)
+        }
+        return out
+    }
+
+    /**
+     * Where [text] stands in [block], as token ranges: in any letter case, as whole words (Salinas,
+     * not Salinasa); in Chinese, which has no spaces, anywhere.
+     */
+    fun occurrences(block: ReaderBlock.Text, text: String): List<IntRange> {
+        val needle = text.trim()
+        if (needle.isEmpty()) return emptyList()
+        val hay = block.text
+        fun cjk(c: Char) = Character.UnicodeScript.of(c.code) == Character.UnicodeScript.HAN
+        val out = ArrayList<IntRange>()
+        var from = 0
+        while (true) {
+            val at = hay.indexOf(needle, from, ignoreCase = true)
+            if (at < 0) break
+            val end = at + needle.length
+            val leftOk = at == 0 || !hay[at - 1].isLetterOrDigit() || cjk(needle.first())
+            val rightOk = end == hay.length || !hay[end].isLetterOrDigit() || cjk(needle.last())
+            if (leftOk && rightOk) range(block, at, end)?.let { out += it }
+            from = at + 1
+        }
+        return out
+    }
+
+    /** The book-wide highlight whose text stands at characters [start, end) of [block], if any. */
+    fun bookWideAt(book: List<Highlight>, block: ReaderBlock.Text, start: Int, end: Int): Highlight? {
+        val first = block.tokens.indexOfFirst { it.end > start }
+        val last = block.tokens.indexOfLast { it.start < end }
+        if (first !in 0..last) return null
+        return book.firstOrNull { h -> occurrences(block, h.text).any { r -> first >= r.first && last <= r.last } }
     }
 
     /** Tokens overlapping characters [start, end). */
@@ -110,11 +160,16 @@ object Highlights {
 internal fun HighlightPanel(
     current: Highlight?,
     canWiden: Boolean,
-    onColor: (Int) -> Unit,
+    /** (colour, for the whole book) */
+    onColor: (Int, Boolean) -> Unit,
     onSentence: () -> Unit,
     onNote: (String) -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    /** Moves the highlight to the whole book or back to this place; null: no such choice. */
+    onWholeBook: ((Boolean) -> Unit)? = null
 ) {
+    // A new highlight is for this place unless «Во всей книге» is chosen first.
+    var wholeBook by remember(current?.id, current?.chapterIndex) { mutableStateOf(current?.chapterIndex == Highlights.BOOK_WIDE) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(if (current == null) "Выделить" else "Выделено", style = MaterialTheme.typography.titleSmall)
@@ -124,13 +179,29 @@ internal fun HighlightPanel(
                 Box(
                     Modifier.padding(horizontal = 4.dp).size(30.dp).clip(CircleShape).background(c)
                         .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
-                        .clickable { onColor(i) }
+                        .clickable { onColor(i, wholeBook) }
                 )
             }
             Spacer(Modifier.weight(1f))
             if (current != null) {
                 IconButton(onClick = onRemove) {
                     Icon(LexiconIcons.Trash, contentDescription = "Убрать выделение", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        if (onWholeBook != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Switch(
+                    checked = wholeBook,
+                    onCheckedChange = { on -> wholeBook = on; if (current != null) onWholeBook(on) }
+                )
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text("Во всей книге", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Отметить это слово везде, где оно встречается, с одной заметкой (например, кто это)",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -189,7 +260,7 @@ internal fun HighlightList(
                     Box(Modifier.size(width = 4.dp, height = 40.dp).background(Highlights.color(h.color), RoundedCornerShape(2.dp)))
                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                         Text(
-                            "Раздел ${h.chapterIndex + 1} из $totalChapters · ${h.chapterTitle}",
+                            if (h.chapterIndex == Highlights.BOOK_WIDE) Highlights.BOOK_WIDE_TITLE else "Раздел ${h.chapterIndex + 1} из $totalChapters · ${h.chapterTitle}",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1, overflow = TextOverflow.Ellipsis
                         )
@@ -214,10 +285,12 @@ internal fun PhraseSheet(
     highlight: Highlight?,
     canWiden: Boolean,
     onSentence: () -> Unit,
-    onColor: (Int, Highlight?) -> Unit,
+    onColor: (Int, Highlight?, Boolean) -> Unit,
     onNote: (Highlight, String) -> Unit,
     onRemove: (Highlight) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** Moves [highlight] to the whole book (true) or back to this place. */
+    onWholeBook: (Highlight?, Boolean) -> Unit = { _, _ -> }
 ) {
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
@@ -234,10 +307,11 @@ internal fun PhraseSheet(
             HighlightPanel(
                 current = highlight,
                 canWiden = canWiden,
-                onColor = { onColor(it, highlight) },
+                onColor = { c, book -> onColor(c, highlight, book) },
                 onSentence = onSentence,
                 onNote = { n -> highlight?.let { onNote(it, n) } },
-                onRemove = { highlight?.let(onRemove) }
+                onRemove = { highlight?.let(onRemove) },
+                onWholeBook = { on -> onWholeBook(highlight, on) }
             )
             if (highlight == null) {
                 Text("Выбери цвет — потом можно добавить заметку.", style = MaterialTheme.typography.bodySmall,
