@@ -203,6 +203,10 @@ class EsEngine(
         return best
     }
 
+    /** A third-person indicative form of a verb (enseña, cuentan), not a subjunctive, imperative or participle. */
+    private fun finiteThird(a: EsAnalysis): Boolean =
+        a.entry.pos == "гл." && a.grammar.startsWith("3 л.") && listOf("субх.", "повел.", "причастие").none { it in a.grammar }
+
     private fun isInfinitive(word: String?): Boolean =
         word != null && analyses(word).any { it.entry.pos == "гл." && (it.grammar.startsWith("инфинитив") || it.entry.lemma == word.lowercase()) }
 
@@ -252,6 +256,13 @@ class EsEngine(
                 t.text.lowercase() in BARE_ADVERBS && a.first().entry.pos == "сущ." && !(before != null && (before in NOUN_MARKERS ||
                     before in setOf("de", "esta", "esa", "aquella") || analyses(before).firstOrNull()?.entry?.pos in setOf("прил.", "числ."))) ->
                     a.firstOrNull { it.entry.pos == "нар." }?.entry?.key
+                // A noun that is also a verb form, with no article before it and an article or «toda» after it, is the
+                // verb: «ahora abarca toda la República» abarcar, not «abarca» «сандалия».
+                // Only a third-person indicative form, and not after an adjective or a numeral («gran cosa el», «ocho meses la»).
+                a.first().entry.pos == "сущ." && (before == null || (before !in NOUN_MARKERS && before !in PREPOSITIONS_BEFORE_NOUN &&
+                    analyses(before).firstOrNull()?.entry?.pos !in setOf("прил.", "числ.", "опред."))) &&
+                    after != null && after in DETERMINERS_AFTER_VERB && a.any { finiteThird(it) } ->
+                    a.firstOrNull { finiteThird(it) }?.entry?.key
                 // After a word that is only a noun, a noun that is also an adjective is the adjective: «un oficial corrupto».
                 before != null && a.first().entry.pos == "сущ." && a.any { it.entry.pos == "прил." } && before !in NOUN_MARKERS &&
                     analyses(before).let { b -> b.isNotEmpty() && b.all { it.entry.pos == "сущ." } } ->
@@ -296,7 +307,11 @@ class EsEngine(
             val gap = words.getOrNull(k + 1)?.takeIf { linked(i, it) }
             val prep = words.getOrNull(k + 2)?.takeIf { gap != null && linked(gap, it) && tokens[gap].text.lowercase().let { g -> g.endsWith("mente") || g in GAP_ADVERBS } }
                 ?.let { tokens[it].text.lowercase().let { p -> CONTRACTED[p] ?: p } }?.takeIf { it in VERB_PREPOSITIONS }
+            // acabar / terminar + gerund: «acabaron cayendo» — in the end they fell.
+            val gerund = after != null && words.getOrNull(k + 1)?.let { linked(i, it) } == true &&
+                analyses(after).any { it.entry.pos == "гл." && it.grammar.startsWith("герундий") }
             val key = when {
+                gerund && dict.contains("$lemma haciendo") -> "$lemma haciendo"
                 prep != null && reflexive && dict.contains("${lemma}se $prep") -> "${lemma}se $prep"
                 prep != null && dict.contains("$lemma $prep") && "$lemma $prep" !in BEFORE_INFINITIVE -> "$lemma $prep"
                 reflexive && !lemma.endsWith("se") && entry(lemma + "se")?.ru?.isNotEmpty() == true -> lemma + "se"
@@ -580,6 +595,10 @@ class EsEngine(
         private val NOT_PRONOMINAL = setOf("estar", "tener", "haber", "ser", "poder", "deber")
         /** Ordinals: «el segundo» is «второй», not «секунда». */
         private val ORDINALS = setOf("primero", "primera", "segundo", "segunda", "tercero", "tercera", "último", "última")
+        /** Words a noun follows after a preposition: «con abarcas». */
+        private val PREPOSITIONS_BEFORE_NOUN = setOf("de", "con", "en", "por", "para", "sin", "a", "y", "o", "muy", "más", "tan", "como")
+        /** Words a verb is followed by more often than a noun: «abarca toda la República», «come el pan». */
+        private val DETERMINERS_AFTER_VERB = setOf("el", "la", "los", "las", "toda", "todo", "todos", "todas", "su", "sus", "un", "una")
         private val BARE_ADVERBS = setOf("mañana", "tarde")
         private val NOUN_MARKERS = setOf("el", "la", "los", "las", "una", "un", "del", "su", "sus", "mi", "mis", "tu", "tus", "este", "ese", "aquel",
             "estos", "esos", "nuestro", "nuestra", "nuestros", "nuestras", "unos", "unas", "cada", "ningún", "algún")

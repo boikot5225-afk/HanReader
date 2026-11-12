@@ -197,7 +197,23 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val userMeanings by vm.userMeanings.collectAsState()
     val userSplits by vm.userSplits.collectAsState()
     // Names of this book (found or «Не учить») and the reader's own «Это имя».
-    val names = remember(bookWords, userNames) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word }.apply { addAll(userNames) } }
+    // Names of this chapter: a word written with a capital inside a sentence and never in lower case here
+    // (Amado Carrillo) is a name at the start of a sentence too («Amado está en el Caribe»), not «любимый».
+    val chapterNames = remember(chapter, engine) {
+        val eng = engine
+        val out = HashSet<String>()
+        if (chapter != null && eng != null && eng !is ZhEngine) {
+            val lower = HashSet<String>()
+            chapter.blocks.forEach { b ->
+                val tokens = (b as? ReaderBlock.Text)?.tokens ?: return@forEach
+                for (r in eng.sureNames(tokens)) out += tokens[r.first].text
+                tokens.forEach { t -> if (t.kind == TokenKind.HAN && t.text.firstOrNull()?.isLowerCase() == true) lower += t.text }
+            }
+            out.removeAll { it.lowercase() in lower }
+        }
+        out
+    }
+    val names = remember(bookWords, userNames, chapterNames) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word }.apply { addAll(userNames); addAll(chapterNames) } }
     val coverage = remember(chapter, matcher, names) { chapter?.let { KnownCoverage.of(it, matcher, names, engine) } }
     // A language without a line above words (Spanish) never reserves room for it.
     val showPinyin = pinyinMode != PinyinMode.OFF && com.hanreader.app.lang.Languages.current.readingTitle != null

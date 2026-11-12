@@ -275,6 +275,17 @@ class EsEngineTest {
         assertEquals("частные самолёты", gloss("Llegaban en reactores particulares.", "reactores"))
         assertEquals("адресованный", gloss("Había escrito una carta dirigida a Ramón.", "dirigida"))
         assertEquals("попасть в", gloss("Los jóvenes habían caído en una trifulca.", "caído"))
+        // The reader's list «переводы под вопросом».
+        assertEquals("в итоге", gloss("Los tres magnates acabaron cayendo.", "acabaron"))
+        assertEquals("охватывать", gloss("Pero ha crecido y ahora abarca toda la República.", "abarca"))
+        assertEquals("фракции", gloss("Las dos facciones que planteaban problemas.", "facciones"))
+        assertEquals("ляпнуть невпопад", gloss("A veces meaba fuera del tiesto.", "meaba"))
+        assertEquals("быть в ударе", gloss("Durante todo el ciclo electoral estuvo en vena.", "estuvo"))
+        assertEquals("потерять кураж", gloss("De pronto perdió la onda.", "perdió"))
+        assertEquals("изворотливые", gloss("Estaban hartos de políticos maniobreros.", "maniobreros"))
+        assertEquals("загнанный", gloss("Parecía un zorro acorralado.", "acorralado"))
+        assertEquals("лапы", gloss("Eran lavadoras con patas.", "patas"))
+        assertEquals("сандалия", gloss("Llevaba una abarca vieja.", "abarca"))
     }
 
     @Test
