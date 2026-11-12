@@ -57,7 +57,7 @@ internal val CREDITS = listOf(
     Credit("Уровни HSK 3.0 и 2.0", "Complete HSK Vocabulary; hskhsk.com", "MIT", "HSK_LEVELS_NOTICE.txt", "zh"),
     Credit("Частоты слов HSK", "Complete HSK Vocabulary", "MIT", "HSK_FREQUENCY_NOTICE.txt", "zh"),
     Credit("Упрощённые и традиционные иероглифы", "OpenCC", "Apache 2.0", "OPENCC_NOTICE.txt", "zh"),
-    Credit("Шрифты", "Noto, LXGW WenKai, Zhuque Fangsong, Inter и др.", "SIL OFL 1.1", "FONTS_NOTICE.txt"),
+    Credit("Шрифты", "Literata, Lora, Inter, Cormorant, Oswald, IBM Plex Mono", "SIL OFL 1.1", "FONTS_NOTICE.txt"),
     Credit("Библиотеки", "Kotlin, AndroidX, jsoup", "Apache 2.0, MIT", "LIBRARIES_NOTICE.txt"),
 )
 

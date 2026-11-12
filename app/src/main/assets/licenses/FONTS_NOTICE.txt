@@ -1,10 +1,6 @@
-Fonts bundled in res/font, subset to the characters HanReader needs (GB2312, HSK lists,
-frequent dictionary characters; Latin, pinyin and Cyrillic for the UI fonts).
+Fonts bundled in res/font, subset to Latin and Cyrillic.
 All are licensed under the SIL Open Font License 1.1 (OFL.txt in this folder).
 
-- Noto Serif SC, Noto Sans SC — Google / Adobe (Source Han), google/fonts
-- LXGW WenKai (霞鹜文楷) — LXGW, npm @fontpkg/lxgw-wen-kai 1.520.0
-- Zhuque Fangsong (朱雀仿宋) technical preview 0.212 — TrionesType, npm @fontpkg/zhuque-fangsong-technical-preview
 - Oswald — Vernon Adams et al., google/fonts
 - IBM Plex Mono — IBM, google/fonts
 - Cormorant Garamond — Christian Thalmann, google/fonts
