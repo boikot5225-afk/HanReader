@@ -249,7 +249,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // Short translations above the pinyin: over unknown words or over recommended ones.
     val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, bookWide, known) {
         val eng = engine
-        val zhless = eng != null && eng !is ZhEngine
+        // A language with an alphabet: phrases carry one hint, words their reading in context.
+        val zhless = eng is com.hanreader.app.lang.AlphabeticModule
         val words = when (appearance.gloss) {
             GlossMode.OFF -> null
             GlossMode.UNKNOWN -> unknownSet
@@ -268,7 +269,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                     if (t.kind != TokenKind.HAN || ' ' !in t.pinyin) continue
                     var j = i
                     var hinted = false
-                    while (j < tokens.size && (j == i || tokens[j].kind != TokenKind.HAN || tokens[j].pinyin == com.hanreader.app.es.EsEngine.IN_PHRASE)) {
+                    while (j < tokens.size && (j == i || tokens[j].kind != TokenKind.HAN || tokens[j].pinyin == com.hanreader.app.lang.IN_PHRASE)) {
                         if (tokens[j].kind == TokenKind.HAN && tokens[j].text in words) hinted = true
                         j++
                     }
@@ -1461,22 +1462,11 @@ private fun WordSheet(
     val word = block.text.substring(first.start, last.end)
     // The Chinese card: dictionary entry, characters, readings. Other languages: their own part below.
     val zh = engine as? ZhEngine
-    // Spanish: the reading chosen from the context (se alza: alzar) goes first.
-    val es = remember(word) {
-        val e = engine as? com.hanreader.app.es.EsEngine
-        // Several words: a dictionary phrase, also inflected («me di cuenta» -> darse cuenta).
-        val all = if (e == null) emptyList()
-            else (if (selection.first != selection.last) e.phraseKey(tokens, block.text, selection.first, selection.last)?.let { e.analyses(it) } else null)
-                ?: e.analyses(word)
-        val inContext = if (selection.first == selection.last) first.pinyin else ""
-        // A pronominal verb the context named (se limita: limitarse) goes before the plain verb.
-        val pronominal = if (e != null && inContext.endsWith("se") && ' ' !in inContext && all.none { it.entry.key == inContext })
-            all.firstOrNull { it.entry.lemma + "se" == inContext }?.let { v -> e.entry(inContext)?.let { com.hanreader.app.es.EsAnalysis(v.form, it, v.grammar) } }
-        else null
-        listOfNotNull(pronominal) + if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.key == inContext) 0 else 1 }
-    }
-    // The plain verb of a pronominal one shown first (limitarse: limitar): what «Знаю» and the conjugation are about.
-    val esLemma = es.firstOrNull()?.entry?.lemma?.let { l -> l.removeSuffix("se").takeIf { b -> l.endsWith("se") && es.any { it.entry.lemma == b } } ?: l }
+    // A language with an alphabet (Spanish, English): its readings of the word, the one the context chose first.
+    val alpha = engine as? com.hanreader.app.lang.AlphabeticModule
+    val es = remember(word) { alpha?.cardAnalyses(tokens, block.text, selection.first, selection.last).orEmpty() }
+    // The word «Знаю» and the conjugation are about (limitarse: limitar).
+    val esLemma = remember(word) { alpha?.cardLemma(es) }
     val entry = remember(word) { zh?.lookup(word)?.takeIf { it.hasDefinition } }
     // A combination the dictionary lacks: its dictionary words (革命 + 党), else its characters.
     val composed = remember(word) { if (entry == null) zh?.compose(word) else null }
@@ -1488,7 +1478,7 @@ private fun WordSheet(
         else entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
     // A single character: the meanings of the reading on the page (得 de after a verb, not dé «получить»).
     val pageReading = if (selection.first == selection.last && first.text.length == 1) first.pinyin.takeIf { it.isNotEmpty() } else null
-    val russian = remember(word, pageReading) { zh?.russianSenses(word, pageReading) ?: es.firstOrNull()?.entry?.let { (engine as com.hanreader.app.es.EsEngine).senses(it) }.orEmpty() }
+    val russian = remember(word, pageReading) { zh?.russianSenses(word, pageReading) ?: es.firstOrNull()?.entry?.let { alpha?.senses(it) }.orEmpty() }
     val otherReadings = remember(word, pageReading) { zh?.otherReadings(word, pageReading).orEmpty() }
     // A tapped marker of a Chinese construction in this sentence (把, 虽然 … 但是): what the construction means.
     val grammar = remember(word, selection) {
@@ -1661,7 +1651,7 @@ private fun WordSheet(
             // A word inside a set phrase (sin embargo): the phrase and its meaning, one tap to take it.
             val phrase = remember(word, selection) {
                 if (selection.first != selection.last) null
-                else (engine as? com.hanreader.app.es.EsEngine)?.let { e ->
+                else alpha?.let { e ->
                     e.phraseAt(tokens, block.text, selection.first)?.let { r ->
                         val p = e.phraseKey(tokens, block.text, r.first, r.last) ?: block.text.substring(tokens[r.first].start, tokens[r.last].end)
                         Triple(r, p, e.cardTranslation(p))
@@ -1694,8 +1684,7 @@ private fun WordSheet(
                 }
                 // Grammar of a verb form: tense or mood, person, compound forms with the neighbours, when it is used.
                 val note = remember(word, selection) {
-                    (engine as? com.hanreader.app.es.EsEngine)?.takeIf { selection.first == selection.last }
-                        ?.let { e -> com.hanreader.app.es.EsGrammar.note(e, tokens, selection.first, es) }
+                    alpha?.takeIf { selection.first == selection.last }?.formNote(tokens, selection.first, es)
                 }
                 note?.let { n ->
                     Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
@@ -1710,21 +1699,22 @@ private fun WordSheet(
                     }
                 }
                 // The whole conjugation of the verb, on demand (built from the forms table in the background).
-                if (es.first().entry.pos == "гл.") {
+                if (es.first().entry.isVerb) {
                     val lemma = esLemma ?: es.first().entry.lemma
                     var showConj by remember(lemma) { mutableStateOf(false) }
                     TextButton(onClick = { showConj = !showConj }, contentPadding = PaddingValues(0.dp)) {
                         Text(if (showConj) "Скрыть спряжение" else "Спряжение $lemma")
                     }
                     if (showConj) {
-                        val conj by produceState<Map<String, Map<String, List<String>>>?>(null, lemma) {
+                        // Null while it is being built; then the table, or nothing when the language has none.
+                        val conj by produceState<Result<com.hanreader.app.lang.Conjugation?>?>(null, lemma) {
                             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                                (engine as com.hanreader.app.es.EsEngine).conjugation(lemma)
+                                runCatching { alpha?.conjugationTable(lemma) }
                             }
                         }
                         val c = conj
                         if (c == null) Text("Собираю формы…", style = MaterialTheme.typography.bodySmall)
-                        else ConjugationTable(c)
+                        else c.getOrNull()?.let { ConjugationTable(it) } ?: Text("Форм нет в словаре", style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 val en = es.first().entry.en
@@ -1823,24 +1813,19 @@ private fun WordSheet(
     }
 }
 
-/** A Spanish verb's forms by tense and person (yo hablo, tú hablas…), gerund and participle first. */
+/** A verb's forms by tense and person (yo hablo, tú hablas…), the forms without a person first. */
 @Composable
-private fun ConjugationTable(c: Map<String, Map<String, List<String>>>) {
-    val persons = listOf("1 ед" to "yo", "2 ед" to "tú", "3 ед" to "él, ella, usted", "1 мн" to "nosotros", "2 мн" to "vosotros", "3 мн" to "ellos, ustedes")
+private fun ConjugationTable(c: com.hanreader.app.lang.Conjugation) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        val nonFinite = listOf("герундий" to "Gerundio", "причастие" to "Participio").mapNotNull { (k, t) -> c[k]?.get("")?.let { "$t: ${it.joinToString(" / ")}" } }
-        if (nonFinite.isNotEmpty()) Text(nonFinite.joinToString("   "), style = MaterialTheme.typography.bodyMedium)
-        for (tense in com.hanreader.app.es.EsEngine.CONJ_TENSES) {
-            val rows = c[tense] ?: continue
-            if (tense == "герундий" || tense.contains("причастие")) continue
+        if (c.nonFinite.isNotEmpty()) Text(c.nonFinite.joinToString("   "), style = MaterialTheme.typography.bodyMedium)
+        for ((tense, rows) in c.tenses) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(com.hanreader.app.es.EsGrammar.spanishName(tense), style = MaterialTheme.typography.labelLarge)
-                for ((key, who) in persons) {
-                    val forms = rows[key] ?: continue
+                Text(tense, style = MaterialTheme.typography.labelLarge)
+                for ((who, forms) in rows) {
                     Row {
                         Text(who, Modifier.width(118.dp), style = MaterialTheme.typography.bodySmall, color = muted)
-                        Text(forms.joinToString(" / "), style = MaterialTheme.typography.bodyMedium, fontFamily = WordFont)
+                        Text(forms, style = MaterialTheme.typography.bodyMedium, fontFamily = WordFont)
                     }
                 }
             }

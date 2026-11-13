@@ -134,7 +134,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
                 Panel(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            (if (com.hanreader.app.lang.Languages.current == com.hanreader.app.lang.Languages.SPANISH) "Добавь испанскую книгу" else "Добавь китайскую книгу") +
+                            "Добавь ${com.hanreader.app.lang.Languages.current.bookAdjective} книгу" +
                                 ": EPUB, FB2, TXT или документ Word",
                             style = MaterialTheme.typography.titleMedium
                         )

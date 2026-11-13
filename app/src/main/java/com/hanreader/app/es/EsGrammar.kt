@@ -3,19 +3,8 @@ package com.hanreader.app.es
 import com.hanreader.app.reader.RToken
 import com.hanreader.app.zh.TokenKind
 
-/** What a verb form is and why it is used, for the word card: offline, by rules. */
-data class GrammarNote(
-    /** Tense or mood in Spanish and Russian: «Pretérito indefinido — простое прошедшее». */
-    val tense: String,
-    /** «3-е лицо ед. ч. (él, ella, usted)»; null when the form has no person. */
-    val person: String?,
-    /** When it is used, in a sentence or two. */
-    val explanation: String,
-    /** The words of a compound form on the page: «había venido». Null for a single word. */
-    val construction: String? = null,
-    /** Pronouns attached to the verb: «me lo». */
-    val pronouns: String? = null
-)
+/** What a verb form is and why it is used (the shared [com.hanreader.app.lang.FormNote]). */
+typealias GrammarNote = com.hanreader.app.lang.FormNote
 
 object EsGrammar {
     private class Tense(val name: String, val explanation: String)

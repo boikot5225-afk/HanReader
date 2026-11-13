@@ -40,19 +40,36 @@ object BookLanguages {
     fun detect(book: BookSource): LanguageInfo =
         recognize(book).takeIf { it in Languages.AVAILABLE || it == Languages.current } ?: Languages.current
 
-    /** Chinese when a good share of the letters in the first chapters are Chinese characters, else Spanish. */
+    /**
+     * Chinese when a good share of the letters in the first chapters are Chinese characters; else the
+     * language with an alphabet whose commonest words ([LanguageInfo.markers]) the text uses most.
+     */
     fun recognize(book: BookSource): LanguageInfo {
         var han = 0
         var letters = 0
+        val alphabetic = Languages.ALL.filter { it.markers.isNotEmpty() }
+        val hits = IntArray(alphabetic.size)
+        val word = StringBuilder()
+        fun endWord() {
+            if (word.isEmpty()) return
+            val w = word.toString().lowercase()
+            alphabetic.forEachIndexed { i, l -> if (w in l.markers) hits[i]++ }
+            word.setLength(0)
+        }
         for (c in book.chapters.take(10)) {
             for (b in book.blocks(c.index)) {
                 val t = (b as? EpubBlock.Text)?.text ?: continue
-                for (ch in t) if (ch.isLetter()) { letters++; if (ch.isHan()) han++ }
+                for (ch in t) {
+                    if (ch.isLetter()) { letters++; if (ch.isHan()) { han++; endWord() } else word.append(ch) } else endWord()
+                }
+                endWord()
                 if (letters > 20_000) break
             }
             if (letters > 20_000) break
         }
-        return if (letters > 0 && han * 3 >= letters) Languages.CHINESE else Languages.SPANISH
+        if (letters > 0 && han * 3 >= letters) return Languages.CHINESE
+        val best = hits.indices.maxByOrNull { hits[it] } ?: return Languages.SPANISH
+        return alphabetic[best]
     }
 }
 

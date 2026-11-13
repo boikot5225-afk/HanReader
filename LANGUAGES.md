@@ -88,3 +88,18 @@
   «阿Q正传» Лу Синя: литературные значения частых иероглифов (便 «тогда», 被 — залог, 伊 «она»),
   имена и места, числа (`zh/ZhNumbers.kt`: 一九三一年 «1931 год», 四两 «4 ляна»), чтение 传 по контексту.
   В manual.tsv: «-» — не слово, резать (文传 в 人以文传).
+
+## Язык с латиницей: общий интерфейс (0.24.1)
+
+Общие экраны (карточка слова, итог главы, подсказки, библиотека) больше не знают испанского напрямую:
+- `lang/Alphabetic.kt` — `AlphabeticModule`: разбор слова для карточки (`cardAnalyses`, `cardLemma`, `senses`),
+  выражения (`phraseAt`, `phraseKey`), разбор формы (`formNote`), таблица спряжения (`conjugationTable`,
+  уже с подписями лиц и времён). Общие типы `LexEntry`, `LexAnalysis`, `FormNote`, `Conjugation`, метка `IN_PHRASE`;
+  в испанском коде остались прежние имена как псевдонимы (`EsEntry`, `EsAnalysis`, `GrammarNote`).
+- `LanguageInfo.bookAdjective` («испанскую») и `markers` — частые короткие слова, по которым узнаётся язык
+  книги с латиницей (`BookLanguages.recognize`: иероглифы — китайский, иначе язык с наибольшим числом своих слов).
+- `LanguageEngines`: реестр загрузчиков (`EngineLoader`); загрузка одного языка отпускает словари остальных.
+
+Новый язык (английский): модуль `en/EnEngine : AlphabeticModule`, запись в `Languages` (с `markers`),
+загрузчик в `LanguageEngines`, тег в `BuildConfig.LANGUAGES`. Экраны менять не нужно.
+`AlphabeticModuleTest` — что модуль должен уметь.

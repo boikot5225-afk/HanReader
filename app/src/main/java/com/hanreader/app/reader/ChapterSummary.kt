@@ -67,7 +67,7 @@ object ChapterSummary {
     /** The key of a word on the page: its phrase, its reading in context (limitarse) or its dictionary word. */
     fun keyOf(t: RToken, engine: LanguageModule): String? = when {
         engine is ZhEngine -> t.text
-        t.pinyin == com.hanreader.app.es.EsEngine.IN_PHRASE -> null
+        t.pinyin == com.hanreader.app.lang.IN_PHRASE -> null
         ' ' in t.pinyin -> t.pinyin
         // «poder/сущ.»: the noun reading of a word; «Знаю» is about the word.
         t.pinyin.isNotEmpty() -> t.pinyin.substringBefore('/')
@@ -110,7 +110,7 @@ object ChapterSummary {
                     val end = if (phrase) {
                         var j = ti
                         var k = ti + 1
-                        while (k < tokens.size && (tokens[k].kind != TokenKind.HAN || tokens[k].pinyin == com.hanreader.app.es.EsEngine.IN_PHRASE)) {
+                        while (k < tokens.size && (tokens[k].kind != TokenKind.HAN || tokens[k].pinyin == com.hanreader.app.lang.IN_PHRASE)) {
                             if (tokens[k].kind == TokenKind.HAN) j = k
                             k++
                         }

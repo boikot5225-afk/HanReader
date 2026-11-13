@@ -14,35 +14,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-/** A dictionary word: [ru] from the Russian Wiktionary, [en] from the English one. */
-data class EsEntry(
-    val lemma: String,
-    val pos: String,
-    val ru: List<String>,
-    val en: List<String>,
-    /** The Russian meaning is a machine translation of the English one (not the Russian Wiktionary). */
-    val machine: Boolean = false,
-    /** Frequency rank in Spanish subtitles: 1 = most frequent, 0 = not in the list. */
-    val rank: Int = 0,
-    /** The main meaning in a few words (frequent words, edited pass), for the note over the word. */
-    val short: String = "",
-    /** Gender of a noun: «м», «ж», «мж» (both); empty for other words. */
-    val gender: String = "",
-    /** The word as other parts of speech (haber: the noun «имущество» beside the verb), each with its own senses. */
-    val alts: List<EsEntry> = emptyList(),
-    /** Names this reading among the readings of a word: the lemma, for another part of speech «haber/сущ.». */
-    val key: String = lemma
-) {
-    /** «сущ., ж. р.», «сущ., м. и ж. р.», «гл.». */
-    val posLabel: String get() = when (gender) {
-        "м" -> "$pos, м. р."
-        "ж" -> "$pos, ж. р."
-        "мж" -> "$pos, м. и ж. р."
-        else -> pos
-    }
-
-    val isName: Boolean get() = pos == "имя"
-}
+/** A Spanish dictionary word (the shared [com.hanreader.app.lang.LexEntry]). */
+typealias EsEntry = com.hanreader.app.lang.LexEntry
 
 /**
  * The variant of Spanish whose regional senses come first. Senses carry their region in a label:
@@ -68,7 +41,7 @@ enum class EsVariant(val title: String, private val marks: List<String>) {
 }
 
 /** One reading of a word on the page: hablo → hablar, «1 л. ед. ч., наст.». */
-data class EsAnalysis(val form: String, val entry: EsEntry, val grammar: String)
+typealias EsAnalysis = com.hanreader.app.lang.LexAnalysis
 
 /**
  * The Spanish language module. Words are runs of letters; a word on the page is looked up as it
@@ -80,7 +53,7 @@ class EsEngine(
     private val forms: SortedTsv,
     private val grammar: List<String>,
     override val loadMs: Long = 0
-) : LanguageModule {
+) : com.hanreader.app.lang.AlphabeticModule {
     override val info: LanguageInfo get() = Languages.SPANISH
 
     private val cache = object : LinkedHashMap<String, List<EsAnalysis>>(2048, 0.75f, true) {
@@ -174,7 +147,7 @@ class EsEngine(
      * The longest dictionary phrase of 2–4 words around the word at [index] (sin embargo, a pesar de),
      * as a range of token indices; words must be separated by single spaces. Null if none.
      */
-    fun phraseAt(tokens: List<RToken>, text: String, index: Int): IntRange? {
+    override fun phraseAt(tokens: List<RToken>, text: String, index: Int): IntRange? {
         if (tokens.getOrNull(index)?.kind != TokenKind.HAN) return null
         // Word tokens reachable from [index] through single spaces, up to three on each side.
         fun step(from: Int, dir: Int): Int? {
@@ -349,7 +322,7 @@ class EsEngine(
      * its first word is inflected or it is reflexive: «me di cuenta» is darse cuenta, «echo de menos»
      * echar de menos. Null if the dictionary has no such phrase.
      */
-    fun phraseKey(tokens: List<RToken>, text: String, a: Int, b: Int): String? {
+    override fun phraseKey(tokens: List<RToken>, text: String, a: Int, b: Int): String? {
         if (b <= a || tokens.getOrNull(a)?.kind != TokenKind.HAN || tokens.getOrNull(b)?.kind != TokenKind.HAN) return null
         for (j in a + 1..b) if (tokens[j].kind == TokenKind.SPACE && tokens[j].text != " ") return null
         // A phrase ending in «de» / «a» written with the article joined: «a pesar del» is a pesar de + el.
@@ -405,7 +378,38 @@ class EsEngine(
     private val variant: EsVariant get() = com.hanreader.app.AppearanceStore.appearance.value.esVariant
 
     /** Russian senses with the chosen variant's regional ones first and other regions' last. */
-    fun senses(e: EsEntry): List<String> = e.ru.sortedBy { variant.rank(it) }
+    override fun senses(entry: EsEntry): List<String> = entry.ru.sortedBy { variant.rank(it) }
+
+    override fun cardAnalyses(tokens: List<RToken>, text: String, a: Int, b: Int): List<EsAnalysis> {
+        val word = text.substring(tokens[a].start, tokens[b].end)
+        // Several words: a dictionary phrase, also inflected («me di cuenta» -> darse cuenta).
+        val all = (if (a != b) phraseKey(tokens, text, a, b)?.let { analyses(it) } else null) ?: analyses(word)
+        val inContext = if (a == b) tokens[a].pinyin else ""
+        // A pronominal verb the context named (se limita: limitarse) goes before the plain verb.
+        val pronominal = if (inContext.endsWith("se") && ' ' !in inContext && all.none { it.entry.key == inContext })
+            all.firstOrNull { it.entry.lemma + "se" == inContext }?.let { v -> entry(inContext)?.let { EsAnalysis(v.form, it, v.grammar) } }
+        else null
+        return listOfNotNull(pronominal) + if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.key == inContext) 0 else 1 }
+    }
+
+    /** The plain verb of a pronominal one shown first (limitarse: limitar): what «Знаю» and the conjugation are about. */
+    override fun cardLemma(analyses: List<EsAnalysis>): String? = analyses.firstOrNull()?.entry?.lemma?.let { l ->
+        l.removeSuffix("se").takeIf { b -> l.endsWith("se") && analyses.any { it.entry.lemma == b } } ?: l
+    }
+
+    override fun formNote(tokens: List<RToken>, index: Int, analyses: List<EsAnalysis>) = EsGrammar.note(this, tokens, index, analyses)
+
+    override fun conjugationTable(lemma: String): com.hanreader.app.lang.Conjugation? {
+        val c = conjugation(lemma)
+        if (c.isEmpty()) return null
+        val persons = listOf("1 ед" to "yo", "2 ед" to "tú", "3 ед" to "él, ella, usted", "1 мн" to "nosotros", "2 мн" to "vosotros", "3 мн" to "ellos, ustedes")
+        val nonFinite = listOf("герундий" to "Gerundio", "причастие" to "Participio").mapNotNull { (k, t) -> c[k]?.get("")?.let { "$t: ${it.joinToString(" / ")}" } }
+        val tenses = CONJ_TENSES.filter { it != "герундий" && !it.contains("причастие") }.mapNotNull { tense ->
+            val rows = c[tense] ?: return@mapNotNull null
+            EsGrammar.spanishName(tense) to persons.mapNotNull { (key, who) -> rows[key]?.let { who to it.joinToString(" / ") } }
+        }
+        return com.hanreader.app.lang.Conjugation(nonFinite, tenses)
+    }
 
     override fun glossShort(word: String, reading: String?): String? {
         if (reading == IN_PHRASE) return null
@@ -603,7 +607,7 @@ class EsEngine(
         private val NOUN_MARKERS = setOf("el", "la", "los", "las", "una", "un", "del", "su", "sus", "mi", "mis", "tu", "tus", "este", "ese", "aquel",
             "estos", "esos", "nuestro", "nuestra", "nuestros", "nuestras", "unos", "unas", "cada", "ningún", "algún")
         /** [RToken.pinyin] of a word inside a phrase after its first word: no hint of its own. */
-        const val IN_PHRASE = "~"
+        const val IN_PHRASE = com.hanreader.app.lang.IN_PHRASE
         /** Forms of haber: a participle after one is a verb (había adoptado). */
         private val HABER = setOf("he", "has", "ha", "hemos", "habéis", "han", "había", "habías", "habíamos", "habíais", "habían",
             "hube", "hubo", "hubimos", "hubieron", "habré", "habrá", "habremos", "habrán", "habría", "habrías", "habríamos", "habrían",

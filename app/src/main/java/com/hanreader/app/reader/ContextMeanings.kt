@@ -27,7 +27,7 @@ object ContextMeanings {
     /** The key a word on the page has in its book: what the context chose for it. */
     fun keyOf(t: RToken, engine: LanguageModule): String = when {
         engine is ZhEngine -> t.text
-        t.pinyin.isNotEmpty() && t.pinyin != com.hanreader.app.es.EsEngine.IN_PHRASE -> t.pinyin
+        t.pinyin.isNotEmpty() && t.pinyin != com.hanreader.app.lang.IN_PHRASE -> t.pinyin
         else -> engine.lemma(t.text)
     }
 
@@ -58,7 +58,7 @@ object ContextMeanings {
             for (t in tokens) {
                 if (t.kind != TokenKind.HAN) continue
                 here["$bi:${t.start}"]?.let { glossFor["@$bi:${t.start}"] = it; continue }
-                if (book.isEmpty() || t.text !in hinted || t.pinyin == com.hanreader.app.es.EsEngine.IN_PHRASE) continue
+                if (book.isEmpty() || t.text !in hinted || t.pinyin == com.hanreader.app.lang.IN_PHRASE) continue
                 val m = book[keyOf(t, engine)] ?: continue
                 if (engine is ZhEngine) {
                     // Chinese: a book meaning replaces the meaning of every reading of the word.

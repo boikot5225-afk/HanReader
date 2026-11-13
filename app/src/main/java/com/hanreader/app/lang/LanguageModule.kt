@@ -45,7 +45,14 @@ data class LanguageInfo(
      * Whether a stored word (a «Знаю» mark, a level mark) belongs to this language: the marks of
      * all languages share one table, each language counts and uses only its own.
      */
-    val ownsWord: (String) -> Boolean = { true }
+    val ownsWord: (String) -> Boolean = { true },
+    /** The language's adjective for «Добавь … книгу»: «испанскую». */
+    val bookAdjective: String = "",
+    /**
+     * Its commonest small words (lower case): a book in a language with an alphabet is recognized
+     * by how many of its words are these. Empty for Chinese, recognized by its characters.
+     */
+    val markers: Set<String> = emptySet()
 ) {
     val locale: Locale get() = Locale.forLanguageTag(tag)
 }
@@ -182,7 +189,8 @@ object Languages {
         noWordsMessage = "В тексте нет китайских иероглифов",
         isWordChar = { it.isHan() },
         legacyCharset = "GB18030",
-        ownsWord = { w -> w.any { it.isHan() } }
+        ownsWord = { w -> w.any { it.isHan() } },
+        bookAdjective = "китайскую"
     )
 
     val SPANISH = LanguageInfo(
@@ -196,7 +204,10 @@ object Languages {
         isWordChar = { it.isLetter() },
         legacyCharset = "windows-1252",
         hyphenate = com.hanreader.app.es.EsHyphenator::points,
-        ownsWord = { w -> w.isNotEmpty() && w.all { !it.isLetter() || Character.UnicodeScript.of(it.code) == Character.UnicodeScript.LATIN } && w.any { it.isLetter() } }
+        ownsWord = { w -> w.isNotEmpty() && w.all { !it.isLetter() || Character.UnicodeScript.of(it.code) == Character.UnicodeScript.LATIN } && w.any { it.isLetter() } },
+        bookAdjective = "испанскую",
+        markers = setOf("de", "la", "que", "el", "en", "y", "los", "se", "del", "las", "un", "por", "con", "no", "una",
+            "su", "para", "es", "al", "lo", "como", "más", "pero", "sus", "le", "ya", "o", "fue", "este", "ha", "sí", "porque")
     )
 
     /** Every language the code knows, in a fixed order (statistics keep their days by the index here). */
@@ -240,21 +251,45 @@ object Languages {
     }
 }
 
+/** How a language's module is loaded and let go. */
+interface EngineLoader {
+    /** The complete module, loaded once per process in the background. */
+    fun warmUp(context: Context): Deferred<LanguageModule>
+    /** Enough to build and show a chapter, as soon as possible (Chinese: the dictionary alone). */
+    fun core(context: Context): Deferred<LanguageModule> = warmUp(context)
+    /** Lets the loaded dictionaries go; the next [warmUp] loads them again. */
+    fun release()
+}
+
 /**
  * Loads the module of [Languages.current] once per process. The dictionaries of one language take
- * tens of megabytes: loading one lets the other language's go, so a switch without a restart (tests,
- * a backup restored) never keeps both on a small phone.
+ * tens of megabytes: loading one lets the others go, so a switch without a restart (tests, a backup
+ * restored) never keeps two on a small phone. A new language adds its loader to [LOADERS].
  */
 object LanguageEngines {
-    /** The complete module: everything it knows (Chinese: Russian meanings, HSK, names). */
-    fun warmUp(context: Context): Deferred<LanguageModule> = when (Languages.current) {
-        Languages.SPANISH -> { com.hanreader.app.reader.ZhEngine.release(); com.hanreader.app.es.EsEngine.warmUp(context) }
-        else -> { com.hanreader.app.es.EsEngine.release(); com.hanreader.app.reader.ZhEngine.warmUp(context) }
+    private val LOADERS: Map<LanguageInfo, EngineLoader> by lazy {
+        mapOf(
+            Languages.CHINESE to object : EngineLoader {
+                override fun warmUp(context: Context) = com.hanreader.app.reader.ZhEngine.warmUp(context)
+                override fun core(context: Context) = com.hanreader.app.reader.ZhEngine.core(context)
+                override fun release() = com.hanreader.app.reader.ZhEngine.release()
+            },
+            Languages.SPANISH to object : EngineLoader {
+                override fun warmUp(context: Context) = com.hanreader.app.es.EsEngine.warmUp(context)
+                override fun release() = com.hanreader.app.es.EsEngine.release()
+            }
+        )
     }
 
-    /** Enough to build and show a chapter, as soon as possible (Chinese: the dictionary alone). */
-    fun core(context: Context): Deferred<LanguageModule> = when (Languages.current) {
-        Languages.SPANISH -> { com.hanreader.app.reader.ZhEngine.release(); com.hanreader.app.es.EsEngine.warmUp(context) }
-        else -> { com.hanreader.app.es.EsEngine.release(); com.hanreader.app.reader.ZhEngine.core(context) }
+    private fun loader(): EngineLoader {
+        val current = Languages.current
+        LOADERS.forEach { (l, loader) -> if (l != current) loader.release() }
+        return LOADERS[current] ?: LOADERS.getValue(Languages.CHINESE)
     }
+
+    /** The complete module: everything it knows (Chinese: Russian meanings, HSK, names). */
+    fun warmUp(context: Context): Deferred<LanguageModule> = loader().warmUp(context)
+
+    /** Enough to build and show a chapter, as soon as possible (Chinese: the dictionary alone). */
+    fun core(context: Context): Deferred<LanguageModule> = loader().core(context)
 }
