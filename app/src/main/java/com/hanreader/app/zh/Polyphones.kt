@@ -99,6 +99,8 @@ object Polyphones {
             // 传 zhuàn «жизнеописание» after «написать, составить» and «это, большое, внутреннее» (做传, 立本传,
             // 大传, 内传) and as the topic (传的名目, 的传的); chuán «передавать» elsewhere (人以文传, 传进).
             '传' -> if (prev != null && prev.last() in "做作立写列为本大内" || (prev == null || prev == "的") && next == "的") "zhuàn" else null
+            // 处 chù «место» after a number or «этот, каждый» (几处, 一处, 各处); elsewhere the dictionary's.
+            '处' -> if (prev != null && prev.last() in "几一两三四五六七八九十百千多各此某何别") "chù" else null
             '中' -> if (prev != null && prev.last() in "打射猜考选击投砸押" && (next == null || next[0] !in "间国央心学部文午")) "zhòng" else null
             // 冲 chòng «к, в сторону» before 着 or a person (冲我笑).
             '冲' -> if (next == "着" || next != null && next in setOf("我", "你", "他", "她", "它", "我们", "你们", "他们", "她们", "咱们", "大家")) "chòng" else null
