@@ -73,7 +73,34 @@ class ZhSegmenter(private val dict: ZhDictionary) {
                 }
             }
         }
-        return if (blocked.isEmpty() && extra.isEmpty()) refine(out) else refine(out, extra)
+        return mixed(if (blocked.isEmpty() && extra.isEmpty()) refine(out) else refine(out, extra))
+    }
+
+    /**
+     * Dictionary words of characters and Latin letters together (阿Q, 卡拉OK, A型): the text is cut
+     * where the script changes, so the two neighbouring pieces are joined back when the dictionary
+     * knows the whole and they touch (阿 Q with a space stays apart).
+     */
+    private fun mixed(tokens: List<ZhToken>): List<ZhToken> {
+        if (tokens.none { it.kind == TokenKind.OTHER }) return tokens
+        val out = ArrayList<ZhToken>(tokens.size)
+        var i = 0
+        while (i < tokens.size) {
+            val a = tokens[i]
+            val b = tokens.getOrNull(i + 1)
+            if (b != null && a.end == b.start && (a.kind == TokenKind.HAN && b.kind == TokenKind.OTHER || a.kind == TokenKind.OTHER && b.kind == TokenKind.HAN)) {
+                val whole = a.text + b.text
+                val entry = dict.lookup(whole)?.takeIf { it.hasDefinition }
+                if (entry != null) {
+                    out += ZhToken(whole, a.start, b.end, TokenKind.HAN, entry)
+                    i += 2
+                    continue
+                }
+            }
+            out += a
+            i++
+        }
+        return out
     }
 
     /**

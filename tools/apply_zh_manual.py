@@ -20,6 +20,8 @@ The reader sends words whose translation was wrong or missing in a real book (th
   should not keep whole (文传 in 人以文传, 文以人传); it is removed from the dictionary.
 - "!reading" for a defined word replaces its reading in the dictionary (地方 \t !dì fang).
   A defined word the segmenter never keeps whole (Jieba frequency 0, 起作用) gets a frequency.
+- An optional sixth column: the word's frequency for the segmenter, when it cuts a dictionary
+  word in two (之于 \t … \t 1000: else 之 + 于 win).
 - The note column is for people (where the word was met); "#" starts a comment line.
 
 Run after editing the file; it is idempotent:
@@ -40,13 +42,20 @@ LEXICON_BIN = os.path.join(ROOT, "app/src/main/assets/zh/lexicon.bin")
 NEW_FREQ = 60
 
 
+# Word -> frequency from the sixth column: a word the segmenter cuts although the dictionary has it
+# (之于 against the frequent 之 and 于) needs a higher one.
+FREQ = {}
+
+
 def read_manual():
     rows = []
     for n, line in enumerate(open(MANUAL, encoding="utf-8"), 1):
         line = line.rstrip("\n")
         if not line.strip() or line.startswith("#"):
             continue
-        p = line.split("\t") + [""] * 5
+        p = line.split("\t") + [""] * 6
+        if p[5].strip().isdigit():
+            FREQ[p[0].strip()] = int(p[5].strip())
         word, reading, ru, en = (x.strip() for x in p[:4])
         if not word or not ru:
             sys.exit(f"manual.tsv:{n}: a word and its Russian senses are required")
@@ -124,6 +133,11 @@ def main():
         freq = e[4] if e and len(e) > 4 and int(e[4] or 0) >= NEW_FREQ else str(NEW_FREQ)
         lex[w] = [w, reading, en, rank, freq]
         changed += 1
+    for w, f in FREQ.items():
+        e = lex.get(w)
+        if e is not None and int(e[4] or 0) < f:
+            e[4] = str(f)
+            changed += 1
     if changed:
         with open(LEXICON, "wb") as raw, gzip.GzipFile(filename="lexicon.dat", mode="wb", fileobj=raw, mtime=0) as gz:
             gz.write("".join("\t".join(lex[w]) + "\n" for w in sorted(lex)).encode("utf-8"))
