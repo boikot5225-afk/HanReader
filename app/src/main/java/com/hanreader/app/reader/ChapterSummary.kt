@@ -70,7 +70,7 @@ object ChapterSummary {
         t.pinyin == com.hanreader.app.lang.IN_PHRASE -> null
         ' ' in t.pinyin -> t.pinyin
         // «poder/сущ.»: the noun reading of a word; «Знаю» is about the word.
-        t.pinyin.isNotEmpty() -> t.pinyin.substringBefore('/')
+        t.pinyin.isNotEmpty() -> com.hanreader.app.lang.ContextRules.key(t.pinyin).substringBefore('/')
         else -> engine.lemma(t.text)
     }
 

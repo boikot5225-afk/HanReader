@@ -52,7 +52,9 @@ class EsEngine(
     private val dict: SortedTsv,
     private val forms: SortedTsv,
     private val grammar: List<String>,
-    override val loadMs: Long = 0
+    override val loadMs: Long = 0,
+    /** Meanings the words around choose (assets/es/context.tsv): durmientes near «rieles» — «шпалы». */
+    private val rules: com.hanreader.app.lang.ContextRules = com.hanreader.app.lang.ContextRules.EMPTY
 ) : com.hanreader.app.lang.AlphabeticModule {
     override val info: LanguageInfo get() = Languages.SPANISH
 
@@ -292,7 +294,37 @@ class EsEngine(
             }
             if (key != null) out[i] = t.copy(pinyin = key)
         }
+        if (!rules.isEmpty) chooseMeanings(out, words)
         return out
+    }
+
+    /**
+     * Meanings the sentence chooses ([rules]): the reading becomes "key#meaning" («durmiente#шпала»), so
+     * the hint, the card and the summary show that meaning. Words of a phrase are left to the phrase.
+     */
+    private fun chooseMeanings(out: MutableList<RToken>, words: List<Int>) {
+        var start = 0
+        while (start < words.size) {
+            // A sentence: words up to a full stop, a question or an exclamation mark.
+            var end = start
+            while (end + 1 < words.size && (words[end] + 1 until words[end + 1]).none { j -> out[j].kind == TokenKind.PUNCT && out[j].text.any { it in ".!?…;" } }) end++
+            val idx = words.subList(start, end + 1)
+            val lemmasOf = HashMap<Int, Set<String>>()
+            fun lemmas(k: Int) = lemmasOf.getOrPut(k) { analyses(out[idx[k]].text).mapTo(HashSet()) { it.entry.lemma } }
+            val sentence = com.hanreader.app.lang.ContextRules.Sentence(
+                idx.map { out[it].text.lowercase() }, ::lemmas,
+                { k -> val t = out[idx[k]]; (analyses(t.text).firstOrNull { it.entry.key == t.pinyin } ?: analyses(t.text).firstOrNull())?.entry?.pos == "гл." })
+            for (k in idx.indices) {
+                val t = out[idx[k]]
+                if (t.pinyin == IN_PHRASE || ' ' in t.pinyin) continue
+                val own = lemmas(k)
+                if (!rules.covers(own)) continue
+                val meaning = rules.meaning(own, sentence, k) ?: continue
+                val key = t.pinyin.ifEmpty { analyses(t.text).firstOrNull()?.entry?.key.orEmpty() }
+                out[idx[k]] = t.copy(pinyin = "$key#$meaning")
+            }
+            start = end + 1
+        }
     }
 
     /**
@@ -346,8 +378,9 @@ class EsEngine(
      * The entry of [word] read as [reading]: one of its own readings by [EsEntry.key], else the dictionary
      * word the context named (a phrase «traer cola», a pronominal verb «limitarse»), else the first reading.
      */
-    private fun pick(word: String, reading: String?): EsEntry? {
+    private fun pick(word: String, readingInContext: String?): EsEntry? {
         val a = analyses(word)
+        val reading = readingInContext?.let { com.hanreader.app.lang.ContextRules.key(it) }
         if (reading.isNullOrEmpty() || reading == IN_PHRASE) return a.firstOrNull()?.entry
         return a.firstOrNull { it.entry.key == reading }?.entry ?: entry(reading)?.takeIf { it.ru.isNotEmpty() } ?: a.firstOrNull()?.entry
     }
@@ -384,7 +417,7 @@ class EsEngine(
         val word = text.substring(tokens[a].start, tokens[b].end)
         // Several words: a dictionary phrase, also inflected («me di cuenta» -> darse cuenta).
         val all = (if (a != b) phraseKey(tokens, text, a, b)?.let { analyses(it) } else null) ?: analyses(word)
-        val inContext = if (a == b) tokens[a].pinyin else ""
+        val inContext = if (a == b) com.hanreader.app.lang.ContextRules.key(tokens[a].pinyin) else ""
         // A pronominal verb the context named (se limita: limitarse) goes before the plain verb.
         val pronominal = if (inContext.endsWith("se") && ' ' !in inContext && all.none { it.entry.key == inContext })
             all.firstOrNull { it.entry.lemma + "se" == inContext }?.let { v -> entry(inContext)?.let { EsAnalysis(v.form, it, v.grammar) } }
@@ -413,6 +446,8 @@ class EsEngine(
 
     override fun glossShort(word: String, reading: String?): String? {
         if (reading == IN_PHRASE) return null
+        // The meaning the sentence chose (durmientes near «rieles»: «шпала»).
+        com.hanreader.app.lang.ContextRules.chosen(reading)?.let { return it }
         // The first word of a phrase: the meaning of the phrase (trajeron cola: «вызвать последствия»).
         val e = pick(word, reading) ?: return null
         // A name with no Russian meaning (Gustavo «a male given name»): no hint.
@@ -425,7 +460,11 @@ class EsEngine(
 
     override fun cardTranslation(word: String, reading: String?): String? {
         val e = pick(word, reading) ?: return null
-        return (senses(e).ifEmpty { e.en }).take(2).joinToString("; ").ifEmpty { null }
+        val chosen = com.hanreader.app.lang.ContextRules.chosen(reading)
+        val senses = senses(e).ifEmpty { e.en }
+        // The meaning the sentence chose first, then the dictionary's main one.
+        if (chosen != null) return (listOf(chosen) + senses.filter { it != chosen }).take(2).joinToString("; ")
+        return senses.take(2).joinToString("; ").ifEmpty { null }
     }
 
     /**
@@ -631,12 +670,13 @@ class EsEngine(
         /** Reflexive pronouns: «me di cuenta» reads as darse cuenta. */
         private val REFLEXIVE = setOf("me", "te", "se", "nos", "os")
 
-        fun load(dict: java.io.InputStream, forms: java.io.InputStream, grammar: java.io.InputStream): EsEngine {
+        fun load(dict: java.io.InputStream, forms: java.io.InputStream, grammar: java.io.InputStream, context: java.io.InputStream? = null): EsEngine {
             val t = System.nanoTime()
             val d = SortedTsv.read(dict)
             val f = SortedTsv.read(forms)
             val g = grammar.bufferedReader().use { it.readLines() }
-            return EsEngine(d, f, g, (System.nanoTime() - t) / 1_000_000)
+            val r = context?.bufferedReader()?.useLines { com.hanreader.app.lang.ContextRules.parse(it) } ?: com.hanreader.app.lang.ContextRules.EMPTY
+            return EsEngine(d, f, g, (System.nanoTime() - t) / 1_000_000, r)
         }
 
         /**
@@ -680,7 +720,9 @@ class EsEngine(
                         val dict = mapped(app, "dict.tsv")
                         val forms = mapped(app, "forms.tsv")
                         val grammar = app.assets.open("es/grammar.tsv").bufferedReader().use { it.readLines() }
-                        EsEngine(dict, forms, grammar, (System.nanoTime() - t) / 1_000_000)
+                        val rules = runCatching { app.assets.open("es/context.tsv").bufferedReader().useLines { com.hanreader.app.lang.ContextRules.parse(it) } }
+                            .getOrDefault(com.hanreader.app.lang.ContextRules.EMPTY)
+                        EsEngine(dict, forms, grammar, (System.nanoTime() - t) / 1_000_000, rules)
                     }.fold({ d.complete(it) }, { d.completeExceptionally(it) })
                 }
                 return d

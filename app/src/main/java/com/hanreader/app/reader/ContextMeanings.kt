@@ -27,7 +27,7 @@ object ContextMeanings {
     /** The key a word on the page has in its book: what the context chose for it. */
     fun keyOf(t: RToken, engine: LanguageModule): String = when {
         engine is ZhEngine -> t.text
-        t.pinyin.isNotEmpty() && t.pinyin != com.hanreader.app.lang.IN_PHRASE -> t.pinyin
+        t.pinyin.isNotEmpty() && t.pinyin != com.hanreader.app.lang.IN_PHRASE -> com.hanreader.app.lang.ContextRules.key(t.pinyin)
         else -> engine.lemma(t.text)
     }
 

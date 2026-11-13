@@ -1,0 +1,9 @@
+# Meanings chosen by the words around (see lang/ContextRules.kt).
+# lemma	conditions (near:a,b · after:a b · before:a b · next:a · after-verb; joined by " & ")	meaning	note
+#
+# 13.11.2026 — J. J. Arreola «El guardagujas»
+durmiente	near:riel,rieles,tren,trenes,vía,vías,rueda,ruedas,vagón,vagones,ferrocarril,locomotora,estación	шпала	ж.-д. рассказ
+lamentablemente	after-verb	плачевно, жалко	после глагола — как именно, а не «к сожалению»
+templar	after:ánimo	закалять (дух)	templar el ánimo
+expediente	before:mano de	уловка, средство	echar mano de expedientes
+tratar	next:a	общаться, обращаться (с кем-то)	tratar a alguien

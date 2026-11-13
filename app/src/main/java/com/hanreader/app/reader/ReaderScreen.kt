@@ -1502,7 +1502,9 @@ private fun WordSheet(
             com.hanreader.app.zh.Palladius.name(syllables, ChineseNames.isSurname(word[0]) && word.length in 2..4)?.let { "$it (имя)" }
         }
     }
-    val translation = userMeaning ?: nameInRussian ?: (if (zh == null) engine.cardTranslation(word, es.firstOrNull()?.entry?.key) else engine.cardTranslation(word, pageReading))
+    // A language with an alphabet: the reading the sentence chose (with its meaning, «durmiente#шпала»), else the card's first.
+    val alphaReading = first.pinyin.takeIf { selection.first == selection.last && '#' in it } ?: es.firstOrNull()?.entry?.key
+    val translation = userMeaning ?: nameInRussian ?: (if (zh == null) engine.cardTranslation(word, alphaReading) else engine.cardTranslation(word, pageReading))
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
     var status by remember(word) { mutableStateOf<String?>(null) }

@@ -348,7 +348,8 @@ class EsEngineTest {
     companion object {
         fun load(): EsEngine {
             val dir = File("src/main/assets/es")
-            return EsEngine.load(File(dir, "dict.tsv").inputStream(), File(dir, "forms.tsv").inputStream(), File(dir, "grammar.tsv").inputStream())
+            return EsEngine.load(File(dir, "dict.tsv").inputStream(), File(dir, "forms.tsv").inputStream(), File(dir, "grammar.tsv").inputStream(),
+                File(dir, "context.tsv").takeIf { it.isFile }?.inputStream())
         }
     }
 }
