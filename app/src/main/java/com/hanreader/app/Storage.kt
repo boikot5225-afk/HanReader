@@ -92,26 +92,34 @@ data class BookEntity(
     val charOffset: Int = 0
 )
 
-/** A word the reader marked «Это имя»: never taught, never underlined, kept whole by the segmenter. */
-@Entity(tableName = "user_names")
+/**
+ * A word the reader marked «Это имя»: never taught, never underlined, kept whole by the segmenter.
+ * [language] is the tag of the language it was marked in (Spanish «Sara» is not an English name).
+ */
+@Entity(tableName = "user_names", primaryKeys = ["language", "word"])
 data class UserName(
-    @PrimaryKey val word: String,
-    val addedAt: Long = System.currentTimeMillis()
+    val word: String,
+    val addedAt: Long = System.currentTimeMillis(),
+    val language: String = com.hanreader.app.lang.Languages.CHINESE.tag
 )
 
 @Dao
 interface UserNameDao {
-    @Query("SELECT word FROM user_names")
-    fun observeWords(): Flow<List<String>>
+    @Query("SELECT word FROM user_names WHERE language = :language")
+    fun observeWords(language: String): Flow<List<String>>
 
-    @Query("SELECT * FROM user_names ORDER BY word")
+    /** Every language's names (backup). */
+    @Query("SELECT * FROM user_names ORDER BY language, word")
     suspend fun all(): List<UserName>
+
+    @Query("SELECT * FROM user_names WHERE language = :language ORDER BY word")
+    suspend fun allIn(language: String): List<UserName>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun put(n: UserName)
 
-    @Query("DELETE FROM user_names WHERE word = :word")
-    suspend fun remove(word: String)
+    @Query("DELETE FROM user_names WHERE language = :language AND word = :word")
+    suspend fun remove(language: String, word: String)
 
     @Query("DELETE FROM user_names")
     suspend fun removeAll()
@@ -296,20 +304,33 @@ interface UserSplitDao {
     suspend fun removeAll()
 }
 
-/** The reader's own meaning of a word: shown first, used over the word and on its card. */
-@Entity(tableName = "user_meanings")
+/**
+ * The reader's own meaning of a word: shown first, used over the word and on its card. A meaning for
+ * every book belongs to its [language] (Spanish «red» — «сеть», English «red» — «красный»); one for a
+ * place or a book (keys «@<book>|…», see [com.hanreader.app.reader.ContextMeanings]) has language "":
+ * its book has one language.
+ */
+@Entity(tableName = "user_meanings", primaryKeys = ["language", "word"])
 data class UserMeaning(
-    @PrimaryKey val word: String,
+    val word: String,
     val meaning: String,
-    val updatedAt: Long = System.currentTimeMillis()
-)
+    val updatedAt: Long = System.currentTimeMillis(),
+    val language: String = com.hanreader.app.lang.Languages.CHINESE.tag
+) {
+    companion object {
+        /** The language a meaning under [key] is kept in: "" for a place or a book, else [language]. */
+        fun languageOf(key: String, language: String): String = if (key.startsWith("@")) "" else language
+    }
+}
 
 @Dao
 interface UserMeaningDao {
-    @Query("SELECT * FROM user_meanings")
-    fun observeAll(): Flow<List<UserMeaning>>
+    /** The meanings of [language] and those of places and books. */
+    @Query("SELECT * FROM user_meanings WHERE language = :language OR language = ''")
+    fun observeAll(language: String): Flow<List<UserMeaning>>
 
-    @Query("SELECT * FROM user_meanings ORDER BY word")
+    /** Every language's meanings (backup). */
+    @Query("SELECT * FROM user_meanings ORDER BY language, word")
     suspend fun all(): List<UserMeaning>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -318,8 +339,8 @@ interface UserMeaningDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putAll(list: List<UserMeaning>)
 
-    @Query("DELETE FROM user_meanings WHERE word = :word")
-    suspend fun remove(word: String)
+    @Query("DELETE FROM user_meanings WHERE language = :language AND word = :word")
+    suspend fun remove(language: String, word: String)
 
     @Query("DELETE FROM user_meanings")
     suspend fun removeAll()
@@ -380,27 +401,30 @@ data class WordSource(
  * A word the reader treats as known: no pinyin in "unknown only" mode, not counted as new.
  * [source] is "manual" (tapped «Знаю») or "hsk3:N" / "hsk2:N" (bulk-marked by level).
  */
-@Entity(tableName = "known_words")
+@Entity(tableName = "known_words", primaryKeys = ["language", "word"])
 data class KnownWord(
-    @PrimaryKey val word: String,
+    val word: String,
     val source: String,
-    val addedAt: Long = System.currentTimeMillis()
+    val addedAt: Long = System.currentTimeMillis(),
+    /** The tag of the language it was marked in: Spanish «come» known is not English «come» known. */
+    val language: String = com.hanreader.app.lang.Languages.CHINESE.tag
 )
 
 @Dao
 interface KnownWordDao {
-    /** Words marked known (by hand or by level); not the ones marked «Не знаю». */
-    @Query("SELECT word FROM known_words WHERE source != 'unknown'")
-    fun observeWords(): Flow<List<String>>
+    /** Words of [language] marked known (by hand or by level); not the ones marked «Не знаю». */
+    @Query("SELECT word FROM known_words WHERE language = :language AND source != 'unknown'")
+    fun observeWords(language: String): Flow<List<String>>
 
-    /** Words marked «Не знаю»: unknown whatever the level, cards or parts say. */
-    @Query("SELECT word FROM known_words WHERE source = 'unknown'")
-    fun observeUnknown(): Flow<List<String>>
+    /** Words of [language] marked «Не знаю»: unknown whatever the level, cards or parts say. */
+    @Query("SELECT word FROM known_words WHERE language = :language AND source = 'unknown'")
+    fun observeUnknown(language: String): Flow<List<String>>
 
-    @Query("SELECT * FROM known_words WHERE word = :word")
-    fun observe(word: String): Flow<KnownWord?>
+    @Query("SELECT * FROM known_words WHERE language = :language AND word = :word")
+    fun observe(language: String, word: String): Flow<KnownWord?>
 
-    @Query("SELECT * FROM known_words ORDER BY word")
+    /** Every language's marks (backup). */
+    @Query("SELECT * FROM known_words ORDER BY language, word")
     suspend fun all(): List<KnownWord>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -410,10 +434,10 @@ interface KnownWordDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun putAllIfAbsent(words: List<KnownWord>): List<Long>
 
-    @Query("DELETE FROM known_words WHERE word = :word")
-    suspend fun remove(word: String)
+    @Query("DELETE FROM known_words WHERE language = :language AND word = :word")
+    suspend fun remove(language: String, word: String)
 
-    @Query("DELETE FROM known_words WHERE source LIKE 'hsk%'")
+    @Query("DELETE FROM known_words WHERE language = 'zh-CN' AND source LIKE 'hsk%'")
     suspend fun removeLevelMarks()
 
     @Query("DELETE FROM known_words")
@@ -429,13 +453,13 @@ interface KnownWordDao {
         return putAllIfAbsent(words).count { it > 0 }
     }
 
-    @Query("DELETE FROM known_words WHERE source LIKE :prefix || '%'")
-    suspend fun removeMarksStartingWith(prefix: String)
+    @Query("DELETE FROM known_words WHERE language = :language AND source LIKE :prefix || '%'")
+    suspend fun removeMarksStartingWith(language: String, prefix: String)
 
-    /** Level marks of another language ([prefix] "es-ES:"): replaced, the Chinese HSK marks stay. */
+    /** Level marks of another language ([prefix] "es-ES:", its tag): replaced, other languages' marks stay. */
     @Transaction
     suspend fun setLevelMarks(words: List<KnownWord>, prefix: String): Int {
-        removeMarksStartingWith(prefix)
+        removeMarksStartingWith(prefix.removeSuffix(":"), prefix)
         return putAllIfAbsent(words).count { it > 0 }
     }
 
@@ -727,13 +751,13 @@ interface CardDao {
 // so no database of version 3 exists under this name; Lexicon data arrives through backups.
 // Version 5 (0.2.0): known_words. Schemas are exported to app/schemas for migration checks.
 // Version 6 (0.3.0): book_words and books.analyzedTokens (book vocabulary analysis).
-// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names. Version 9 (0.9.9): books.charOffset. Version 10 (0.10.0): highlights. Version 11 (0.13.0): daily_activity, book_progress. Version 12 (0.15.0): user_meanings. Version 13 (0.17.1): user_splits.
+// Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names. Version 9 (0.9.9): books.charOffset. Version 10 (0.10.0): highlights. Version 11 (0.13.0): daily_activity, book_progress. Version 12 (0.15.0): user_meanings. Version 13 (0.17.1): user_splits. Version 14 (0.24.2): language of known_words, user_names, user_meanings.
 @Database(
     entities = [
         WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
         Bookmark::class, UserName::class, Highlight::class, DailyActivity::class, BookProgress::class, UserMeaning::class, UserSplit::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
@@ -880,7 +904,50 @@ abstract class LexiconDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+        /**
+         * Marks, names and meanings get the language they belong to: a word with Chinese characters
+         * is Chinese, any other one Spanish (the only other language before 14); a meaning of a
+         * place or a book («@…») has none.
+         */
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                fun languageOf(word: String) = com.hanreader.app.lang.Languages.legacyOf(word)
+                db.execSQL("CREATE TABLE `known_words_new` (`word` TEXT NOT NULL, `source` TEXT NOT NULL, `addedAt` INTEGER NOT NULL, `language` TEXT NOT NULL, PRIMARY KEY(`language`, `word`))")
+                db.query("SELECT word, source, addedAt FROM known_words").use { c ->
+                    while (c.moveToNext()) {
+                        val w = c.getString(0)
+                        db.execSQL("INSERT OR REPLACE INTO known_words_new (word, source, addedAt, language) VALUES (?, ?, ?, ?)",
+                            arrayOf<Any>(w, c.getString(1), c.getLong(2), languageOf(w)))
+                    }
+                }
+                db.execSQL("DROP TABLE known_words")
+                db.execSQL("ALTER TABLE known_words_new RENAME TO known_words")
+
+                db.execSQL("CREATE TABLE `user_names_new` (`word` TEXT NOT NULL, `addedAt` INTEGER NOT NULL, `language` TEXT NOT NULL, PRIMARY KEY(`language`, `word`))")
+                db.query("SELECT word, addedAt FROM user_names").use { c ->
+                    while (c.moveToNext()) {
+                        val w = c.getString(0)
+                        db.execSQL("INSERT OR REPLACE INTO user_names_new (word, addedAt, language) VALUES (?, ?, ?)",
+                            arrayOf<Any>(w, c.getLong(1), languageOf(w)))
+                    }
+                }
+                db.execSQL("DROP TABLE user_names")
+                db.execSQL("ALTER TABLE user_names_new RENAME TO user_names")
+
+                db.execSQL("CREATE TABLE `user_meanings_new` (`word` TEXT NOT NULL, `meaning` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `language` TEXT NOT NULL, PRIMARY KEY(`language`, `word`))")
+                db.query("SELECT word, meaning, updatedAt FROM user_meanings").use { c ->
+                    while (c.moveToNext()) {
+                        val w = c.getString(0)
+                        db.execSQL("INSERT OR REPLACE INTO user_meanings_new (word, meaning, updatedAt, language) VALUES (?, ?, ?, ?)",
+                            arrayOf<Any>(w, c.getString(1), c.getLong(2), UserMeaning.languageOf(w, languageOf(w))))
+                    }
+                }
+                db.execSQL("DROP TABLE user_meanings")
+                db.execSQL("ALTER TABLE user_meanings_new RENAME TO user_meanings")
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {

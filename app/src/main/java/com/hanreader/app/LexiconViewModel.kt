@@ -130,7 +130,7 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                     examples = dao.allExamples(),
                     settings = com.hanreader.app.lang.Languages.ALL.map { settingsStore.load(it.tag) },
                     knownWords = knownDao.all(),
-                    userNames = db.userNameDao().all().map { it.word },
+                    userNames = db.userNameDao().all(),
                     sources = dao.allSources(),
                     library = LibraryBackup(
                         books = db.bookDao().all(),
@@ -215,7 +215,7 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                     backup.userNames?.let { names ->
                         val dao = LexiconDatabase.get(getApplication()).userNameDao()
                         dao.removeAll()
-                        dao.putAll(names.map { UserName(it) })
+                        dao.putAll(names)
                     }
                 }
                 backup.library?.let { lib ->

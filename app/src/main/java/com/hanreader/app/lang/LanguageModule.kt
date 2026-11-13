@@ -222,6 +222,12 @@ object Languages {
         tags.mapNotNull { t -> ALL.firstOrNull { it.tag.substringBefore('-') == t } }.distinct().ifEmpty { ALL }
     }
 
+    /**
+     * The language of a stored word from before words carried one (marks, names, meanings, old
+     * backups): Chinese if it has a Chinese character, else Spanish, the only other language then.
+     */
+    fun legacyOf(word: String): String = if (word.any { it.isHan() }) CHINESE.tag else SPANISH.tag
+
     /** The language a book or setting falls back to: the app's first one. */
     val default: LanguageInfo get() = AVAILABLE.first()
 

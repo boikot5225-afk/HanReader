@@ -77,9 +77,14 @@ class NamesTest {
 
     @Test
     fun backupKeepsUserNames() {
-        val b = Backup(1, emptyList(), emptyList(), emptyList(), null, listOf("雷蒙德", "莉娜"))
-        assertEquals(listOf("雷蒙德", "莉娜"), BackupFormat.decode(BackupFormat.encode(b)).userNames)
+        val names = listOf(com.hanreader.app.UserName("雷蒙德", 1, "zh-CN"), com.hanreader.app.UserName("Sara", 2, "es-ES"))
+        val b = Backup(1, emptyList(), emptyList(), emptyList(), null, names)
+        assertEquals(names, BackupFormat.decode(BackupFormat.encode(b)).userNames)
         assertNull(BackupFormat.decode(BackupFormat.encode(b.copy(userNames = null))).userNames)
+        // A copy from before languages: names are plain strings, their language comes from the script.
+        val old = BackupFormat.encode(b.copy(userNames = null)).replace("\"version\":3", "\"version\":2")
+            .replace("\"cards\"", "\"userNames\":[\"莉娜\",\"Lima\"],\"cards\"")
+        assertEquals(listOf("zh-CN" to "莉娜", "es-ES" to "Lima"), BackupFormat.decode(old).userNames!!.map { it.language to it.word })
     }
 
     @Test

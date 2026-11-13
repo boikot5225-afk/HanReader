@@ -12,8 +12,8 @@ data class Backup(
     val settings: List<LearningSettings>,
     /** HanReader: known words. Null when the file has none (Lexicon backups): restoring keeps the current ones. */
     val knownWords: List<KnownWord>? = null,
-    /** HanReader: words marked «Это имя». Null when the file has none: restoring keeps the current ones. */
-    val userNames: List<String>? = null,
+    /** HanReader: words marked «Это имя», each with its language. Null when the file has none: restoring keeps the current ones. */
+    val userNames: List<UserName>? = null,
     /** HanReader: where saved words were met. Null in older files: restoring keeps none (they belong to the cards). */
     val sources: List<WordSource>? = null,
     /** HanReader: the library. Null in older files and word-only copies: restoring keeps the current books. */
@@ -49,7 +49,8 @@ class BackupFormatException(message: String) : Exception(message)
 object BackupFormat {
     private const val FORMAT = "lexicon-backup"
     /** 2: HanReader library, word sources. Version 1 files still restore. */
-    const val VERSION = 2
+    /** 3 (0.24.2): known words, names and meanings carry their language. */
+    const val VERSION = 3
 
     fun encode(backup: Backup): String {
         val root = JSONObject()
@@ -105,11 +106,16 @@ object BackupFormat {
                         put("word", k.word)
                         put("source", k.source)
                         put("addedAt", k.addedAt)
+                        put("language", k.language)
                     })
                 }
             })
         }
-        backup.userNames?.let { names -> root.put("userNames", JSONArray().apply { names.forEach { put(it) } }) }
+        backup.userNames?.let { names ->
+            root.put("userNames", JSONArray().apply {
+                names.forEach { n -> put(JSONObject().apply { put("word", n.word); put("language", n.language); put("addedAt", n.addedAt) }) }
+            })
+        }
         backup.sources?.let { list ->
             root.put("sources", JSONArray().apply {
                 list.forEach { w ->
@@ -160,7 +166,7 @@ object BackupFormat {
         }
         backup.userMeanings?.let { list ->
             root.put("userMeanings", JSONArray().apply {
-                list.forEach { m -> put(JSONObject().apply { put("word", m.word); put("meaning", m.meaning); put("updatedAt", m.updatedAt) }) }
+                list.forEach { m -> put(JSONObject().apply { put("word", m.word); put("meaning", m.meaning); put("updatedAt", m.updatedAt); put("language", m.language) }) }
             })
         }
         backup.userSplits?.let { list -> root.put("userSplits", JSONArray().apply { list.forEach { put(it) } }) }
@@ -239,11 +245,20 @@ object BackupFormat {
             val known = knownJson?.let { arr ->
                 (0 until arr.length()).map { i ->
                     val k = arr.getJSONObject(i)
-                    KnownWord(k.getString("word"), k.optString("source", "manual"), k.optLong("addedAt", 0L))
-                }.filter { it.word.isNotBlank() }.distinctBy { it.word }
+                    val w = k.getString("word")
+                    // Copies before version 3 have no language: Chinese characters or Spanish, as on update.
+                    KnownWord(w, k.optString("source", "manual"), k.optLong("addedAt", 0L),
+                        k.optString("language", "").ifEmpty { com.hanreader.app.lang.Languages.legacyOf(w) })
+                }.filter { it.word.isNotBlank() }.distinctBy { it.language to it.word }
             }
             val names = root.optJSONArray("userNames")?.let { arr ->
-                (0 until arr.length()).map { arr.getString(it).trim() }.filter { it.isNotEmpty() }.distinct()
+                (0 until arr.length()).map { i ->
+                    // Before version 3 a name is a plain string.
+                    val o = arr.optJSONObject(i)
+                    val w = (o?.getString("word") ?: arr.getString(i)).trim()
+                    UserName(w, o?.optLong("addedAt", 0L) ?: 0L,
+                        o?.optString("language", "")?.ifEmpty { null } ?: com.hanreader.app.lang.Languages.legacyOf(w))
+                }.filter { it.word.isNotEmpty() }.distinctBy { it.language to it.word }
             }
             val sources = root.optJSONArray("sources")?.let { arr ->
                 val ids = cards.mapTo(HashSet()) { it.id }
@@ -266,8 +281,11 @@ object BackupFormat {
             val meanings = root.optJSONArray("userMeanings")?.let { arr ->
                 (0 until arr.length()).map { i ->
                     val m = arr.getJSONObject(i)
-                    UserMeaning(m.getString("word"), m.getString("meaning"), m.optLong("updatedAt", 0L))
-                }.filter { it.word.isNotBlank() && it.meaning.isNotBlank() }.distinctBy { it.word }
+                    val w = m.getString("word")
+                    val language = if (m.has("language")) m.getString("language")
+                        else UserMeaning.languageOf(w, com.hanreader.app.lang.Languages.legacyOf(w))
+                    UserMeaning(w, m.getString("meaning"), m.optLong("updatedAt", 0L), language)
+                }.filter { it.word.isNotBlank() && it.meaning.isNotBlank() }.distinctBy { it.language to it.word }
             }
             val splits = root.optJSONArray("userSplits")?.let { arr ->
                 (0 until arr.length()).map { arr.getString(it).trim() }.filter { it.length >= 2 }.distinct()

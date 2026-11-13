@@ -62,6 +62,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val books = db.bookDao()
     private val cards = db.cardDao()
     private val knownDao = db.knownWordDao()
+    /** The tag of the language being read: marks, names and meanings are kept per language. */
+    private val lang = com.hanreader.app.lang.Languages.current.tag
     private val prefs = app.getSharedPreferences("reader_settings", android.content.Context.MODE_PRIVATE)
     private val engineDeferred = com.hanreader.app.lang.LanguageEngines.warmUp(app)
     /** The dictionary alone: chapters, analysis and search need nothing more and start at once. */
@@ -92,17 +94,15 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     /** Words marked «Знаю» by hand or by HSK level. */
-    val markedKnown: StateFlow<Set<String>> = knownDao.observeWords()
+    val markedKnown: StateFlow<Set<String>> = knownDao.observeWords(lang)
         .map { it.toHashSet() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     /** Everything the reader treats as known: marked words plus cards learned in reviews (30+ days). */
-    val knownWords: StateFlow<Set<String>> = combine(knownDao.observeWords(), knownDao.observeUnknown(), studyCards) { marked, unknown, list ->
-        // The marks of every language share one table: only the current language's words count here.
-        val own = com.hanreader.app.lang.Languages.current.ownsWord
-        val no = unknown.filterTo(HashSet()) { own(it) }
+    val knownWords: StateFlow<Set<String>> = combine(knownDao.observeWords(lang), knownDao.observeUnknown(lang), studyCards) { marked, unknown, list ->
+        val no = unknown.toHashSet()
         val words = HashSet<String>(marked.size + list.size).apply {
-            marked.filterTo(this) { own(it) }
+            addAll(marked)
             list.filter { it.isLearned() }.forEach { add(it.word) }
             removeAll(no)
         }
@@ -110,7 +110,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     /** How [word] is marked: "manual", "hsk3:4", "unknown"... or null. */
-    fun knownMark(word: String) = knownDao.observe(word)
+    fun knownMark(word: String) = knownDao.observe(lang, word)
 
     private val _pinyinMode = MutableStateFlow(
         PinyinMode.entries.firstOrNull { it.name == prefs.getString("pinyin", null) } ?: PinyinMode.ALL
@@ -135,18 +135,18 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     /** «Знаю» / «Не знаю»: both override the level, the cards and the word's parts. */
     fun setKnown(word: String, known: Boolean) {
-        viewModelScope.launch { knownDao.put(KnownWord(word, if (known) "manual" else UNKNOWN)) }
+        viewModelScope.launch { knownDao.put(KnownWord(word, if (known) "manual" else UNKNOWN, language = lang)) }
     }
 
     /** Removes the reader's own mark: the word is known again only if the chosen level has it. */
     fun clearKnown(word: String) {
         viewModelScope.launch {
-            knownDao.remove(word)
+            knownDao.remove(lang, word)
             val mark = _levelMark.value
             if (mark.level == 0) return@launch
             val engine = runCatching { engineDeferred.await() }.getOrNull() as? ZhEngine ?: return@launch
             val inLevel = withContext(Dispatchers.Default) { levelWords(engine, mark.system, mark.level).contains(word) }
-            if (inLevel) knownDao.put(KnownWord(word, levelTag(mark.system, mark.level)))
+            if (inLevel) knownDao.put(KnownWord(word, levelTag(mark.system, mark.level), language = lang))
         }
     }
 
@@ -175,7 +175,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     val levels = any.levels ?: throw IllegalStateException("У этого языка нет уровней")
                     val prefix = com.hanreader.app.lang.Languages.current.tag + ":"
                     val words = if (level == 0) emptySet() else withContext(Dispatchers.Default) { levels.knownAt(level) }
-                    val added = knownDao.setLevelMarks(words.map { KnownWord(it, prefix + level) }, prefix)
+                    val added = knownDao.setLevelMarks(words.map { KnownWord(it, prefix + level, language = lang) }, prefix)
                     _levelMark.value = LevelMark(system, level)
                     prefs.edit().putInt(levelKey, level).apply()
                     return@runCatching added
@@ -183,7 +183,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 val engine = any
                 val words = withContext(Dispatchers.Default) { levelWords(engine, system, level) }
                 val tag = levelTag(system, level)
-                val added = knownDao.setLevelMarks(words.map { KnownWord(it, tag) })
+                val added = knownDao.setLevelMarks(words.map { KnownWord(it, tag, language = lang) })
                 _levelMark.value = LevelMark(system, level)
                 prefs.edit().putString("hskSystem", system.name).putInt("hskLevel", level)
                     .putInt("hskData", HSK_DATA_VERSION).apply()
@@ -513,12 +513,12 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val userNameDao = db.userNameDao()
 
     /** Words the reader marked «Это имя». */
-    val userNames: StateFlow<Set<String>> = userNameDao.observeWords().map { it.toHashSet() as Set<String> }
+    val userNames: StateFlow<Set<String>> = userNameDao.observeWords(lang).map { it.toHashSet() as Set<String> }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     /** Names the segmenter keeps as one word: the reader's own and the ones found in this book. */
     private suspend fun namesToKeepWhole(bookId: Long): Set<String> {
-        val own = userNameDao.all().map { it.word }
+        val own = userNameDao.allIn(lang).map { it.word }
         val found = books.ignoredWords(bookId)
         return (own + found).filterTo(HashSet()) { it.length in 2..8 && it.all { c -> com.hanreader.app.lang.Languages.current.isWordChar(c) } }
     }
@@ -526,7 +526,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     /** Marks or unmarks [word] as a name; the chapter is rebuilt so the name stays whole. */
     fun setUserName(word: String, isName: Boolean) {
         viewModelScope.launch {
-            if (isName) userNameDao.put(com.hanreader.app.UserName(word)) else userNameDao.remove(word)
+            if (isName) userNameDao.put(com.hanreader.app.UserName(word, language = lang)) else userNameDao.remove(lang, word)
             _open.value?.let { rebuildOpenChapter(it) }
         }
     }
@@ -656,7 +656,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** The reader's own meanings of words (word -> meaning). */
-    val userMeanings: StateFlow<Map<String, String>> = meaningDao.observeAll()
+    val userMeanings: StateFlow<Map<String, String>> = meaningDao.observeAll(lang)
         .map { list -> list.associate { it.word to it.meaning } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
@@ -664,7 +664,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     fun setUserMeaning(word: String, meaning: String) {
         val m = meaning.trim()
         viewModelScope.launch {
-            if (m.isEmpty()) meaningDao.remove(word) else meaningDao.put(com.hanreader.app.UserMeaning(word, m))
+            val l = com.hanreader.app.UserMeaning.languageOf(word, lang)
+            if (m.isEmpty()) meaningDao.remove(l, word) else meaningDao.put(com.hanreader.app.UserMeaning(word, m, language = l))
         }
     }
 

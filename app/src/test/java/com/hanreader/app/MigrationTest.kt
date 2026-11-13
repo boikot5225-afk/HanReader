@@ -115,7 +115,58 @@ class MigrationTest {
             assertEquals(listOf("雷蒙德"), db.userNameDao().all().map { it.word })
             assertEquals(emptyList<String>(), db.bookDao().ignoredWords(7)) // cascade
         }
-        assertEquals(13, db.openHelper.readableDatabase.version)
+        assertEquals(14, db.openHelper.readableDatabase.version)
+        db.close()
+    }
+
+    /** A database from just before languages (v13) with Chinese and Spanish marks, names and meanings. */
+    private fun createV13(file: File) {
+        val schema = JSONObject(File("schemas/com.hanreader.app.LexiconDatabase/13.json").readText()).getJSONObject("database")
+        val db = SQLiteDatabase.openOrCreateDatabase(file, null)
+        val entities = schema.getJSONArray("entities")
+        for (i in 0 until entities.length()) {
+            val e = entities.getJSONObject(i)
+            val table = e.getString("tableName")
+            db.execSQL(e.getString("createSql").replace("\${TABLE_NAME}", table))
+            val indices = e.optJSONArray("indices") ?: continue
+            for (k in 0 until indices.length()) db.execSQL(indices.getJSONObject(k).getString("createSql").replace("\${TABLE_NAME}", table))
+        }
+        db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '${schema.getString("identityHash")}')")
+        db.execSQL("INSERT INTO known_words (word, source, addedAt) VALUES ('我', 'hsk3:1', 1), ('come', 'manual', 2), ('red', 'es-ES:2', 3), ('阿Q', 'unknown', 4)")
+        db.execSQL("INSERT INTO user_names (word, addedAt) VALUES ('雷蒙德', 1), ('Sara', 2)")
+        db.execSQL("INSERT INTO user_meanings (word, meaning, updatedAt) VALUES ('端', 'держать', 1), ('red', 'сеть', 2), ('@7|b|limitarse', 'ограничиваться', 3)")
+        db.version = 13
+        db.close()
+    }
+
+    @Test
+    fun wordsGetTheirLanguage() {
+        val file = app.getDatabasePath("migration-13.db")
+        file.parentFile?.mkdirs()
+        file.delete()
+        createV13(file)
+        val db = Room.databaseBuilder(app, LexiconDatabase::class.java, file.name)
+            .addMigrations(*LexiconDatabase.MIGRATIONS).allowMainThreadQueries().build()
+        runBlocking {
+            val known = db.knownWordDao().all().associate { it.word to it.language }
+            assertEquals(mapOf("我" to "zh-CN", "come" to "es-ES", "red" to "es-ES", "阿Q" to "zh-CN"), known)
+            assertEquals(setOf("come", "red"), db.knownWordDao().observeWords("es-ES").first().toSet())
+            assertEquals(listOf("我"), db.knownWordDao().observeWords("zh-CN").first())
+            assertEquals(listOf("阿Q"), db.knownWordDao().observeUnknown("zh-CN").first())
+            // Another language with an alphabet sees none of them: English «come» is not Spanish «come».
+            assertEquals(emptyList<String>(), db.knownWordDao().observeWords("en-US").first())
+            db.knownWordDao().put(KnownWord("come", "manual", language = "en-US"))
+            assertEquals(2, db.knownWordDao().all().count { it.word == "come" })
+
+            assertEquals(mapOf("雷蒙德" to "zh-CN", "Sara" to "es-ES"), db.userNameDao().all().associate { it.word to it.language })
+            val meanings = db.userMeaningDao().all().associate { it.word to it.language }
+            assertEquals(mapOf("端" to "zh-CN", "red" to "es-ES", "@7|b|limitarse" to ""), meanings)
+            // Spanish sees its meanings and the book's; Chinese sees its own and the book's (its key is a book's).
+            assertEquals(setOf("red", "@7|b|limitarse"), db.userMeaningDao().observeAll("es-ES").first().map { it.word }.toSet())
+            assertEquals(setOf("端", "@7|b|limitarse"), db.userMeaningDao().observeAll("zh-CN").first().map { it.word }.toSet())
+        }
+        assertEquals(14, db.openHelper.readableDatabase.version)
         db.close()
     }
 }
