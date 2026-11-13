@@ -102,6 +102,10 @@ object ChineseNames {
     private const val STOP = "曰云说道笑问想看的了是在有也都和就不走来去把被给对叫让听又还才等们着过得地很太最更要会能可这那你我他她它一二三两几上下里中大小多少好与及或而但却便即将已曾正没别吗呢吧啊呀哦嗯哈之其所以为从到向往跟同比像如若虽因由站坐跑拿带见点摇叹喊哭答接转回忙急只再先刚才连并且则乃亦家人们"
     private const val BEFORE_MEASURE = "一二三四五六七八九十两几每这那哪半"
 
+    /** A Chinese surname: a name starting with it is written «Фамилия Имя» in Russian (罗飞 «Ло Фэй»). */
+    fun isSurname(c: Char): Boolean = c in PLAIN || c in COMMON || c in OTHER_SURNAMES
+    private const val OTHER_SURNAMES = "韩尹熊孟柳彭郑薛邓邹袁曾欧司上诸端皇令慕宇夏"
+
     /**
      * Name candidates of one paragraph: for each surname token followed by single-character
      * tokens, the two-character candidate and the three-character one (either may be null).

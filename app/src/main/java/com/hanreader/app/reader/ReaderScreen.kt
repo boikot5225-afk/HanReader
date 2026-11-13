@@ -740,6 +740,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 if (eng == null || eng is ZhEngine) byLemma else chapterWords.mapNotNull { w -> byLemma[eng.lemma(w)]?.let { w to it } }.toMap() + byLemma
             },
             userNames = userNames,
+            bookNames = names,
             onUserName = { w, on -> vm.setUserName(w, on); selection = null },
             doubtSource = book.entity.title + " · " + chapter.title,
             onSave = { word, reading, translation, sentence, done ->
@@ -1448,6 +1449,8 @@ private fun WordSheet(
     onSave: (String, String, String, String, (Result<Boolean>) -> Unit) -> Unit,
     recommendations: Map<String, Recommendation> = emptyMap(),
     userNames: Set<String> = emptySet(),
+    /** Names the book analysis found (and the reader marked): their card gives the name in Russian. */
+    bookNames: Set<String> = emptySet(),
     onUserName: (String, Boolean) -> Unit = { _, _ -> },
     /** Where the word stands, for a doubted translation: «El narco · 5. Magnates». */
     doubtSource: String = ""
@@ -1501,7 +1504,15 @@ private fun WordSheet(
     }
     val own = MeaningScope.entries.firstNotNullOfOrNull { sc -> userMeanings[meaningKeys.getValue(sc)]?.let { sc to it } }
     val userMeaning = own?.second
-    val translation = userMeaning ?: (if (zh == null) engine.cardTranslation(word, es.firstOrNull()?.entry?.key) else engine.cardTranslation(word, pageReading))
+    // A name without a Russian meaning: the name in Russian letters (罗飞 «Ло Фэй (имя)»), not its characters' meanings.
+    val nameInRussian = remember(word) {
+        if (zh == null || russian.isNotEmpty() || (word !in bookNames && word !in userNames && zh.nameKind(word) == null)) null
+        else {
+            val syllables = tokens.subList(selection.first, selection.last + 1).flatMap { t -> t.syllables.ifEmpty { t.pinyin.split(' ') } }
+            com.hanreader.app.zh.Palladius.name(syllables, ChineseNames.isSurname(word[0]) && word.length in 2..4)?.let { "$it (имя)" }
+        }
+    }
+    val translation = userMeaning ?: nameInRussian ?: (if (zh == null) engine.cardTranslation(word, es.firstOrNull()?.entry?.key) else engine.cardTranslation(word, pageReading))
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
     var status by remember(word) { mutableStateOf<String?>(null) }
