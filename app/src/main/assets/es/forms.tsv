@@ -76416,7 +76416,7 @@ basquetbolísticas	basquetbolístico:2
 basquetbolísticos	basquetbolístico:3
 basqueteros	basquetero:4
 basquiñas	basquiña:3
-basta	bastar:66|basto:1|bastir:72
+basta	!bastar:66|basto:1|bastir:72
 bastaba	bastar:67
 bastabais	bastar:6
 bastaban	bastar:7
@@ -228797,10 +228797,10 @@ enmoheceríamos	enmohecer:37
 enmohecerían	enmohecer:38
 enmohecerías	enmohecer:39
 enmoheces	enmohecer:40
-enmohecida	enmohecer:9
-enmohecidas	enmohecer:10
+enmohecida	enmohecido:1|enmohecer:83
+enmohecidas	enmohecido:2|enmohecer:84
 enmohecido	enmohecer:11
-enmohecidos	enmohecer:12
+enmohecidos	enmohecido:3|enmohecer:85
 enmoheciendo	enmohecer:52
 enmoheciera	enmohecer:68
 enmohecierais	enmohecer:17

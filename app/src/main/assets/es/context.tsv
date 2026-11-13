@@ -7,3 +7,7 @@ lamentablemente	after-verb	плачевно, жалко	после глагол�
 templar	after:ánimo	закалять (дух)	templar el ánimo
 expediente	before:mano de	уловка, средство	echar mano de expedientes
 tratar	next:a	общаться, обращаться (с кем-то)	tratar a alguien
+# 13.11.2026 — «El guardagujas», список 3
+desarmado	near:pieza,piezas,tren,motor,máquina,mueble,reloj	разобранный	fue desarmado pieza por pieza
+golpe	before:de & near:dar,darse	драка (darse de golpes — драться)	dándose de golpes
+estar	next:para	быть (там), чтобы	estar para + инфинитив

@@ -47,4 +47,14 @@ class ContextRulesTest {
         val tok = engine.chapter(listOf(text), TextOptions())(text).tokens.first { it.text == "durmientes" }
         assertEquals("шпала", engine.cardTranslation(tok.text, tok.pinyin)!!.substringBefore(';'))
     }
+
+    @Test
+    fun moreSpanishByTheSentence() {
+        assertEquals("разобранный", hint("El motor fue desarmado pieza por pieza.", "desarmado"))
+        assertEquals("безоружный", hint("El ladrón estaba desarmado.", "desarmado"))
+        // The whole phrase darse de golpes, over its first word.
+        assertEquals("драться", hint("Se dieron de golpes en la calle.", "dieron"))
+        assertEquals("быть (там), чтобы", hint("Ellos estarán para ayudarle.", "estarán"))
+        assertEquals("достаточно, хватает", hint("Basta mirar con atención.", "Basta"))
+    }
 }
