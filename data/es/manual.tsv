@@ -1,0 +1,36 @@
+# Hand-checked Spanish fixes from real books (see tools/apply_es_manual.py). Notes: only the book, no sentences from it.
+# lemma	pos	ru (" ; " between)	main meaning over the word	English	other parts of speech ("-" clears)	note
+#
+# 13.11.2026 — J. J. Arreola «El guardagujas» (вся книга) и «Переводы под вопросом»
+ignorar	гл.	не знать ; не подозревать ; игнорировать ; не обращать внимания	не знать				Arreola
+partir	гл.	отправляться ; уезжать ; делить ; разделять ; раскалывать	отправляться				Arreola
+volverse	гл.	становиться ; оборачиваться (al volverse — обернувшись) ; возвращаться	становиться				Arreola
+vago	прил.	смутный ; неопределённый ; ленивый	смутный				Arreola
+justo	прил.	справедливый ; точный (la hora justa — точное время) ; правильный	справедливый				Arreola
+hora justa	выраж.	точное время ; ровно в срок	точное время	the exact time			Arreola
+llevar	гл.	носить ; нести ; провести (время: lleva poco tiempo aquí — недавно здесь) ; везти ; уносить	носить				Arreola
+a su suerte	выраж.	на произвол судьбы	на произвол судьбы	to one's fate			Arreola
+abandonar a su suerte	выраж.	бросить на произвол судьбы	бросить на произвол	to leave to one's fate			Arreola
+en lo que se refiere a	предл.	что касается ; в том, что касается	что касается	as regards			Arreola
+contenido	прил.	содержащийся ; сдержанный	содержащийся	contained ; restrained	сущ.|содержание|содержание ; содержимое|content (of a text) ; contents		Arreola
+itinerario	сущ.	маршрут ; расписание (поездов)	маршрут				Arreola
+convoy	сущ.	состав (поезда) ; конвой ; колонна	состав, конвой				Arreola
+guía	сущ.	справочник ; путеводитель ; гид ; экскурсовод	справочник, гид				Arreola
+plano	сущ.	план ; чертёж ; плоскость ; уровень ; кадр	план				Arreola
+circular	гл.	курсировать ; ходить (о транспорте) ; циркулировать ; распространяться	курсировать				Arreola
+empeñarse	гл.	настаивать (en — на) ; упорно стремиться ; влезать в долги	настаивать				Arreola
+subir	гл.	подниматься ; садиться (в транспорт: subir al tren) ; поднимать ; повышать	подниматься				Arreola
+abordar	гл.	садиться (в поезд, на корабль) ; браться за (вопрос) ; рассматривать ; обсуждать	садиться, браться за				Arreola
+consultar	гл.	справляться ; посмотреть (consultar el reloj — посмотреть на часы) ; советоваться ; консультироваться	справляться				Arreola
+expedición	сущ.	выдача (билетов, документов) ; экспедиция ; отправка	экспедиция, выдача				Arreola
+informe	сущ.	сведения ; справка (dar informes — дать справки) ; доклад ; отчёт	сведения				Arreola
+francamente	нар.	откровенно говоря ; честно говоря ; искренне	откровенно говоря				Arreola
+pieza	сущ.	деталь ; часть ; комната (Лат. Ам.: номер) ; пьеса ; штука	деталь				Arreola
+viejecillo	сущ.	старичок	старичок	little old man			Arreola
+averiado	прил.	неисправный ; сломанный ; повреждённый	неисправный	broken down ; damaged			Arreola
+salido	прил.	вышедший ; выступающий ; (разг.) возбуждённый	вышедший				Arreola
+solamente que	нар.	только (чтобы) ; вот только ; при условии что	только				Arreola
+dadas las circunstancias	выраж.	при данных обстоятельствах	при таких обстоятельствах	given the circumstances			Arreola
+dadas las condiciones	выраж.	при данных условиях	при таких условиях	given the conditions			Arreola
+dado que	союз	поскольку ; учитывая, что	поскольку	given that			Arreola
+referirse a	гл.	касаться (en lo que se refiere a — что касается) ; иметь в виду ; ссылаться на ; относиться к	касаться				Arreola
