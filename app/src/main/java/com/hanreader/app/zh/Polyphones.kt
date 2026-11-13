@@ -105,6 +105,8 @@ object Polyphones {
             '切' -> if (next != null && next[0] in "勿莫忌记") "qiè" else "qiē"
             // 夫 fú, the bookish opening particle «итак, ведь», at the start of a clause (夫文童者…); else fū «муж».
             '夫' -> if (prev == null && next != null) "fú" else null
+            // 待 dāi «оставаться, пробыть» before 在, 着, 了 or a stretch of time (待在家里, 待一会儿); else dài «ждать».
+            '待' -> if (next != null && (next[0] in "在着了" || next.startsWith("一会") || next.startsWith("会儿"))) "dāi" else null
             '中' -> if (prev != null && prev.last() in "打射猜考选击投砸押" && (next == null || next[0] !in "间国央心学部文午")) "zhòng" else null
             // 冲 chòng «к, в сторону» before 着 or a person (冲我笑).
             '冲' -> if (next == "着" || next != null && next in setOf("我", "你", "他", "她", "它", "我们", "你们", "他们", "她们", "咱们", "大家")) "chòng" else null
