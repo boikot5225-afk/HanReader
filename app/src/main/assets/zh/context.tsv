@@ -1,0 +1,124 @@
+# Chinese context rules: readings of polyphones by their neighbours and cuts of dictionary words.
+# Format and conditions: app/src/main/java/com/hanreader/app/zh/ZhRules.kt. The first rule that holds wins.
+# kind	word	conditions	result	note
+
+set	COUNTERS	这那哪每几一两半二三四五六七八九十百千
+set	ADVERB	狠猛轻静快慢悄默渐微深重很暗偷乖死紧怒冷急
+set	SUBJECTS	我,你,他,她,它,我们,你们,他们,她们,咱们,大家,就,还,总,也,都,必,只,可,非,又,现在,那,这
+set	DEGREE	很,更,多,太,像,要命,了,比,好,对,非常,特别,那么,这么,不,清楚,到,厉害,多么,可怕
+set	ONLY_BEFORE	剩下,知道,希望,觉得,不过,因为,是,有,能
+set	PRONOUNS	我,你,他,她,它,我们,你们,他们,她们,咱们,大家
+set	LOCAL	政府,官员,干部,法院,法规,经济,财政,部队,保护,主义,戏,志,性,政权,当局,领导,选举,特色,口音,风味,小吃
+set	COUNT_CHARS	一二三四五六七八九十两几每半
+
+# --- Words ---
+read	重重	next=地	zhòng zhòng	重重地坐下 «тяжело»; elsewhere chóngchóng «слой за слоем»
+read	地方	next=$LOCAL	dì fāng	«местный» before an institution (地方政府); else dìfang «место»
+read	当	earlier:把,拿,将	dàng	把他当朋友 «принимать за»
+
+# --- 地: the adverbial particle after a description, else the earth ---
+read	地	!prev	dì
+read	地	!next	dì
+read	地	next:上下里面板毯底方区点图球址位带铁窖狱震洞道形步主	dì	在地上, 地板
+read	地	long-prev	de	不耐烦地问
+read	地	prev0:$ADVERB	de	慢地, 轻地
+read	地	*	dì
+
+# --- 得: děi «нужно» after a subject, else the complement particle ---
+read	得	prev & next & prev=$SUBJECTS & !next=$DEGREE & !next:很更多太像好对大快慢真不了比	děi	我得走了
+read	得	!prev & next & !next=$DEGREE	děi
+read	得	*	de	说得很快
+
+# --- 长: zhǎng «расти, глава», else cháng «длинный» ---
+read	长	next:得出大高满着了成	zhǎng	长得, 长大
+read	长	prev:级部院校队班首家族局市省州船村团社组厂处科县乡镇会	zhǎng	校长, 部长
+read	长	*	cháng
+
+# --- 只: zhī the measure word after a number or demonstrative, else «только» ---
+read	只	!prev:这那哪每几一两半二三四五六七八九十百	-
+read	只	!next	-
+read	只	next=$ONLY_BEFORE	-	这只是
+read	只	next:是有能会要想好在不听见剩用	-
+read	只	*	zhī	那只猫
+
+# --- 重: chóng «снова» or a layer after a number, else the dictionary's ---
+read	重	next:写做来读说画打选装修建返演播温提排印组	chóng	重写, 重来
+read	重	prev:一两几双三四五六七八九十千万 & next & !next:了的	chóng	两重门
+
+# --- 种: zhòng «сажать», else «вид» ---
+read	种	!next	-
+read	种	next:树花菜地田稻麦豆瓜草粮果庄	zhòng	种树
+read	种	next:了着过 & !prev:$COUNTERS各某此该同多	zhòng	我种了
+
+# --- 教: jiāo «учить», but a teaching or religion stays jiào ---
+read	教	next:育室授师堂会徒练导材科学派条义士主皇区案务养训规化坊习	-	教育, 教室
+read	教	prev:宗道佛回儒督主邪国传礼家请说	-	宗教
+read	教	*	jiāo	教我写字
+
+# --- 处: chǔ «находиться, обходиться» before these; a place keeps chù ---
+read	处	prev:到各此何住去好一深远近高低某别四	-	到处, 此处
+read	处	next:得不在于理置事罚境	chǔ	处得来, 处在
+
+# --- Single rules ---
+read	还	next:给钱债清	huán	还钱
+read	行	prev:$COUNTERS & next & !next:了吗吧啊呢不	háng	一行字
+read	数	prev:一	shǔ	数一数
+read	数	next:一了着过钱星 & !prev:$COUNTERS	shǔ	数钱
+read	觉	prev~睡	jiào	睡了一觉
+read	觉	prev:个一午好大懒	jiào	午觉
+read	空	prev:有没抽得	kòng	有空
+read	空	next=儿	kòng
+read	干	prev:很太晒烤吹擦喝流哭榨洗烘变挺风晾抹舔蒸烧	gān	晒干
+read	倒	next:在地下	dǎo	倒在地上
+read	背	next:起包走回	bēi	背起
+read	量	prev:一	liáng	量一量
+read	量	next:一了体血身尺	liáng	量体温
+read	量	next=量	liáng
+read	假	prev:放请休度暑寒病婚产	jià	放假
+read	假	prev=天	jià
+read	假	long-prev & prev:天 & prev0:$COUNTERS	jià	三天假
+read	着	prev:猜点烧摸够睡找 & next:了	zháo	猜着了
+read	了	prev=不	liǎo	受不了
+read	削	*	xiāo
+read	似	next:的	-	似的 shìde
+read	似	*	sì
+read	弹	next:琴钢吉奏起了着过一	tán	弹琴
+read	系	next:上好着紧鞋领带住	jì	系鞋带
+read	盛	next:饭汤水满粥菜了	chéng	盛饭
+read	扇	next:了着风他她我你 & !prev:$COUNTERS	shān	扇了他一耳光
+read	担	prev:$COUNTERS	dàn	两担水
+read	为	prev:选称视定改变化作成分认列评封拜奉尊推任命转划译立奉誉	wéi	选为, 称为
+read	传	prev:做作立写列为本大内	zhuàn	«жизнеописание»: 立传, 本传
+read	传	!prev & next=的	zhuàn	传的名目
+read	传	prev=的 & next=的	zhuàn
+read	切	next:勿莫忌记	qiè	切勿 «ни в коем случае»
+read	切	*	qiē	切开
+read	夫	!prev & next	fú	opening particle «итак»: 夫文童者
+read	待	next:在着了	dāi	待在家里 «оставаться»
+read	待	next^一会,会儿	dāi
+read	中	prev:打射猜考选击投砸押 & !next:间国央心学部文午	zhòng	打中 «попасть»
+read	冲	next=着	chòng	冲着 «к, в сторону»
+read	冲	next=$PRONOUNS	chòng	冲我笑
+read	涨	next:红紫	zhàng	涨红
+read	涨	prev:脸	zhàng	脸涨得通红
+read	卷	prev:$COUNTERS第	juàn	第一卷
+read	缝	prev:$COUNTERS道条	fèng	一道缝 «щель»
+read	缝	next:儿隙	fèng
+read	缝	*	féng	«шить»
+read	铺	prev:$COUNTERS	pù	一铺
+read	铺	*	pū	«стелить»
+read	看	next^孩	kān	看孩子 «присматривать»
+read	看	next=小孩,家,守	kān	看家
+read	转	next:圈	zhuàn	转圈
+
+# --- Cuts of dictionary words ---
+split	把门,把手,把头	next & !next:的是很也都坏 & !prev:的个这那只副门	1	他把门关上: 把 + noun before a verb
+split	才能	next & !next:的和与及或是也都很 & !prev:的有无其之种项	1	才能来: 才 + 能, not «талант»
+split	的话	next-any:，,：:	0	«если» before a comma
+split	的话	*	1	你说的话: 的 + 话
+split	就要	later:了	0	«вот-вот» with 了 later in the clause
+split	就要	*	1
+split	却说	prev	1	«теперь обратимся к» opens a passage; after a subject 却 + 说
+split	可不	next	1	«ещё бы» stands alone; 这可不容易 is 可 + 不
+split	发起	next:怒火脾呆抖烧疯愁慌急狠	1	发起怒来 «рассердиться»
+split	本书,个人,回城	prev:$COUNT_CHARS这那哪	1	这本书, 一个人: measure + noun after a number

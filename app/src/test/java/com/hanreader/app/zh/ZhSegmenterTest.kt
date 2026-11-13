@@ -11,6 +11,7 @@ class ZhSegmenterTest {
     companion object {
         // Unit tests run with the module directory as the working directory.
         val dict: ZhDictionary by lazy {
+            ZhRules.current = ZhRules.load(File("src/main/assets/zh/context.tsv"))
             ZhDictionary.map(File("src/main/assets/zh/lexicon.bin"))
         }
         val segmenter by lazy { ZhSegmenter(dict) }

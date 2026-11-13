@@ -488,6 +488,8 @@ class ZhEngine(
                         val t = System.nanoTime()
                         val dict = ZhDictionary.map(lexiconFile(app))
                         val ms = (System.nanoTime() - t) / 1_000_000
+                        com.hanreader.app.zh.ZhRules.current = runCatching { app.assets.open("zh/context.tsv").use { com.hanreader.app.zh.ZhRules.load(it) } }
+                            .getOrDefault(com.hanreader.app.zh.ZhRules.EMPTY)
                         val script = runCatching { app.assets.open("zh/script.tsv").use { ZhScript.parse(it) } }.getOrDefault(ZhScript.NONE)
                         c.complete(ZhEngine(dict, ms, script = script))
                         val hsk = app.assets.open("zh/hsk.tsv").bufferedReader().useLines { HskLevels.parse(it) }
