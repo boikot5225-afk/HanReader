@@ -183,6 +183,18 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     }
                 }
+                // The language of every restored book: the copy's record when it has one; copies from
+                // before languages existed have none, so each book's own text decides (a plain
+                // "not recorded means Chinese" would turn old HanReader backups Spanish here).
+                backup.library?.let { lib ->
+                    val tags = lib.books.associate { b ->
+                        b.id to com.hanreader.app.lang.BookLanguages.restoredTag(
+                            lib.languages[b.id],
+                            { runCatching { com.hanreader.app.epub.BookFiles.open(File(booksDir, b.fileName)) }.getOrNull() },
+                        )
+                    }
+                    com.hanreader.app.lang.BookLanguages.replaceAll(getApplication(), tags)
+                }
                 // One transaction: a failure leaves cards, known words and books exactly as before.
                 db.withTransaction {
                     dao.replaceAll(backup.cards, backup.examples)
@@ -197,8 +209,6 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         lib.ignored.chunked(2_000).forEach { books.insertWords(it) }
                         db.statsDao().putProgressAll(lib.progress)
                     }
-                    // The language of each restored book (Chinese when the copy says nothing).
-                    backup.library?.let { lib -> com.hanreader.app.lang.BookLanguages.replaceAll(getApplication(), lib.languages) }
                     backup.userSplits?.let { list ->
                         db.userSplitDao().removeAll()
                         db.userSplitDao().putAll(list.map { com.hanreader.app.UserSplit(it) })
