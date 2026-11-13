@@ -56,4 +56,11 @@ class GrammarTest {
         assertTrue(Grammar.at(t, second).any { it.point.title.startsWith("比 … 还要") })
         assertTrue(Grammar.at(tokens("我要去商店。"), 1).isEmpty())
     }
+
+    @Test
+    fun repeatedVerbAroundBian() {
+        val t = tokens("他说走就走。")
+        assertTrue(Grammar.at(t, t.indexOf("就")).any { it.point.title.startsWith("X 便 X") })
+        assertTrue(Grammar.at(tokens("他吃完就走。"), 2).none { it.point.title.startsWith("X 便 X") })
+    }
 }

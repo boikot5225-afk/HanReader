@@ -101,6 +101,10 @@ object Polyphones {
             '传' -> if (prev != null && prev.last() in "做作立写列为本大内" || (prev == null || prev == "的") && next == "的") "zhuàn" else null
             // 处 chù «место» after a number or «этот, каждый» (几处, 一处, 各处); elsewhere the dictionary's.
             '处' -> if (prev != null && prev.last() in "几一两三四五六七八九十百千多各此某何别") "chù" else null
+            // 切 qiē «резать» (切细, 切开); qiè «ни в коем случае» only before a prohibition (切勿, 切莫, 切忌).
+            '切' -> if (next != null && next[0] in "勿莫忌记") "qiè" else "qiē"
+            // 夫 fú, the bookish opening particle «итак, ведь», at the start of a clause (夫文童者…); else fū «муж».
+            '夫' -> if (prev == null && next != null) "fú" else null
             '中' -> if (prev != null && prev.last() in "打射猜考选击投砸押" && (next == null || next[0] !in "间国央心学部文午")) "zhòng" else null
             // 冲 chòng «к, в сторону» before 着 or a person (冲我笑).
             '冲' -> if (next == "着" || next != null && next in setOf("我", "你", "他", "她", "它", "我们", "你们", "他们", "她们", "咱们", "大家")) "chòng" else null
