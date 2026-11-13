@@ -27,6 +27,18 @@ class BookLanguagesTest {
         }
     }
 
+    /** The language of a restored book: the copy's record wins; without one the book's own text decides; an unreadable book is Chinese. */
+    @Test
+    fun restoredLanguage() {
+        // The copy says it: the book is not even opened.
+        assertEquals(Languages.SPANISH.tag, BookLanguages.restoredTag(Languages.SPANISH.tag) { error("the copy says it") })
+        // Copies from before languages existed say nothing: the book's own text decides.
+        assertEquals(Languages.CHINESE.tag, BookLanguages.restoredTag(null) { TxtBook("第一章 雨夜\n那天晚上一直在下雨。".toByteArray(), "x") })
+        assertEquals(Languages.SPANISH.tag, BookLanguages.restoredTag(null) { TxtBook("Capítulo 1\nLa lluvia había empezado poco después de medianoche.".toByteArray(), "x") })
+        // A book that cannot be read is Chinese (every book from before languages existed).
+        assertEquals(Languages.CHINESE.tag, BookLanguages.restoredTag(null) { null })
+    }
+
     @Test
     fun eachLanguageOwnsItsWords() {
         val zh = Languages.CHINESE.ownsWord

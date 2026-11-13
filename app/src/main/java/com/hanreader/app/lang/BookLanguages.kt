@@ -17,7 +17,7 @@ object BookLanguages {
     val changes = kotlinx.coroutines.flow.MutableStateFlow(0)
 
     fun of(context: Context, bookId: Long): String =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(bookId.toString(), null) ?: Languages.current.tag
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(bookId.toString(), null) ?: Languages.CHINESE.tag
 
     fun set(context: Context, bookId: Long, tag: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(bookId.toString(), tag).apply()
@@ -35,6 +35,14 @@ object BookLanguages {
     fun remove(context: Context, bookId: Long) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(bookId.toString()).apply()
     }
+
+    /**
+     * The language of a book restored from a backup: the copy's record when it has one; copies
+     * from before languages existed have none, so the book's own text decides ([open] reads it);
+     * a book that cannot be read is Chinese (every book from before languages existed).
+     */
+    fun restoredTag(recorded: String?, open: () -> BookSource?): String =
+        recorded ?: open()?.use { recognize(it).tag } ?: Languages.CHINESE.tag
 
     /** The language a new book is read in: the one of its text, if this app reads it; else the one being read. */
     fun detect(book: BookSource): LanguageInfo =
