@@ -422,7 +422,12 @@ class EsEngine(
         val pronominal = if (inContext.endsWith("se") && ' ' !in inContext && all.none { it.entry.key == inContext })
             all.firstOrNull { it.entry.lemma + "se" == inContext }?.let { v -> entry(inContext)?.let { EsAnalysis(v.form, it, v.grammar) } }
         else null
-        return listOfNotNull(pronominal) + if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.key == inContext) 0 else 1 }
+        // The first word of a dictionary phrase (modus in «modus operandi»): the phrase's card first —
+        // the word's own readings after it; a phrase head may have no entry of its own at all.
+        val phrase = if (a == b && ' ' in inContext && all.none { it.entry.key == inContext })
+            entry(inContext)?.let { EsAnalysis(inContext, it, "") }
+        else null
+        return listOfNotNull(pronominal, phrase) + if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.key == inContext) 0 else 1 }
     }
 
     /** The plain verb of a pronominal one shown first (limitarse: limitar): what «Знаю» and the conjugation are about. */
@@ -567,7 +572,7 @@ class EsEngine(
         override val all = (1..bands.size).toList()
         override fun title(level: Int) = titles.getOrElse(level - 1) { "C2+" }
         override fun of(word: String): Int = analyses(word).firstOrNull()?.entry?.rank?.takeIf { it > 0 }?.let { levelOf(it) } ?: 0
-        override fun estimate(word: String): Int = of(word).takeIf { it > 0 } ?: (bands.size + 1)
+        override fun estimate(word: Int): Int = 0
         override fun knownAt(level: Int): Set<String> = (1..level.coerceAtMost(bands.size)).flatMapTo(HashSet()) { byLevel[it - 1] }
     }
 
