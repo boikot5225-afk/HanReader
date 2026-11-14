@@ -259,7 +259,8 @@ class EsEngineTest {
     fun bookCombinations() {
         fun key(text: String, word: String) = engine.inContext(engine.tokenize(text), text).first { it.text == word }.pinyin
         fun gloss(text: String, word: String) = engine.inContext(engine.tokenize(text), text).first { it.text == word }.let { engine.glossShort(it.text, it.pinyin) }
-        assertEquals("конспиративные квартиры", gloss("Tenían varias casas francas en Juárez.", "casas"))
+        // Inflected nominal phrases use their canonical dictionary entry (casa franca).
+        assertEquals("конспиративная квартира", gloss("Tenían varias casas francas en Juárez.", "casas"))
         assertEquals("конспиративная квартира", gloss("Lo llevaron a una casa franca.", "casa"))
         assertEquals("триллион долларов", gloss("Un billón de dólares al año.", "billón"))
         assertEquals("миллиарды", gloss("Ganan miles de millones de dólares.", "miles"))

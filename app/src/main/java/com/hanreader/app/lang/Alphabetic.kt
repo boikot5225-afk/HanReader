@@ -29,7 +29,9 @@ data class LexEntry(
     /** The word as other parts of speech (haber: the noun «имущество» beside the verb), each with its own senses. */
     val alts: List<LexEntry> = emptyList(),
     /** Names this reading among the readings of a word: the lemma, for another part of speech «haber/сущ.». */
-    val key: String = lemma
+    val key: String = lemma,
+    /** A rule's sense for this occurrence only; never stored in the dictionary cache. */
+    val contextMeaning: String? = null
 ) {
     /** «сущ., ж. р.», «сущ., м. и ж. р.», «гл.». */
     val posLabel: String get() = when (gender) {

@@ -1,0 +1,267 @@
+[
+  {
+    "id": "real-plaza-0",
+    "left": "narco:4:28:295:300",
+    "right": "narco:7:75:75:81",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-plaza-1",
+    "left": "narco:6:80:776:781",
+    "right": "narco:7:76:439:444",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-plaza-2",
+    "left": "narco:7:64:421:426",
+    "right": "narco:9:46:502:507",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-plaza-3",
+    "left": "narco:8:51:179:185",
+    "right": "narco:13:32:83:89",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-plaza-4",
+    "left": "narco:11:66:347:352",
+    "right": "narco:13:32:210:215",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-plaza-5",
+    "left": "narco:11:89:518:523",
+    "right": "narco:17:11:204:210",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-banda-6",
+    "left": "narco:4:9:84:90",
+    "right": "narco:4:11:535:540",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-banda-7",
+    "left": "narco:4:10:266:272",
+    "right": "narco:13:34:181:186",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-banda-8",
+    "left": "narco:4:22:203:209",
+    "right": "narco:13:49:277:282",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-banda-9",
+    "left": "narco:4:51:125:131",
+    "right": "narco:15:6:484:489",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-capital-10",
+    "left": "narco:4:32:183:190",
+    "right": "narco:13:92:345:352",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-capital-11",
+    "left": "narco:4:73:107:114",
+    "right": "narco:19:91:142:149",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-piso-12",
+    "left": "narco:9:20:6:10",
+    "right": "narco:14:29:166:170",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-cuota-13",
+    "left": "narco:10:98:495:501",
+    "right": "narco:20:51:103:108",
+    "provenance": "epub"
+  },
+  {
+    "id": "real-cuota-14",
+    "left": "narco:11:42:435:441",
+    "right": "narco:21:22:283:288",
+    "provenance": "epub"
+  },
+  {
+    "id": "synthetic-pair-0",
+    "left": "synthetic-0-a",
+    "right": "synthetic-0-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-1",
+    "left": "synthetic-1-a",
+    "right": "synthetic-1-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-2",
+    "left": "synthetic-2-a",
+    "right": "synthetic-2-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-3",
+    "left": "synthetic-3-a",
+    "right": "synthetic-3-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-4",
+    "left": "synthetic-4-a",
+    "right": "synthetic-4-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-5",
+    "left": "synthetic-5-a",
+    "right": "synthetic-5-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-6",
+    "left": "synthetic-6-a",
+    "right": "synthetic-6-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-7",
+    "left": "synthetic-7-a",
+    "right": "synthetic-7-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-8",
+    "left": "synthetic-8-a",
+    "right": "synthetic-8-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-9",
+    "left": "synthetic-9-a",
+    "right": "synthetic-9-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-10",
+    "left": "synthetic-10-a",
+    "right": "synthetic-10-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-11",
+    "left": "synthetic-11-a",
+    "right": "synthetic-11-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-12",
+    "left": "synthetic-12-a",
+    "right": "synthetic-12-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-13",
+    "left": "synthetic-13-a",
+    "right": "synthetic-13-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-14",
+    "left": "synthetic-14-a",
+    "right": "synthetic-14-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-15",
+    "left": "synthetic-15-a",
+    "right": "synthetic-15-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-16",
+    "left": "synthetic-16-a",
+    "right": "synthetic-16-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-17",
+    "left": "synthetic-17-a",
+    "right": "synthetic-17-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-18",
+    "left": "synthetic-18-a",
+    "right": "synthetic-18-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-19",
+    "left": "synthetic-19-a",
+    "right": "synthetic-19-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-20",
+    "left": "synthetic-20-a",
+    "right": "synthetic-20-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": true
+  },
+  {
+    "id": "synthetic-pair-21",
+    "left": "synthetic-21-a",
+    "right": "synthetic-21-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-22",
+    "left": "synthetic-22-a",
+    "right": "synthetic-22-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  },
+  {
+    "id": "synthetic-pair-23",
+    "left": "synthetic-23-a",
+    "right": "synthetic-23-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": true
+  },
+  {
+    "id": "synthetic-pair-24",
+    "left": "synthetic-24-a",
+    "right": "synthetic-24-b",
+    "provenance": "synthetic",
+    "same_russian_gloss_allowed": false
+  }
+]

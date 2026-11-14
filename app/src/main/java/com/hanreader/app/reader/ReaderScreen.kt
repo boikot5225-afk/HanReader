@@ -1464,21 +1464,21 @@ private fun WordSheet(
     val zh = engine as? ZhEngine
     // A language with an alphabet (Spanish, English): its readings of the word, the one the context chose first.
     val alpha = engine as? com.hanreader.app.lang.AlphabeticModule
-    val es = remember(word) { alpha?.cardAnalyses(tokens, block.text, selection.first, selection.last).orEmpty() }
+    val es = remember(engine, tokens, selection) { alpha?.cardAnalyses(tokens, block.text, selection.first, selection.last).orEmpty() }
     // The word «Знаю» and the conjugation are about (limitarse: limitar).
-    val esLemma = remember(word) { alpha?.cardLemma(es) }
+    val esLemma = remember(engine, es) { alpha?.cardLemma(es) }
     val entry = remember(word) { zh?.lookup(word)?.takeIf { it.hasDefinition } }
     // A combination the dictionary lacks: its dictionary words (革命 + 党), else its characters.
     val composed = remember(word) { if (entry == null) zh?.compose(word) else null }
     val chars = remember(word) { if (entry == null) composed ?: zh?.characters(word).orEmpty() else emptyList() }
     // The word cards and «Знаю» are about: Spanish hablo → hablar; Chinese: the word itself.
-    val cardWord = remember(word) { if (zh != null) word else esLemma ?: engine.lemma(word) }
+    val cardWord = remember(word, esLemma, engine) { if (zh != null) word else esLemma ?: engine.lemma(word) }
     // One token: its reading in context (慢慢地 de, not the dictionary's dì).
     val reading = if (zh == null) "" else if (selection.first == selection.last && first.pinyin.isNotEmpty() && first.text.length == 1) first.pinyin
         else entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
     // A single character: the meanings of the reading on the page (得 de after a verb, not dé «получить»).
     val pageReading = if (selection.first == selection.last && first.text.length == 1) first.pinyin.takeIf { it.isNotEmpty() } else null
-    val russian = remember(word, pageReading) { zh?.russianSenses(word, pageReading) ?: es.firstOrNull()?.entry?.let { alpha?.senses(it) }.orEmpty() }
+    val russian = zh?.russianSenses(word, pageReading) ?: es.firstOrNull()?.entry?.let { alpha?.senses(it) }.orEmpty()
     val otherReadings = remember(word, pageReading) { zh?.otherReadings(word, pageReading).orEmpty() }
     // A tapped marker of a Chinese construction in this sentence (把, 虽然 … 但是): what the construction means.
     val grammar = remember(word, selection) {
@@ -1589,6 +1589,11 @@ private fun WordSheet(
             }) { scope, text, previous ->
                 if (previous != null && previous != scope) onUserMeaning(meaningKeys.getValue(previous), "")
                 onUserMeaning(meaningKeys.getValue(scope), text)
+            }
+            if (alpha != null && russian.size > 1) {
+                Text(if ('#' in first.pinyin && selection.first == selection.last) "Первое значение — по контекстному правилу"
+                    else "Словарные значения: контекст может требовать другого смысла",
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (russian.isNotEmpty()) {
                 russian.forEachIndexed { i, sense ->

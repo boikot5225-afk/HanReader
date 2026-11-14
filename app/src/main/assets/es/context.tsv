@@ -11,3 +11,30 @@ tratar	next:a	общаться, обращаться (с кем-то)	tratar a a
 desarmado	near:pieza,piezas,tren,motor,máquina,mueble,reloj	разобранный	fue desarmado pieza por pieza
 golpe	before:de & near:dar,darse	драка (darse de golpes — драться)	dándose de golpes
 estar	next:para	быть (там), чтобы	estar para + инфинитив
+# 0.24.9 — audited sense distinctions. Windows use words/lemmas, never a book title.
+# within:N:words = evidence at most N words away; prev = preceding word or lemma.
+# Literal collocations precede domain readings; no global Mexican default.
+plaza	next:principal,central,mayor,colonial,coloniales	площадь	городское пространство
+plaza	within:8:tráfico,contrabando,territorio,cuota,encargado,capo	территория контроля наркотрафика	территория и управление, не любая площадь в Мексике
+banda	within:6:tocar,canción,música,musical,teclado,trompeta,grabar,rock,himno,álbum	музыкальная группа	музыка рядом с коллективом
+halcón	near:volar,ave,ala,pluma,cazar,presa	сокол	птица: сохранять буквальное значение
+halcón	near:cártel,espía,informador,sicario,encargar,seguir,trabajar	наблюдатель, осведомитель картеля	мексиканская криминальная речь; проверять локальные свидетельства
+mordida	near:perro,morder,diente,animal,manzana	укус	буквальное значение
+mordida	near:pagar,dinero,policía,soldado,conductor,mafia,soborno,traficante	взятка	ASALE: mordida; выбор существительного и в форме мн. ч.
+célula	near:organismo,biología,tejido,microscopio,sangre	клетка	биология
+célula	near:zeta,zetas,cártel,guerrero,recluta,sicario,hampones,autónomo,organizar	ячейка организации	организационная единица
+cuota	near:cártel,gánster,extorsión,amenaza,incendiario	побор, дань	принудительный платёж
+cuota	near:pagar,cuartel	взнос, отчисление	платёж без достаточных признаков вымогательства
+cuota	near:conseguir,parte,repartir	доля	часть дохода или рынка
+piso	next:de & after:arriba	этаж	уровень здания
+piso	near:alquiler,mueble,televisor,portero,puerta,habitar	квартира	жильё в испанском варианте
+capital	prev:la	столица	род существительного различает ciudad и dinero
+capital	prev:el	капитал	мужской род: деньги
+capital	near:movimiento,conseguir,invertir,financiero	капитал	финансы
+orden	near:recibir,cumplir,obedecer,acuerdo	приказ, распоряжение	команда, не порядок
+orden	before:a las	приказ, распоряжение	a las órdenes de: под командованием
+baja	near:guerra,millón,causar,violencia,conflicto,muerto	потери, погибшие	военные потери; существительное, не bajo
+corrido/сущ.	near:música,canción,componer,mexicano,tradición,origen,cantar	коридо, народная баллада	музыкальное существительное, не прилагательное
+saber	next:construir,comprender	уметь	способность, не знание факта
+blanqueo	near:dinero,cártel,droga,acusación,suiza	отмывание денег	финансы, не отбеливание ткани
+plaza	next:en & near:impuesto & near:mandar	территория контроля наркотрафика	контроль участка и сбор дани

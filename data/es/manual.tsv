@@ -39,7 +39,7 @@ en visera	выраж.	козырьком (ладонь ко лбу, от сол�
 fonda	сущ.	постоялый двор ; гостиница ; (Мекс.) закусочная ; пансион	постоялый двор				Arreola
 pasaje	сущ.	билет ; проезд ; пассажиры ; отрывок (текста) ; переулок	билет, проезд				Arreola
 previsión	сущ.	мера предосторожности ; предусмотрительность ; прогноз	мера предосторожности				Arreola
-durmiente	прил.	спящий ; дремлющий	спящий, шпала				Arreola
+durmiente	прил.	спящий ; дремлющий	спящий, шпала		сущ.|спящий|спящий ; шпала|person sleeping ; railway sleeper		Arreola
 lamentablemente	нар.	к сожалению ; плачевно, жалко (о состоянии)	к сожалению, плачевно				Arreola
 estremecerse	гл.	содрогаться ; сотрясаться ; вздрагивать ; трепетать	содрогаться				Arreola
 colocarse	гл.	располагаться ; помещаться ; устраиваться (на работу)	располагаться				Arreola
@@ -68,3 +68,14 @@ pura apariencia	выраж.	одна видимость ; пустая види�
 puro	прил.	чистый ; настоящий ; сплошной, один лишь (перед сущ.: pura apariencia) ; сущий	чистый				Arreola
 bastar	гл.	хватать ; быть достаточным (basta + инф. — достаточно…)	достаточно, хватает				Arreola
 intemperie	сущ.	непогода ; открытый воздух (a la intemperie — под открытым небом) ; ненастье	непогода				Arreola
+# 0.24.9 — contextual audit: retain ordinary senses; no quotations from supplied books.
+halcón	сущ.	сокол ; (Мекс., крим.) наблюдатель, осведомитель картеля ; ястреб (сторонник жёсткой политики)	сокол			Spanish Wiktionary/EN data; cartel sense explicit in supplied context
+plaza	сущ.	площадь ; место ; должность ; рынок ; (Мекс., крим.) территория контроля наркотрафика	площадь			Regional sense selected only with contextual evidence
+cuota	сущ.	квота ; взнос ; доля ; (крим.) побор, дань	квота			Extortion is not a default meaning
+jefe de plaza	сущ.	руководитель территории наркотрафика	руководитель территории наркотрафика	local head of a drug trafficking territory		Domain expression
+padrino mafioso	сущ.	мафиозный босс ; влиятельный покровитель	мафиозный босс	mafia boss ; powerful patron		Domain expression
+punto de venta	сущ.	торговая точка ; точка продажи	торговая точка	point of sale		General commercial phrase
+tráfico de estupefacientes	сущ.	торговля наркотиками	торговля наркотиками	drug trafficking		General domain expression
+a tiros	нар.	выстрелами ; стрельбой	выстрелами	by shooting		Manner expression; no murder implied by itself
+blanqueo	сущ.	отбеливание ; отбелка ; отмывание денег	отбеливание			Retain literal meaning; context chooses finance
+fuerzas especiales	сущ.	спецназ ; силы специального назначения	спецназ	special forces		Collective plural; retain the complete phrase

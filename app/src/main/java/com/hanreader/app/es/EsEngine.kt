@@ -82,7 +82,7 @@ class EsEngine(
 
     /** Every dictionary reading of [word], the most useful first (a word with a Russian meaning first). */
     fun analyses(word: String): List<EsAnalysis> {
-        val w = word.lowercase()
+        val w = java.text.Normalizer.normalize(word, java.text.Normalizer.Form.NFC).lowercase()
         synchronized(cache) { cache[w] }?.let { return it }
         val self = entry(w)?.let { e -> listOf(EsAnalysis(w, e, "")) + e.alts.map { EsAnalysis(w, it, "") } }.orEmpty()
         val asForm = ArrayList<EsAnalysis>(2)
@@ -95,14 +95,22 @@ class EsEngine(
             val lemma = part[0]
             val g = part.getOrNull(1)?.toIntOrNull()?.let { grammar.getOrNull(it) }.orEmpty()
             val e = entry(lemma)?.let { e -> part.getOrNull(2)?.let { p -> e.alts.firstOrNull { it.pos == p } } ?: e }
-            if (lemma != w && e != null && asForm.none { it.entry.key == e.key }) asForm += EsAnalysis(w, e, g)
+            if (lemma != w && e != null) {
+                // Nominal/adjectival inflections keep both parts of speech (corridos: songs as
+                // well as an adjective). Verb inflections never inherit the infinitive's noun.
+                val readings = listOf(e) + if (part.size < 3 && e.pos != "гл." && "мн. ч." in g)
+                    e.alts.filter { it.pos != "гл." && !(it.gender == "м" && "ж. р." in g) } else emptyList()
+                for (reading in readings) if (asForm.none { it.entry.key == reading.key }) asForm += EsAnalysis(w, reading, g)
+            }
         }
         val out = ArrayList<EsAnalysis>(3)
         // A form with an entry of its own whose main sense is regional or marked (jefes «(Мекс.) родители»,
         // bolsas «(Венес.) придурок»): the ordinary word it is a form of comes first (jefe «начальник»).
         val marked = self.firstOrNull()?.entry?.ru?.firstOrNull()?.startsWith("(") == true &&
             asForm.any { f -> f.entry.ru.firstOrNull()?.let { !it.startsWith("(") } == true }
-        if (formFirst || marked) { out += asForm; out += self } else { out += self; out += asForm }
+        val ellipticalPlural = self.firstOrNull()?.entry?.en?.any { it.startsWith("ellipsis of ") } == true &&
+            asForm.any { it.entry.pos == "сущ." && it.entry.lemma != w }
+        if (formFirst || marked || ellipticalPlural) { out += asForm; out += self } else { out += self; out += asForm }
         // A form with no grammar of its own that is a verb with pronouns attached (dámelo): the rule
         // names the form and the pronouns («повел. + me lo»).
         if (out.isEmpty() || out.all { it.grammar.isEmpty() && it.entry.pos == "гл." && it.entry.lemma != w }) {
@@ -154,18 +162,18 @@ class EsEngine(
         // Word tokens reachable from [index] through single spaces, up to three on each side.
         fun step(from: Int, dir: Int): Int? {
             val sp = tokens.getOrNull(from + dir) ?: return null
-            if (sp.kind != TokenKind.SPACE || sp.text != " ") return null
+            if (sp.kind != TokenKind.SPACE || sp.text.any { it == '\n' || it == '\r' }) return null
             return (from + 2 * dir).takeIf { tokens.getOrNull(it)?.kind == TokenKind.HAN }
         }
-        val left = generateSequence(index) { step(it, -1) }.take(4).toList()
-        val right = generateSequence(index) { step(it, 1) }.take(4).toList()
+        val left = generateSequence(index) { step(it, -1) }.take(6).toList()
+        val right = generateSequence(index) { step(it, 1) }.take(6).toList()
         // The longest phrase; a reflexive one after a reflexive pronoun wins over a longer plain one
         // (me di cuenta de: darse cuenta, not dar cuenta de «отчитываться»).
         var best: IntRange? = null
         var bestScore = 0
         for (a in left) for (b in right) {
             val words = (b - a) / 2 + 1
-            if (words < 2 || words > 4) continue
+            if (words < 2 || words > 6) continue
             val key = phraseKey(tokens, text, a, b)?.takeIf { usefulPhrase(it) } ?: continue
             // «volver a» is «снова» only before an infinitive (volvió a llamar), not in «volvió a casa».
             // A verb + preposition after an article is a noun + preposition: «el tratado de» «договор», not tratar de.
@@ -218,7 +226,7 @@ class EsEngine(
             val choice = when {
                 after in setOf("a", "al") && a.any { it.entry.lemma == "ir" } && a.any { it.entry.lemma == "ser" } -> "ir"
                 // After haber only a participle: «había una casa» stays «una».
-                before != null && before in HABER && a.first().entry.pos != "гл." ->
+                before != null && (before in HABER || analyses(before).any { it.entry.lemma == "ser" }) && a.first().entry.pos != "гл." ->
                     a.firstOrNull { it.entry.pos == "гл." && "причастие" in it.grammar }?.entry?.key
                 before != null && (before in VERB_PRONOUNS || before in SUBJECT_PRONOUNS || before == "no") && a.first().entry.pos != "гл." ->
                     a.firstOrNull { it.entry.pos == "гл." }?.entry?.key
@@ -294,7 +302,7 @@ class EsEngine(
             }
             if (key != null) out[i] = t.copy(pinyin = key)
         }
-        if (!rules.isEmpty) chooseMeanings(out, words)
+        if (!rules.isEmpty) chooseMeanings(out, words, text ?: tokens.joinToString("") { it.text })
         return out
     }
 
@@ -302,26 +310,27 @@ class EsEngine(
      * Meanings the sentence chooses ([rules]): the reading becomes "key#meaning" («durmiente#шпала»), so
      * the hint, the card and the summary show that meaning. Words of a phrase are left to the phrase.
      */
-    private fun chooseMeanings(out: MutableList<RToken>, words: List<Int>) {
+    private fun chooseMeanings(out: MutableList<RToken>, words: List<Int>, text: String) {
         var start = 0
         while (start < words.size) {
             // A sentence: words up to a full stop, a question or an exclamation mark.
             var end = start
-            while (end + 1 < words.size && (words[end] + 1 until words[end + 1]).none { j -> out[j].kind == TokenKind.PUNCT && out[j].text.any { it in ".!?…;" } }) end++
+            while (end + 1 < words.size && (words[end] + 1 until words[end + 1]).none { j -> out[j].kind == TokenKind.PUNCT && out[j].text.indices.any { k -> out[j].text[k] in ".!?…;" && com.hanreader.app.lang.SentenceBoundary.ends(text, out[j].start + k) } }) end++
             val idx = words.subList(start, end + 1)
             val lemmasOf = HashMap<Int, Set<String>>()
-            fun lemmas(k: Int) = lemmasOf.getOrPut(k) { analyses(out[idx[k]].text).mapTo(HashSet()) { it.entry.lemma } }
+            fun lemmas(k: Int) = lemmasOf.getOrPut(k) { analyses(out[idx[k]].text).flatMap { listOf(it.entry.key, it.entry.lemma) }.toSet() }
             val sentence = com.hanreader.app.lang.ContextRules.Sentence(
                 idx.map { out[it].text.lowercase() }, ::lemmas,
                 { k -> val t = out[idx[k]]; (analyses(t.text).firstOrNull { it.entry.key == t.pinyin } ?: analyses(t.text).firstOrNull())?.entry?.pos == "гл." })
             for (k in idx.indices) {
                 val t = out[idx[k]]
-                if (t.pinyin == IN_PHRASE || ' ' in t.pinyin) continue
+                if (t.pinyin == IN_PHRASE) continue
                 val own = lemmas(k)
                 if (!rules.covers(own)) continue
-                val meaning = rules.meaning(own, sentence, k) ?: continue
-                val key = t.pinyin.ifEmpty { analyses(t.text).firstOrNull()?.entry?.key.orEmpty() }
-                out[idx[k]] = t.copy(pinyin = "$key#$meaning")
+                val chosen = rules.resolve(own, sentence, k) ?: continue
+                val key = if (' ' in t.pinyin) t.pinyin else
+                    analyses(t.text).firstOrNull { it.entry.key == chosen.lemma || it.entry.lemma == chosen.lemma }?.entry?.key ?: continue
+                out[idx[k]] = t.copy(pinyin = "$key#${chosen.meaning}")
             }
             start = end + 1
         }
@@ -356,13 +365,13 @@ class EsEngine(
      */
     override fun phraseKey(tokens: List<RToken>, text: String, a: Int, b: Int): String? {
         if (b <= a || tokens.getOrNull(a)?.kind != TokenKind.HAN || tokens.getOrNull(b)?.kind != TokenKind.HAN) return null
-        for (j in a + 1..b) if (tokens[j].kind == TokenKind.SPACE && tokens[j].text != " ") return null
-        // A phrase ending in «de» / «a» written with the article joined: «a pesar del» is a pesar de + el.
-        val tail = CONTRACTED[tokens[b].text.lowercase()]
-        fun from(i: Int) = if (tail == null) text.substring(i, tokens[b].end).lowercase() else text.substring(i, tokens[b].start).lowercase() + tail
-        val surface = from(tokens[a].start)
-        if (dict.contains(surface)) return surface
-        val rest = from(tokens[a].end)
+        val selected = tokens.subList(a, b + 1)
+        if (selected.any { it.kind !in setOf(TokenKind.HAN, TokenKind.SPACE) || '\n' in it.text || '\r' in it.text }) return null
+        val words = selected.filter { it.kind == TokenKind.HAN }.map { java.text.Normalizer.normalize(it.text, java.text.Normalizer.Form.NFC).lowercase() }.toMutableList()
+        words[words.lastIndex] = CONTRACTED[words.last()] ?: words.last()
+        val surface = words.joinToString(" ")
+        if (dict.contains(surface) || forms.contains(surface)) return surface
+        val rest = " " + words.drop(1).joinToString(" ")
         val reflexive = reflexiveBefore(tokens, a)
         for (an in analyses(tokens[a].text)) {
             val lemma = an.entry.lemma
@@ -382,7 +391,8 @@ class EsEngine(
         val a = analyses(word)
         val reading = readingInContext?.let { com.hanreader.app.lang.ContextRules.key(it) }
         if (reading.isNullOrEmpty() || reading == IN_PHRASE) return a.firstOrNull()?.entry
-        return a.firstOrNull { it.entry.key == reading }?.entry ?: entry(reading)?.takeIf { it.ru.isNotEmpty() } ?: a.firstOrNull()?.entry
+        return a.firstOrNull { it.entry.key == reading }?.entry ?:
+            analyses(reading).firstOrNull { it.entry.ru.isNotEmpty() }?.entry ?: a.firstOrNull()?.entry
     }
 
     fun tokenize(text: String): List<RToken> {
@@ -394,7 +404,7 @@ class EsEngine(
             val kind = when {
                 c.isLetter() -> {
                     // A word may hold an apostrophe or a hyphen between letters (O'Donnell, franco-español).
-                    while (i < text.length && (text[i].isLetter() || (text[i] in "'’-" && i + 1 < text.length && text[i + 1].isLetter() && i > start))) i++
+                    while (i < text.length && ((text[i].isLetter() || Character.getType(text[i]) in setOf(Character.NON_SPACING_MARK.toInt(), Character.COMBINING_SPACING_MARK.toInt())) || (text[i] in "'’-" && i + 1 < text.length && text[i + 1].isLetter() && i > start))) i++
                     TokenKind.HAN
                 }
                 c.isWhitespace() -> { while (i < text.length && text[i].isWhitespace()) i++; TokenKind.SPACE }
@@ -411,7 +421,10 @@ class EsEngine(
     private val variant: EsVariant get() = com.hanreader.app.AppearanceStore.appearance.value.esVariant
 
     /** Russian senses with the chosen variant's regional ones first and other regions' last. */
-    override fun senses(entry: EsEntry): List<String> = entry.ru.sortedBy { variant.rank(it) }
+    override fun senses(entry: EsEntry): List<String> {
+        val sorted = entry.ru.sortedBy { variant.rank(it) }
+        return entry.contextMeaning?.let { listOf(it) + sorted.filter { s -> s != it } } ?: sorted
+    }
 
     override fun cardAnalyses(tokens: List<RToken>, text: String, a: Int, b: Int): List<EsAnalysis> {
         val word = text.substring(tokens[a].start, tokens[b].end)
@@ -422,7 +435,13 @@ class EsEngine(
         val pronominal = if (inContext.endsWith("se") && ' ' !in inContext && all.none { it.entry.key == inContext })
             all.firstOrNull { it.entry.lemma + "se" == inContext }?.let { v -> entry(inContext)?.let { EsAnalysis(v.form, it, v.grammar) } }
         else null
-        return listOfNotNull(pronominal) + if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.key == inContext) 0 else 1 }
+        val ordered = listOfNotNull(pronominal) + if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.key == inContext) 0 else 1 }
+        val chosen = if (a == b) com.hanreader.app.lang.ContextRules.chosen(tokens[a].pinyin) else null
+        return ordered.mapIndexed { i, analysis ->
+            if (i != 0 || chosen == null) analysis
+            else analysis.copy(entry = analysis.entry.copy(contextMeaning = chosen))
+        }
+
     }
 
     /** The plain verb of a pronominal one shown first (limitarse: limitar): what «Знаю» and the conjugation are about. */

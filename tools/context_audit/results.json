@@ -1,0 +1,892 @@
+{
+  "baseline_commit": "d6eca59",
+  "gold_sha256": "1591eeaa088751e6194300a348dae61cef73c79d911e528ea85cf01dc0797aab",
+  "before": {
+    "all": {
+      "total": 310,
+      "statuses": {
+        "CORRECT": 224,
+        "MISSING_SENSE": 20,
+        "WRONG_SENSE": 30,
+        "MORPHOLOGY_ERROR": 13,
+        "UNRESOLVED": 9,
+        "PHRASE_ERROR": 10,
+        "ACCEPTABLE": 4
+      },
+      "top1": {
+        "n": 224,
+        "denominator": 310,
+        "percent": 72.26
+      },
+      "top3": {
+        "n": 265,
+        "denominator": 310,
+        "percent": 85.48
+      },
+      "morphology": {
+        "n": 68,
+        "denominator": 69,
+        "percent": 98.55
+      },
+      "russian": {
+        "n": 300,
+        "denominator": 310,
+        "percent": 96.77
+      },
+      "mwe": {
+        "n": 43,
+        "denominator": 56,
+        "percent": 76.79
+      },
+      "false_confidence_proxy": {
+        "n": 63,
+        "denominator": 310,
+        "percent": 20.32
+      },
+      "rules": 5,
+      "list_without_rule": 240
+    },
+    "by_book": {
+      "guard": {
+        "total": 60,
+        "statuses": {
+          "CORRECT": 50,
+          "WRONG_SENSE": 6,
+          "MISSING_SENSE": 2,
+          "UNRESOLVED": 1,
+          "MORPHOLOGY_ERROR": 1
+        },
+        "top1": {
+          "n": 50,
+          "denominator": 60,
+          "percent": 83.33
+        },
+        "top3": {
+          "n": 56,
+          "denominator": 60,
+          "percent": 93.33
+        },
+        "morphology": {
+          "n": 11,
+          "denominator": 12,
+          "percent": 91.67
+        },
+        "russian": {
+          "n": 60,
+          "denominator": 60,
+          "percent": 100.0
+        },
+        "mwe": {
+          "n": 4,
+          "denominator": 5,
+          "percent": 80.0
+        },
+        "false_confidence_proxy": {
+          "n": 9,
+          "denominator": 60,
+          "percent": 15.0
+        },
+        "rules": 5,
+        "list_without_rule": 47
+      },
+      "narco": {
+        "total": 250,
+        "statuses": {
+          "CORRECT": 174,
+          "MISSING_SENSE": 18,
+          "WRONG_SENSE": 24,
+          "MORPHOLOGY_ERROR": 12,
+          "UNRESOLVED": 8,
+          "PHRASE_ERROR": 10,
+          "ACCEPTABLE": 4
+        },
+        "top1": {
+          "n": 174,
+          "denominator": 250,
+          "percent": 69.6
+        },
+        "top3": {
+          "n": 209,
+          "denominator": 250,
+          "percent": 83.6
+        },
+        "morphology": {
+          "n": 57,
+          "denominator": 57,
+          "percent": 100.0
+        },
+        "russian": {
+          "n": 240,
+          "denominator": 250,
+          "percent": 96.0
+        },
+        "mwe": {
+          "n": 39,
+          "denominator": 51,
+          "percent": 76.47
+        },
+        "false_confidence_proxy": {
+          "n": 54,
+          "denominator": 250,
+          "percent": 21.6
+        },
+        "rules": 0,
+        "list_without_rule": 193
+      }
+    },
+    "by_split": {
+      "control": {
+        "total": 60,
+        "statuses": {
+          "CORRECT": 50,
+          "WRONG_SENSE": 6,
+          "MISSING_SENSE": 2,
+          "UNRESOLVED": 1,
+          "MORPHOLOGY_ERROR": 1
+        },
+        "top1": {
+          "n": 50,
+          "denominator": 60,
+          "percent": 83.33
+        },
+        "top3": {
+          "n": 56,
+          "denominator": 60,
+          "percent": 93.33
+        },
+        "morphology": {
+          "n": 11,
+          "denominator": 12,
+          "percent": 91.67
+        },
+        "russian": {
+          "n": 60,
+          "denominator": 60,
+          "percent": 100.0
+        },
+        "mwe": {
+          "n": 4,
+          "denominator": 5,
+          "percent": 80.0
+        },
+        "false_confidence_proxy": {
+          "n": 9,
+          "denominator": 60,
+          "percent": 15.0
+        },
+        "rules": 5,
+        "list_without_rule": 47
+      },
+      "development": {
+        "total": 200,
+        "statuses": {
+          "CORRECT": 142,
+          "MISSING_SENSE": 16,
+          "WRONG_SENSE": 18,
+          "MORPHOLOGY_ERROR": 8,
+          "UNRESOLVED": 6,
+          "PHRASE_ERROR": 7,
+          "ACCEPTABLE": 3
+        },
+        "top1": {
+          "n": 142,
+          "denominator": 200,
+          "percent": 71.0
+        },
+        "top3": {
+          "n": 167,
+          "denominator": 200,
+          "percent": 83.5
+        },
+        "morphology": {
+          "n": 48,
+          "denominator": 48,
+          "percent": 100.0
+        },
+        "russian": {
+          "n": 193,
+          "denominator": 200,
+          "percent": 96.5
+        },
+        "mwe": {
+          "n": 30,
+          "denominator": 39,
+          "percent": 76.92
+        },
+        "false_confidence_proxy": {
+          "n": 42,
+          "denominator": 200,
+          "percent": 21.0
+        },
+        "rules": 0,
+        "list_without_rule": 156
+      },
+      "holdout": {
+        "total": 50,
+        "statuses": {
+          "CORRECT": 32,
+          "WRONG_SENSE": 6,
+          "MISSING_SENSE": 2,
+          "UNRESOLVED": 2,
+          "PHRASE_ERROR": 3,
+          "MORPHOLOGY_ERROR": 4,
+          "ACCEPTABLE": 1
+        },
+        "top1": {
+          "n": 32,
+          "denominator": 50,
+          "percent": 64.0
+        },
+        "top3": {
+          "n": 42,
+          "denominator": 50,
+          "percent": 84.0
+        },
+        "morphology": {
+          "n": 9,
+          "denominator": 9,
+          "percent": 100.0
+        },
+        "russian": {
+          "n": 47,
+          "denominator": 50,
+          "percent": 94.0
+        },
+        "mwe": {
+          "n": 9,
+          "denominator": 12,
+          "percent": 75.0
+        },
+        "false_confidence_proxy": {
+          "n": 12,
+          "denominator": 50,
+          "percent": 24.0
+        },
+        "rules": 0,
+        "list_without_rule": 37
+      }
+    },
+    "by_category": {
+      "A": {
+        "total": 111,
+        "statuses": {
+          "CORRECT": 69,
+          "MISSING_SENSE": 13,
+          "WRONG_SENSE": 19,
+          "MORPHOLOGY_ERROR": 8,
+          "UNRESOLVED": 2
+        },
+        "top1": {
+          "n": 69,
+          "denominator": 111,
+          "percent": 62.16
+        },
+        "top3": {
+          "n": 92,
+          "denominator": 111,
+          "percent": 82.88
+        },
+        "morphology": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "russian": {
+          "n": 111,
+          "denominator": 111,
+          "percent": 100.0
+        },
+        "mwe": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "false_confidence_proxy": {
+          "n": 40,
+          "denominator": 111,
+          "percent": 36.04
+        },
+        "rules": 4,
+        "list_without_rule": 102
+      },
+      "B": {
+        "total": 74,
+        "statuses": {
+          "MISSING_SENSE": 6,
+          "WRONG_SENSE": 7,
+          "MORPHOLOGY_ERROR": 1,
+          "CORRECT": 60
+        },
+        "top1": {
+          "n": 60,
+          "denominator": 74,
+          "percent": 81.08
+        },
+        "top3": {
+          "n": 67,
+          "denominator": 74,
+          "percent": 90.54
+        },
+        "morphology": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "russian": {
+          "n": 74,
+          "denominator": 74,
+          "percent": 100.0
+        },
+        "mwe": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "false_confidence_proxy": {
+          "n": 14,
+          "denominator": 74,
+          "percent": 18.92
+        },
+        "rules": 0,
+        "list_without_rule": 57
+      },
+      "C": {
+        "total": 56,
+        "statuses": {
+          "CORRECT": 40,
+          "PHRASE_ERROR": 10,
+          "ACCEPTABLE": 2,
+          "MORPHOLOGY_ERROR": 3,
+          "MISSING_SENSE": 1
+        },
+        "top1": {
+          "n": 40,
+          "denominator": 56,
+          "percent": 71.43
+        },
+        "top3": {
+          "n": 45,
+          "denominator": 56,
+          "percent": 80.36
+        },
+        "morphology": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "russian": {
+          "n": 46,
+          "denominator": 56,
+          "percent": 82.14
+        },
+        "mwe": {
+          "n": 43,
+          "denominator": 56,
+          "percent": 76.79
+        },
+        "false_confidence_proxy": {
+          "n": 4,
+          "denominator": 56,
+          "percent": 7.14
+        },
+        "rules": 0,
+        "list_without_rule": 20
+      },
+      "D": {
+        "total": 69,
+        "statuses": {
+          "UNRESOLVED": 7,
+          "WRONG_SENSE": 4,
+          "CORRECT": 55,
+          "ACCEPTABLE": 2,
+          "MORPHOLOGY_ERROR": 1
+        },
+        "top1": {
+          "n": 55,
+          "denominator": 69,
+          "percent": 79.71
+        },
+        "top3": {
+          "n": 61,
+          "denominator": 69,
+          "percent": 88.41
+        },
+        "morphology": {
+          "n": 68,
+          "denominator": 69,
+          "percent": 98.55
+        },
+        "russian": {
+          "n": 69,
+          "denominator": 69,
+          "percent": 100.0
+        },
+        "mwe": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "false_confidence_proxy": {
+          "n": 5,
+          "denominator": 69,
+          "percent": 7.25
+        },
+        "rules": 1,
+        "list_without_rule": 61
+      }
+    }
+  },
+  "after": {
+    "all": {
+      "total": 310,
+      "statuses": {
+        "CORRECT": 286,
+        "WRONG_SENSE": 8,
+        "UNRESOLVED": 9,
+        "MORPHOLOGY_ERROR": 2,
+        "PHRASE_ERROR": 1,
+        "ACCEPTABLE": 3,
+        "MISSING_SENSE": 1
+      },
+      "top1": {
+        "n": 286,
+        "denominator": 310,
+        "percent": 92.26
+      },
+      "top3": {
+        "n": 294,
+        "denominator": 310,
+        "percent": 94.84
+      },
+      "morphology": {
+        "n": 68,
+        "denominator": 69,
+        "percent": 98.55
+      },
+      "russian": {
+        "n": 309,
+        "denominator": 310,
+        "percent": 99.68
+      },
+      "mwe": {
+        "n": 52,
+        "denominator": 56,
+        "percent": 92.86
+      },
+      "false_confidence_proxy": {
+        "n": 11,
+        "denominator": 310,
+        "percent": 3.55
+      },
+      "rules": 62,
+      "list_without_rule": 189
+    },
+    "by_book": {
+      "guard": {
+        "total": 60,
+        "statuses": {
+          "CORRECT": 55,
+          "WRONG_SENSE": 2,
+          "UNRESOLVED": 1,
+          "MORPHOLOGY_ERROR": 1,
+          "MISSING_SENSE": 1
+        },
+        "top1": {
+          "n": 55,
+          "denominator": 60,
+          "percent": 91.67
+        },
+        "top3": {
+          "n": 57,
+          "denominator": 60,
+          "percent": 95.0
+        },
+        "morphology": {
+          "n": 11,
+          "denominator": 12,
+          "percent": 91.67
+        },
+        "russian": {
+          "n": 60,
+          "denominator": 60,
+          "percent": 100.0
+        },
+        "mwe": {
+          "n": 4,
+          "denominator": 5,
+          "percent": 80.0
+        },
+        "false_confidence_proxy": {
+          "n": 4,
+          "denominator": 60,
+          "percent": 6.67
+        },
+        "rules": 5,
+        "list_without_rule": 47
+      },
+      "narco": {
+        "total": 250,
+        "statuses": {
+          "CORRECT": 231,
+          "WRONG_SENSE": 6,
+          "UNRESOLVED": 8,
+          "MORPHOLOGY_ERROR": 1,
+          "PHRASE_ERROR": 1,
+          "ACCEPTABLE": 3
+        },
+        "top1": {
+          "n": 231,
+          "denominator": 250,
+          "percent": 92.4
+        },
+        "top3": {
+          "n": 237,
+          "denominator": 250,
+          "percent": 94.8
+        },
+        "morphology": {
+          "n": 57,
+          "denominator": 57,
+          "percent": 100.0
+        },
+        "russian": {
+          "n": 249,
+          "denominator": 250,
+          "percent": 99.6
+        },
+        "mwe": {
+          "n": 48,
+          "denominator": 51,
+          "percent": 94.12
+        },
+        "false_confidence_proxy": {
+          "n": 7,
+          "denominator": 250,
+          "percent": 2.8
+        },
+        "rules": 57,
+        "list_without_rule": 142
+      }
+    },
+    "by_split": {
+      "control": {
+        "total": 60,
+        "statuses": {
+          "CORRECT": 55,
+          "WRONG_SENSE": 2,
+          "UNRESOLVED": 1,
+          "MORPHOLOGY_ERROR": 1,
+          "MISSING_SENSE": 1
+        },
+        "top1": {
+          "n": 55,
+          "denominator": 60,
+          "percent": 91.67
+        },
+        "top3": {
+          "n": 57,
+          "denominator": 60,
+          "percent": 95.0
+        },
+        "morphology": {
+          "n": 11,
+          "denominator": 12,
+          "percent": 91.67
+        },
+        "russian": {
+          "n": 60,
+          "denominator": 60,
+          "percent": 100.0
+        },
+        "mwe": {
+          "n": 4,
+          "denominator": 5,
+          "percent": 80.0
+        },
+        "false_confidence_proxy": {
+          "n": 4,
+          "denominator": 60,
+          "percent": 6.67
+        },
+        "rules": 5,
+        "list_without_rule": 47
+      },
+      "development": {
+        "total": 200,
+        "statuses": {
+          "CORRECT": 187,
+          "WRONG_SENSE": 3,
+          "UNRESOLVED": 6,
+          "MORPHOLOGY_ERROR": 1,
+          "ACCEPTABLE": 3
+        },
+        "top1": {
+          "n": 187,
+          "denominator": 200,
+          "percent": 93.5
+        },
+        "top3": {
+          "n": 191,
+          "denominator": 200,
+          "percent": 95.5
+        },
+        "morphology": {
+          "n": 48,
+          "denominator": 48,
+          "percent": 100.0
+        },
+        "russian": {
+          "n": 200,
+          "denominator": 200,
+          "percent": 100.0
+        },
+        "mwe": {
+          "n": 37,
+          "denominator": 39,
+          "percent": 94.87
+        },
+        "false_confidence_proxy": {
+          "n": 4,
+          "denominator": 200,
+          "percent": 2.0
+        },
+        "rules": 46,
+        "list_without_rule": 116
+      },
+      "holdout": {
+        "total": 50,
+        "statuses": {
+          "CORRECT": 44,
+          "WRONG_SENSE": 3,
+          "UNRESOLVED": 2,
+          "PHRASE_ERROR": 1
+        },
+        "top1": {
+          "n": 44,
+          "denominator": 50,
+          "percent": 88.0
+        },
+        "top3": {
+          "n": 46,
+          "denominator": 50,
+          "percent": 92.0
+        },
+        "morphology": {
+          "n": 9,
+          "denominator": 9,
+          "percent": 100.0
+        },
+        "russian": {
+          "n": 49,
+          "denominator": 50,
+          "percent": 98.0
+        },
+        "mwe": {
+          "n": 11,
+          "denominator": 12,
+          "percent": 91.67
+        },
+        "false_confidence_proxy": {
+          "n": 3,
+          "denominator": 50,
+          "percent": 6.0
+        },
+        "rules": 11,
+        "list_without_rule": 26
+      }
+    },
+    "by_category": {
+      "A": {
+        "total": 111,
+        "statuses": {
+          "CORRECT": 101,
+          "WRONG_SENSE": 8,
+          "UNRESOLVED": 2
+        },
+        "top1": {
+          "n": 101,
+          "denominator": 111,
+          "percent": 90.99
+        },
+        "top3": {
+          "n": 106,
+          "denominator": 111,
+          "percent": 95.5
+        },
+        "morphology": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "russian": {
+          "n": 111,
+          "denominator": 111,
+          "percent": 100.0
+        },
+        "mwe": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "false_confidence_proxy": {
+          "n": 8,
+          "denominator": 111,
+          "percent": 7.21
+        },
+        "rules": 39,
+        "list_without_rule": 67
+      },
+      "B": {
+        "total": 74,
+        "statuses": {
+          "CORRECT": 73,
+          "MORPHOLOGY_ERROR": 1
+        },
+        "top1": {
+          "n": 73,
+          "denominator": 74,
+          "percent": 98.65
+        },
+        "top3": {
+          "n": 73,
+          "denominator": 74,
+          "percent": 98.65
+        },
+        "morphology": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "russian": {
+          "n": 74,
+          "denominator": 74,
+          "percent": 100.0
+        },
+        "mwe": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "false_confidence_proxy": {
+          "n": 1,
+          "denominator": 74,
+          "percent": 1.35
+        },
+        "rules": 16,
+        "list_without_rule": 41
+      },
+      "C": {
+        "total": 56,
+        "statuses": {
+          "CORRECT": 52,
+          "PHRASE_ERROR": 1,
+          "ACCEPTABLE": 2,
+          "MISSING_SENSE": 1
+        },
+        "top1": {
+          "n": 52,
+          "denominator": 56,
+          "percent": 92.86
+        },
+        "top3": {
+          "n": 54,
+          "denominator": 56,
+          "percent": 96.43
+        },
+        "morphology": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "russian": {
+          "n": 55,
+          "denominator": 56,
+          "percent": 98.21
+        },
+        "mwe": {
+          "n": 52,
+          "denominator": 56,
+          "percent": 92.86
+        },
+        "false_confidence_proxy": {
+          "n": 1,
+          "denominator": 56,
+          "percent": 1.79
+        },
+        "rules": 0,
+        "list_without_rule": 26
+      },
+      "D": {
+        "total": 69,
+        "statuses": {
+          "UNRESOLVED": 7,
+          "CORRECT": 60,
+          "ACCEPTABLE": 1,
+          "MORPHOLOGY_ERROR": 1
+        },
+        "top1": {
+          "n": 60,
+          "denominator": 69,
+          "percent": 86.96
+        },
+        "top3": {
+          "n": 61,
+          "denominator": 69,
+          "percent": 88.41
+        },
+        "morphology": {
+          "n": 68,
+          "denominator": 69,
+          "percent": 98.55
+        },
+        "russian": {
+          "n": 69,
+          "denominator": 69,
+          "percent": 100.0
+        },
+        "mwe": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "false_confidence_proxy": {
+          "n": 1,
+          "denominator": 69,
+          "percent": 1.45
+        },
+        "rules": 7,
+        "list_without_rule": 55
+      }
+    }
+  },
+  "contrasts": {
+    "baseline": {
+      "total": 40,
+      "both_correct": 5,
+      "same_top1": 37,
+      "same_gloss_allowed": 2,
+      "real": {
+        "n": 0,
+        "denominator": 15
+      },
+      "synthetic": {
+        "n": 5,
+        "denominator": 25
+      }
+    },
+    "after": {
+      "total": 40,
+      "both_correct": 31,
+      "same_top1": 10,
+      "same_gloss_allowed": 2,
+      "real": {
+        "n": 13,
+        "denominator": 15
+      },
+      "synthetic": {
+        "n": 18,
+        "denominator": 25
+      }
+    }
+  }
+}
