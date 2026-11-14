@@ -398,6 +398,25 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * «Язык книги: сменить»: the book moves to that language's library (the library shows only
+     * one language's books). Its word counts are of the old language, so they are dropped —
+     * the next opening counts the book again.
+     */
+    fun setBookLanguage(book: BookEntity, language: com.hanreader.app.lang.LanguageInfo) {
+        if (com.hanreader.app.lang.BookLanguages.of(getApplication(), book.id) == language.tag) return
+        viewModelScope.launch {
+            if (_open.value?.entity?.id == book.id) closeBook()
+            com.hanreader.app.lang.BookLanguages.set(getApplication(), book.id, language.tag)
+            withContext(Dispatchers.IO) {
+                books.deleteWords(book.id)
+                books.setAnalyzed(book.id, 0)
+            }
+            prefs.edit().remove("analysis_v_${book.id}").apply()
+            _message.value = "«${book.title}» теперь в библиотеке языка «${language.title.lowercase()}». Переключить язык: библиотека → «Язык» → «Сменить»."
+        }
+    }
+
     fun openBook(id: Long) {
         viewModelScope.launch {
             openMutex.withLock {
