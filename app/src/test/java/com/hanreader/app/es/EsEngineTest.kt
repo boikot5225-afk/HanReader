@@ -103,6 +103,24 @@ class EsEngineTest {
     }
 
     @Test
+    fun phraseCardFromItsFirstWord() {
+        // «El narco» (Grillo): tapping «modus» in «modus operandi» gives the phrase's card —
+        // modus has no entry of its own, so the card used to say «Слова нет в словаре».
+        val text = "Su modus operandi era simple."
+        val t = engine.chapter(listOf(text), com.hanreader.app.lang.TextOptions())(text).tokens
+        val i = t.indexOfFirst { it.text == "modus" }
+        val a = engine.cardAnalyses(t, text, i, i)
+        assertEquals("modus operandi", a.first().entry.key)
+        // A phrase head with its own readings keeps them after the phrase (de in «de pronto»).
+        val text2 = "Vino de pronto."
+        val t2 = engine.chapter(listOf(text2), com.hanreader.app.lang.TextOptions())(text2).tokens
+        val i2 = t2.indexOfFirst { it.text == "de" }
+        val a2 = engine.cardAnalyses(t2, text2, i2, i2)
+        assertEquals("de pronto", a2.first().entry.key)
+        assertTrue(a2.any { it.entry.key == "de" })
+    }
+
+    @Test
     fun levelsByFrequency() {
         val lv = engine.levels
         assertEquals(1, lv.of("ser"))
