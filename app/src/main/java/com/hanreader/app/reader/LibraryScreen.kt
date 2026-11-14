@@ -60,6 +60,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 
 /** File types the picker offers: EPUB, FB2 (also zipped) and plain text. */
@@ -85,6 +86,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
     var importing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf<BookEntity?>(null) }
+    var langBook by remember { mutableStateOf<BookEntity?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             importing = true
@@ -151,7 +153,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
             items(books.chunked(3), key = { row -> row.first().id }) { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     row.forEach { book ->
-                        BookTile(vm, book, analysis[book.id], knownShare[book.id], Modifier.weight(1f), onOpen = { onOpen(book.id) }, onStats = { onStats(book.id) }, onDelete = { confirmDelete = book })
+                        BookTile(vm, book, analysis[book.id], knownShare[book.id], Modifier.weight(1f), onOpen = { onOpen(book.id) }, onStats = { onStats(book.id) }, onLanguage = { langBook = book }, onDelete = { confirmDelete = book })
                     }
                     repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
@@ -165,6 +167,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
                     known = knownShare[book.id],
                     onOpen = { onOpen(book.id) },
                     onStats = { onStats(book.id) },
+                    onLanguage = { langBook = book },
                     onDelete = { confirmDelete = book }
                 )
             }
@@ -211,13 +214,52 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Отмена") } }
         )
     }
+
+    langBook?.let { book ->
+        BookLanguageDialog(book, onPick = { vm.setBookLanguage(book, it); langBook = null }, onClose = { langBook = null })
+    }
 }
 
+/** «Язык книги: сменить»: the book moves to the chosen language's library. */
 @Composable
-private fun BookRow(vm: ReaderViewModel, book: BookEntity, progress: Float?, known: Int?, onOpen: () -> Unit, onStats: () -> Unit, onDelete: () -> Unit) {
-    Surface(onClick = onOpen, shape = RoundedCornerShape(LocalThemeSpec.current.corner), color = MaterialTheme.colorScheme.surface,
+private fun BookLanguageDialog(book: BookEntity, onPick: (com.hanreader.app.lang.LanguageInfo) -> Unit, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val current = remember(book.id) { com.hanreader.app.lang.BookLanguages.of(context, book.id) }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("Язык книги") },
+        text = {
+            Column {
+                Text(
+                    "«${book.title}» будет в библиотеке выбранного языка; её словарь посчитается заново.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                com.hanreader.app.lang.Languages.AVAILABLE.forEach { l ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onPick(l) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.RadioButton(selected = l.tag == current, onClick = { onPick(l) })
+                        Text(l.title, Modifier.padding(start = 4.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onClose) { Text("Отмена") } }
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun BookRow(vm: ReaderViewModel, book: BookEntity, progress: Float?, known: Int?, onOpen: () -> Unit, onStats: () -> Unit, onLanguage: () -> Unit, onDelete: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    Surface(shape = RoundedCornerShape(LocalThemeSpec.current.corner), color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-        Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+        Box {
+        Row(Modifier.fillMaxWidth().combinedClickable(onClick = onOpen, onLongClick = { menu = true }, onClickLabel = "Открыть", onLongClickLabel = "Действия")
+            .padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             BookCover(vm, book, Modifier.width(64.dp))
             Spacer(Modifier.width(14.dp))
@@ -243,6 +285,14 @@ private fun BookRow(vm: ReaderViewModel, book: BookEntity, progress: Float?, kno
                 Icon(LexiconIcons.Trash, contentDescription = "Удалить книгу", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(text = { Text("Словарь книги") }, onClick = { menu = false; onStats() })
+            if (com.hanreader.app.lang.Languages.AVAILABLE.size > 1) {
+                DropdownMenuItem(text = { Text("Язык книги: сменить") }, onClick = { menu = false; onLanguage() })
+            }
+            DropdownMenuItem(text = { Text("Удалить", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onDelete() })
+        }
+        }
     }
 }
 
@@ -251,7 +301,7 @@ private fun readFraction(book: BookEntity) = if (book.chapterCount > 0 && book.l
 /** A book in the cover grid; long press offers the book's vocabulary and deleting. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BookTile(vm: ReaderViewModel, book: BookEntity, progress: Float?, known: Int?, modifier: Modifier, onOpen: () -> Unit, onStats: () -> Unit, onDelete: () -> Unit) {
+private fun BookTile(vm: ReaderViewModel, book: BookEntity, progress: Float?, known: Int?, modifier: Modifier, onOpen: () -> Unit, onStats: () -> Unit, onLanguage: () -> Unit, onDelete: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box {
@@ -261,6 +311,9 @@ private fun BookTile(vm: ReaderViewModel, book: BookEntity, progress: Float?, kn
             )
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(text = { Text("Словарь книги") }, onClick = { menu = false; onStats() })
+                if (com.hanreader.app.lang.Languages.AVAILABLE.size > 1) {
+                    DropdownMenuItem(text = { Text("Язык книги: сменить") }, onClick = { menu = false; onLanguage() })
+                }
                 DropdownMenuItem(text = { Text("Удалить", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onDelete() })
             }
         }
