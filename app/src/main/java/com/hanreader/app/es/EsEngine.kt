@@ -572,7 +572,7 @@ class EsEngine(
         override val all = (1..bands.size).toList()
         override fun title(level: Int) = titles.getOrElse(level - 1) { "C2+" }
         override fun of(word: String): Int = analyses(word).firstOrNull()?.entry?.rank?.takeIf { it > 0 }?.let { levelOf(it) } ?: 0
-        override fun estimate(word: Int): Int = 0
+        override fun estimate(word: String): Int = of(word).takeIf { it > 0 } ?: (bands.size + 1)
         override fun knownAt(level: Int): Set<String> = (1..level.coerceAtMost(bands.size)).flatMapTo(HashSet()) { byLevel[it - 1] }
     }
 
