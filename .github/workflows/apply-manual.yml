@@ -1,0 +1,30 @@
+name: Apply manual dictionary fixes
+# data/es/manual.tsv and forms_manual.tsv are the hand-checked fixes; the generated assets
+# (app/src/main/assets/es/*.tsv, ~25 MB) are too large to push through some API clients, so this
+# workflow regenerates them after a data push and commits the result itself.
+# No loop: the bot's own commit touches only assets, which are not in `paths`.
+on:
+  push:
+    branches: [main, 'ccr-*', es, amauta, 'experiment/**', 'claude/**']
+    paths: ['data/es/manual.tsv', 'data/es/forms_manual.tsv', 'tools/apply_es_manual.py']
+  workflow_dispatch:
+concurrency:
+  group: apply-manual-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Regenerate Spanish dictionary assets from data/
+        run: python3 tools/apply_es_manual.py
+      - name: Commit regenerated assets
+        shell: bash
+        run: |
+          if git diff --quiet; then echo "Assets already up to date"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Словари: правки из data/es применены к assets (автосборка)"
+          git push

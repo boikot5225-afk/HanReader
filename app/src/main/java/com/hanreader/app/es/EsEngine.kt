@@ -435,7 +435,11 @@ class EsEngine(
         val pronominal = if (inContext.endsWith("se") && ' ' !in inContext && all.none { it.entry.key == inContext })
             all.firstOrNull { it.entry.lemma + "se" == inContext }?.let { v -> entry(inContext)?.let { EsAnalysis(v.form, it, v.grammar) } }
         else null
-        val ordered = listOfNotNull(pronominal) + if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.key == inContext) 0 else 1 }
+        // Preserve Kimi's phrase-head card, including inflected phrase keys from the forms table.
+        val phrase = if (a == b && ' ' in inContext && all.none { it.entry.key == inContext })
+            analyses(inContext).firstOrNull()?.entry?.let { EsAnalysis(inContext, it, "") }
+        else null
+        val ordered = listOfNotNull(pronominal, phrase) + if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.key == inContext) 0 else 1 }
         val chosen = if (a == b) com.hanreader.app.lang.ContextRules.chosen(tokens[a].pinyin) else null
         return ordered.mapIndexed { i, analysis ->
             if (i != 0 || chosen == null) analysis
