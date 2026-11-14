@@ -220,8 +220,9 @@ private fun SummaryRow(
     var open by remember(item.key) { mutableStateOf(false) }
     val block = chapter.blocks[item.block] as ReaderBlock.Text
     val t = block.tokens[item.token]
-    val translation = remember(item.key) {
-        (if (item.phrase && engine !is ZhEngine) engine.glossShort(t.text, item.key) else engine.cardTranslation(t.text, t.pinyin.takeIf { it.isNotEmpty() })
+    val translation = remember(item.key, t, engine) {
+        (if (engine is ZhEngine) engine.cardTranslation(t.text, t.pinyin.takeIf { it.isNotEmpty() }, t.contextMeaning)
+            else if (item.phrase) engine.glossShort(t.text, item.key) else engine.cardTranslation(t.text, t.pinyin.takeIf { it.isNotEmpty() })
             ?: engine.glossShort(t.text, t.pinyin.takeIf { it.isNotEmpty() })).orEmpty()
     }
     val sentence = remember(item.key) { ChapterBuilder.sentence(block.text, t.start, t.start + item.shown.length) }

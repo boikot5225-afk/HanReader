@@ -297,7 +297,10 @@ internal fun glossOf(glossFor: Map<String, String>, t: RToken, block: Int = -1):
     // The reader's meaning for this very place (ContextMeanings) wins.
     if (block >= 0) glossFor["@$block:${t.start}"]?.let { return it }
     // An empty hint for a reading: no hint at all (a word inside a phrase whose first word carries it).
-    if (t.pinyin.isNotEmpty()) glossFor[t.text + "|" + t.pinyin]?.let { return it.ifEmpty { null } }
+    if (t.pinyin.isNotEmpty()) {
+        glossFor[t.glossKey]?.let { return it.ifEmpty { null } }
+        if (t.contextMeaning != null) glossFor[t.text + "|" + t.pinyin]?.let { return it.ifEmpty { null } }
+    }
     return glossFor[t.text]
 }
 

@@ -1,0 +1,242 @@
+[
+  {
+    "id": "pair:0:1",
+    "left": "synthetic:0:0",
+    "right": "synthetic:0:1",
+    "unit": "妖精"
+  },
+  {
+    "id": "pair:0:2",
+    "left": "synthetic:0:0",
+    "right": "synthetic:0:2",
+    "unit": "妖精"
+  },
+  {
+    "id": "pair:1:1",
+    "left": "synthetic:1:0",
+    "right": "synthetic:1:1",
+    "unit": "体面"
+  },
+  {
+    "id": "pair:1:2",
+    "left": "synthetic:1:0",
+    "right": "synthetic:1:2",
+    "unit": "体面"
+  },
+  {
+    "id": "pair:2:1",
+    "left": "synthetic:2:0",
+    "right": "synthetic:2:1",
+    "unit": "小精灵"
+  },
+  {
+    "id": "pair:2:2",
+    "left": "synthetic:2:0",
+    "right": "synthetic:2:2",
+    "unit": "小精灵"
+  },
+  {
+    "id": "pair:3:1",
+    "left": "synthetic:3:0",
+    "right": "synthetic:3:1",
+    "unit": "混血"
+  },
+  {
+    "id": "pair:3:2",
+    "left": "synthetic:3:0",
+    "right": "synthetic:3:2",
+    "unit": "混血"
+  },
+  {
+    "id": "pair:4:1",
+    "left": "synthetic:4:0",
+    "right": "synthetic:4:1",
+    "unit": "地"
+  },
+  {
+    "id": "pair:4:2",
+    "left": "synthetic:4:0",
+    "right": "synthetic:4:2",
+    "unit": "地"
+  },
+  {
+    "id": "pair:5:1",
+    "left": "synthetic:5:0",
+    "right": "synthetic:5:1",
+    "unit": "得"
+  },
+  {
+    "id": "pair:5:2",
+    "left": "synthetic:5:0",
+    "right": "synthetic:5:2",
+    "unit": "得"
+  },
+  {
+    "id": "pair:6:1",
+    "left": "synthetic:6:0",
+    "right": "synthetic:6:1",
+    "unit": "只"
+  },
+  {
+    "id": "pair:6:2",
+    "left": "synthetic:6:0",
+    "right": "synthetic:6:2",
+    "unit": "只"
+  },
+  {
+    "id": "pair:7:1",
+    "left": "synthetic:7:0",
+    "right": "synthetic:7:1",
+    "unit": "还"
+  },
+  {
+    "id": "pair:7:2",
+    "left": "synthetic:7:0",
+    "right": "synthetic:7:2",
+    "unit": "还"
+  },
+  {
+    "id": "pair:8:1",
+    "left": "synthetic:8:0",
+    "right": "synthetic:8:1",
+    "unit": "长"
+  },
+  {
+    "id": "pair:8:2",
+    "left": "synthetic:8:0",
+    "right": "synthetic:8:2",
+    "unit": "长"
+  },
+  {
+    "id": "pair:9:1",
+    "left": "synthetic:9:0",
+    "right": "synthetic:9:1",
+    "unit": "乐"
+  },
+  {
+    "id": "pair:9:2",
+    "left": "synthetic:9:0",
+    "right": "synthetic:9:2",
+    "unit": "乐"
+  },
+  {
+    "id": "pair:10:1",
+    "left": "synthetic:10:0",
+    "right": "synthetic:10:1",
+    "unit": "重"
+  },
+  {
+    "id": "pair:10:2",
+    "left": "synthetic:10:0",
+    "right": "synthetic:10:2",
+    "unit": "重"
+  },
+  {
+    "id": "pair:11:1",
+    "left": "synthetic:11:0",
+    "right": "synthetic:11:1",
+    "unit": "行"
+  },
+  {
+    "id": "pair:11:2",
+    "left": "synthetic:11:0",
+    "right": "synthetic:11:2",
+    "unit": "行"
+  },
+  {
+    "id": "pair:12:1",
+    "left": "synthetic:12:0",
+    "right": "synthetic:12:1",
+    "unit": "藏"
+  },
+  {
+    "id": "pair:12:2",
+    "left": "synthetic:12:0",
+    "right": "synthetic:12:2",
+    "unit": "藏"
+  },
+  {
+    "id": "pair:13:1",
+    "left": "synthetic:13:0",
+    "right": "synthetic:13:1",
+    "unit": "单"
+  },
+  {
+    "id": "pair:13:2",
+    "left": "synthetic:13:0",
+    "right": "synthetic:13:2",
+    "unit": "单"
+  },
+  {
+    "id": "pair:14:1",
+    "left": "synthetic:14:0",
+    "right": "synthetic:14:1",
+    "unit": "恶"
+  },
+  {
+    "id": "pair:14:2",
+    "left": "synthetic:14:0",
+    "right": "synthetic:14:2",
+    "unit": "恶"
+  },
+  {
+    "id": "pair:15:1",
+    "left": "synthetic:15:0",
+    "right": "synthetic:15:1",
+    "unit": "朝"
+  },
+  {
+    "id": "pair:15:2",
+    "left": "synthetic:15:0",
+    "right": "synthetic:15:2",
+    "unit": "朝"
+  },
+  {
+    "id": "pair:16:1",
+    "left": "synthetic:16:0",
+    "right": "synthetic:16:1",
+    "unit": "传"
+  },
+  {
+    "id": "pair:16:2",
+    "left": "synthetic:16:0",
+    "right": "synthetic:16:2",
+    "unit": "传"
+  },
+  {
+    "id": "pair:17:1",
+    "left": "synthetic:17:0",
+    "right": "synthetic:17:1",
+    "unit": "当"
+  },
+  {
+    "id": "pair:17:2",
+    "left": "synthetic:17:0",
+    "right": "synthetic:17:2",
+    "unit": "当"
+  },
+  {
+    "id": "pair:18:1",
+    "left": "synthetic:18:0",
+    "right": "synthetic:18:1",
+    "unit": "数"
+  },
+  {
+    "id": "pair:18:2",
+    "left": "synthetic:18:0",
+    "right": "synthetic:18:2",
+    "unit": "数"
+  },
+  {
+    "id": "pair:19:1",
+    "left": "synthetic:19:0",
+    "right": "synthetic:19:1",
+    "unit": "为"
+  },
+  {
+    "id": "pair:19:2",
+    "left": "synthetic:19:0",
+    "right": "synthetic:19:2",
+    "unit": "为"
+  }
+]

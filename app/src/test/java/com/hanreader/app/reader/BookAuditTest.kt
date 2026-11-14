@@ -24,9 +24,12 @@ class BookAuditTest {
         val path = System.getenv("AUDIT_BOOK") ?: return
         fun lines(f: String) = File("src/main/assets/zh/$f").bufferedReader().readLines().asSequence()
         val e = ZhEngine(ZhSegmenterTest.dict, 0, russian = ZhEngine.parseRussian(lines("ru.tsv")),
-            russianAi = ZhEngine.parseRussian(lines("ru_ai.tsv")), russianChars = ZhEngine.parseRussianChars(lines("ru_chars.tsv")))
+            russianAi = ZhEngine.parseRussian(lines("ru_ai.tsv")), russianChars = ZhEngine.parseRussianChars(lines("ru_chars.tsv")),
+            hsk = HskLevels.parse(lines("hsk.tsv")), names = ZhEngine.parseNames(lines("names.tsv")),
+            script = com.hanreader.app.zh.ZhScript.parse(File("src/main/assets/zh/script.tsv").inputStream()),
+            measures = ZhEngine.parseMeasures(lines("measure.tsv")))
         val book = BookFiles.open(File(path))
-        val analysis = BookAnalyzer.analyze(1, book, e.segmenter, ZhSegmenterTest.dict)
+        val analysis = e.analyze(1, book) { _, _ -> }
         val names = analysis.words.filter { it.ignored }.map { it.word }.toSet()
         File(System.getenv("AUDIT_OUT") + ".names").writeText(names.sorted().joinToString("\n"))
         class Row(val word: String, val reading: String, var n: Int, val gloss: String, val card: String, val sentence: String)
@@ -42,8 +45,8 @@ class BookAuditTest {
                 for (tk in toks) {
                     val key = tk.text + "\t" + tk.pinyin
                     rows.getOrPut(key) {
-                        Row(tk.text, tk.pinyin, 0, e.glossShort(tk.text, tk.pinyin.ifEmpty { null }) ?: "",
-                            e.cardTranslation(tk.text, tk.pinyin.ifEmpty { null }) ?: "", ChapterBuilder.sentence(p.text, tk.start, tk.end).take(80))
+                        Row(tk.text, tk.pinyin, 0, e.glossShort(tk) ?: "",
+                            e.cardTranslation(tk.text, tk.pinyin.ifEmpty { null }, tk.contextMeaning) ?: "", ChapterBuilder.sentence(p.text, tk.start, tk.end).take(80))
                     }.n++
                 }
             }

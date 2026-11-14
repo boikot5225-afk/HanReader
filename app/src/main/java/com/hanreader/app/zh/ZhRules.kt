@@ -10,6 +10,7 @@ import java.io.InputStream
  *
  *   read  \t 字 or 词 \t conditions \t reading ("-" keeps the dictionary's) \t note
  *   split \t 词,词     \t conditions \t where to cut (0 = keep whole)       \t note
+ *   sense \t 词       \t conditions \t Russian sense of this occurrence    \t note
  *   set   \t NAME      \t value — then $NAME anywhere in conditions stands for the value
  *
  * Conditions are joined by " & ", all must hold; "!" before one negates it; "*" always holds.
@@ -19,6 +20,8 @@ import java.io.InputStream
  *  - prev0:CHARS           — prev starts with one of these;
  *  - prev=a,b / next=a,b   — prev / next is one of these words;
  *  - prev~a,b / next^a,b   — prev contains / next starts with one of these;
+ *  - next~a,b             — next contains one of these;
+ *  - near:a,b              — cue within 16 tokens either side, within the sentence;
  *  - long-prev             — prev has two characters or more;
  *  - earlier:a,b           — one of these words in the six before, same clause;
  *  - later:a,b             — one of these words in the eight after, same clause;
@@ -27,7 +30,8 @@ import java.io.InputStream
  */
 class ZhRules private constructor(
     private val reads: Map<String, List<Rule>>,
-    private val splits: Map<String, List<Rule>>
+    private val splits: Map<String, List<Rule>>,
+    private val senses: Map<String, List<Rule>> = emptyMap()
 ) {
     private class Rule(val conditions: List<Condition>, val result: String)
 
@@ -39,7 +43,16 @@ class ZhRules private constructor(
     /** Where a rule looks: [prev] / [next] words, and the tokens when the word is a token of its own. */
     private class Place(val prev: String?, val next: String?, val tokens: List<ZhToken>?, val i: Int)
 
-    val isEmpty: Boolean get() = reads.isEmpty() && splits.isEmpty()
+    val isEmpty: Boolean get() = reads.isEmpty() && splits.isEmpty() && senses.isEmpty()
+
+    /** A Russian sense for this occurrence, independent of its pinyin. */
+    fun meaning(tokens: List<ZhToken>, i: Int): String? {
+        val t = tokens[i]
+        if (t.kind != TokenKind.HAN || t.text !in senses) return null
+        val prev = tokens.getOrNull(i - 1)?.takeIf { it.kind == TokenKind.HAN }?.text
+        val next = tokens.getOrNull(i + 1)?.takeIf { it.kind == TokenKind.HAN }?.text
+        return first(senses[t.text], Place(prev, next, tokens, i))
+    }
 
     /** Whether [word] has reading rules. */
     fun readsOf(word: String): Boolean = word in reads
@@ -76,11 +89,38 @@ class ZhRules private constructor(
             "next=" -> next != null && next in c.words
             "prev~" -> prev != null && c.words.any { prev.contains(it) }
             "next^" -> next != null && c.words.any { next.startsWith(it) }
+            "next~" -> next != null && c.words.any { next.contains(it) }
             "next-any:" -> p.tokens?.getOrNull(p.i + 1)?.text?.firstOrNull()?.let { it in c.chars } == true
             "earlier:" -> p.tokens != null && earlier(p.tokens, p.i, c.words)
             "later:" -> p.tokens != null && later(p.tokens, p.i, c.words)
+            "near:" -> p.tokens != null && near(p.tokens, p.i, c.words)
             else -> false
         }
+    }
+
+    /** Up to 16 tokens either side, within a sentence; a Chinese comma is not a sentence end. */
+    private fun near(tokens: List<ZhToken>, i: Int, words: Set<String>): Boolean {
+        for (direction in listOf(-1, 1)) {
+            var k = i + direction
+            while (k in tokens.indices && kotlin.math.abs(k - i) <= 16) {
+                val t = tokens[k]
+                if (t.text.any { it in "。！？!?；;\n" }) break
+                if (t.kind == TokenKind.HAN) {
+                    if (t.text in words) return true
+                    // A contextual cue may itself have been split (洛 + 哈特). Match bounded
+                    // adjacent Han tokens too, never through punctuation or a sentence boundary.
+                    var phrase = t.text
+                    var j = k + 1
+                    while (j < tokens.size && j <= k + 3 && j <= i + 16 && tokens[j].kind == TokenKind.HAN && phrase.length < 12) {
+                        phrase += tokens[j].text
+                        if (phrase in words) return true
+                        j++
+                    }
+                }
+                k += direction
+            }
+        }
+        return false
     }
 
     /** One of [words] is among the six tokens before [i] in the same clause. */
@@ -114,7 +154,7 @@ class ZhRules private constructor(
         @Volatile
         var current: ZhRules = EMPTY
 
-        private val KINDS = listOf("next-any:", "earlier:", "later:", "prev0:", "prev:", "next:", "prev=", "next=", "prev~", "next^")
+        private val KINDS = listOf("next-any:", "earlier:", "later:", "near:", "prev0:", "prev:", "next:", "prev=", "next=", "prev~", "next~", "next^")
 
         fun load(input: InputStream): ZhRules = input.bufferedReader().useLines { parse(it) }
 
@@ -124,13 +164,14 @@ class ZhRules private constructor(
             val sets = LinkedHashMap<String, String>()
             val reads = LinkedHashMap<String, MutableList<Rule>>()
             val splits = LinkedHashMap<String, MutableList<Rule>>()
+            val senses = LinkedHashMap<String, MutableList<Rule>>()
             for (line in lines) {
                 if (line.isBlank() || line.startsWith("#")) continue
                 val p = line.split('\t')
                 if (p.size < 3) continue
                 val kind = p[0].trim()
                 if (kind == "set") { sets[p[1].trim()] = p[2].trim(); continue }
-                if (p.size < 4 || kind != "read" && kind != "split") continue
+                if (p.size < 4 || kind !in setOf("read", "split", "sense")) continue
                 var text = p[2].trim()
                 // Longer names first: $COUNT_CHARS is not $COUNT + "_CHARS".
                 for (name in sets.keys.sortedByDescending { it.length }) text = text.replace("$$name", sets.getValue(name))
@@ -142,10 +183,10 @@ class ZhRules private constructor(
                 }
                 val result = p[3].trim()
                 if (conditions.isEmpty() || result.isEmpty()) continue
-                val target = if (kind == "read") reads else splits
+                val target = when (kind) { "read" -> reads; "split" -> splits; else -> senses }
                 for (w in p[1].split(',').map { it.trim() }.filter { it.isNotEmpty() }) target.getOrPut(w) { ArrayList() } += Rule(conditions, result)
             }
-            return ZhRules(reads, splits)
+            return ZhRules(reads, splits, senses)
         }
     }
 }

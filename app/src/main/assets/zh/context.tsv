@@ -18,6 +18,7 @@ read	当	earlier:把,拿,将	dàng	把他当朋友 «принимать за»
 
 # --- 地: the adverbial particle after a description, else the earth ---
 read	地	!prev	dì
+read	地	prev=慢慢,轻轻,悄悄,静静,默默,渐渐,重重 & next-any:、，,	de	перечисление после наречия не меняет частицу на землю
 read	地	!next	dì
 read	地	next:上下里面板毯底方区点图球址位带铁窖狱震洞道形步主	dì	在地上, 地板
 read	地	long-prev	de	不耐烦地问
@@ -32,6 +33,8 @@ read	得	*	de	说得很快
 # --- 长: zhǎng «расти, глава», else cháng «длинный» ---
 read	长	next:得出大高满着了成	zhǎng	长得, 长大
 read	长	prev:级部院校队班首家族局市省州船村团社组厂处科县乡镇会	zhǎng	校长, 部长
+read	长	next:一二三四五六七八九十几两 & next~辈,岁	zhǎng	старше на N поколений/лет; длина в метрах остаётся cháng
+read	长	next:一二三四五六七八九十几两 & later:辈,岁	zhǎng	цифра и единица возраста раздельными токенами
 read	长	*	cháng
 
 # --- 只: zhī the measure word after a number or demonstrative, else «только» ---
@@ -122,3 +125,13 @@ split	却说	prev	1	«теперь обратимся к» opens a passage; afte
 split	可不	next	1	«ещё бы» stands alone; 这可不容易 is 可 + 不
 split	发起	next:怒火脾呆抖烧疯愁慌急狠	1	发起怒来 «рассердиться»
 split	本书,个人,回城	prev:$COUNT_CHARS这那哪	1	这本书, 一个人: measure + noun after a number
+
+# 0.24.10: local senses, separate from pronunciation. No book-name or chapter-ID conditions.
+sense	妖精	near:银行,金库,古灵阁,叛乱	гоблин	финансовый мир и восстания гоблинов; обычные значения сохранены
+sense	体面	prev=非常,很,相当,十分 & next=的 & near:宅邸,房子,住宅,建筑	приличный, респектабельный	о виде здания, не о достоинстве
+sense	小精灵	near:康沃尔,康沃尔郡,洛哈特 & near:课堂,教室,灾难,笼子	пикси	конкретное существо, не любой эльф
+read	乐	prev:音	yuè	音乐声: чтение внутри сочетания без собственного пиньиня
+sense	长	next:一二三四五六七八九十几两 & next~辈,岁	старше; старший по возрасту	не «расти» и не длина
+sense	正传	prev=做 & near:给,生平,一生	биография; жизнеописание	написать биографию, не вернуться к основному сюжету
+split	长三	next:辈岁米丈尺寸里	1	число и мера; сохранять словарное 长三 в историческом значении вне измерения
+sense	长	next:一二三四五六七八九十几两 & later:辈,岁	старше; старший по возрасту	единица возраста после отдельного числа

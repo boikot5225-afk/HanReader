@@ -152,8 +152,8 @@ object ChineseNames {
 }
 
 object BookAnalyzer {
-    /** Bumped when the analysis finds more (2: names next to a middle dot; 3: Spanish names by capital letter; 4: Chinese names; 5: surname + a proper name of the dictionary). Older books are re-analysed. */
-    const val VERSION = 5
+    /** Bumped when the analysis finds more (2: names next to a middle dot; 3: Spanish names by capital letter; 4: Chinese names; 5: surname + a proper name of the dictionary; 6: complete magical terminology). Older books are re-analysed. */
+    const val VERSION = 6
 
     /**
      * Segments every chapter once and counts Han words. Name runs repeated in the book are stored

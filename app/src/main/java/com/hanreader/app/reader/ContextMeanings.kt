@@ -64,6 +64,7 @@ object ContextMeanings {
                     // Chinese: a book meaning replaces the meaning of every reading of the word.
                     glossFor[t.text] = m
                     if (t.pinyin.isNotEmpty()) glossFor[t.text + "|" + t.pinyin] = m
+                    if (t.contextMeaning != null) glossFor[t.glossKey] = m
                 } else glossFor[if (t.pinyin.isEmpty()) t.text else t.text + "|" + t.pinyin] = m
             }
         }

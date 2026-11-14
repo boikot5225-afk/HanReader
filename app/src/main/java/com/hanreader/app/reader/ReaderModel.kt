@@ -110,13 +110,28 @@ class ZhEngine(
         READING("машинный перевод CC-CEDICT, по чтению")
     }
 
-    /** Where the Russian meaning of a word comes from, or null when there is none. */
-    fun russianSource(word: String): RussianSource? = when {
-        word in russianChars -> RussianSource.READING
-        word in russianAi -> RussianSource.AI
-        word in russian -> RussianSource.WIKTIONARY
-        else -> null
+    private fun russianKey(word: String): String {
+        var key = word
+        val visited = HashSet<String>()
+        repeat(4) {
+            if (!visited.add(key)) return word
+            if (key in russianChars) return key
+            val value = (russianAi[key] ?: russian[key])?.trim() ?: return key
+            if (!value.startsWith("вариант ", ignoreCase = true)) return key
+            val target = value.substringAfter(' ').trim().takeIf { it.isNotEmpty() && it.all { ch -> ch.isHan() } } ?: return key
+            if (target !in russianAi && target !in russian && target !in russianChars) return key
+            key = target
+        }
+        return key
     }
+
+    /** Where the Russian meaning of a word comes from, or null when there is none. */
+    fun russianSource(word: String): RussianSource? = russianKey(word).let { key -> when {
+        key in russianChars -> RussianSource.READING
+        key in russianAi -> RussianSource.AI
+        key in russian -> RussianSource.WIKTIONARY
+        else -> null
+    } }
 
     /**
      * The entry of character [word] for [reading] (tone marks compared first, then without them),
@@ -144,9 +159,20 @@ class ZhEngine(
      * «смысл; букв.: …», made from CC-CEDICT, both Wiktionaries) first, else the Russian Wiktionary.
      */
     fun russianSenses(word: String, reading: String? = null): List<String> {
-        charEntry(word, reading)?.let { e -> return e.second.split(";").map { it.trim() }.filter { it.isNotEmpty() } }
-        russianAi[word]?.let { v -> return v.split(";").map { it.trim() }.filter { it.isNotEmpty() } }
-        return russian[word]?.split(" ; ")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+        val key = russianKey(word)
+        charEntry(key, reading)?.let { e -> return e.second.split(";").map { it.trim() }.filter { it.isNotEmpty() } }
+        russianAi[key]?.let { v -> return v.split(";").map { it.trim() }.filter { it.isNotEmpty() } }
+        return russian[key]?.split(" ; ")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+    }
+
+    fun russianSenses(word: String, reading: String?, contextMeaning: String?): List<String> {
+        val base = russianSenses(word, reading)
+        return contextMeaning?.let { listOf(it) + base.filter { s -> s != it } } ?: base
+    }
+
+    fun cardTranslation(word: String, reading: String?, contextMeaning: String?): String? {
+        if (contextMeaning == null) return cardTranslation(word, reading)
+        return russianSenses(word, reading, contextMeaning).take(2).joinToString("; ")
     }
 
     private fun toneless(p: String): String = java.text.Normalizer.normalize(p.lowercase(), java.text.Normalizer.Form.NFD)
@@ -274,7 +300,8 @@ class ZhEngine(
                     end = tok.end,
                     defined = tok.entry?.hasDefinition == true,
                     display = if (shown === simple) tok.text else shown.substring(tok.start, tok.end),
-                    syllables = contextual?.split(' ') ?: syllablesOf(tok)
+                    syllables = contextual?.split(' ') ?: syllablesOf(tok),
+                    contextMeaning = com.hanreader.app.zh.ZhRules.current.meaning(segmented, k)
                 )
             }
             PreparedText(simple, shown, tokens)
@@ -542,8 +569,13 @@ data class RToken(
     /** What is drawn: [text] in the script the reader chose (traditional, as in the book). */
     val display: String = text,
     /** The reading of each character, in order; empty when unknown. Joined, they make [pinyin]. */
-    val syllables: List<String> = emptyList()
-)
+    val syllables: List<String> = emptyList(),
+    /** The locally selected sense of this occurrence; never appended to visible pinyin. */
+    val contextMeaning: String? = null
+) {
+    /** A hint cache distinguishes senses of the same spelling and pronunciation. */
+    val glossKey: String get() = text + "|" + pinyin + (contextMeaning?.let { "|" + it } ?: "")
+}
 
 /** A footnote mark in a paragraph: characters [start, end) and the note's text. */
 data class ReaderNote(val start: Int, val end: Int, val text: String)

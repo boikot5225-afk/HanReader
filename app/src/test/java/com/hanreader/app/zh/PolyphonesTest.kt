@@ -22,7 +22,9 @@ class PolyphonesTest {
     fun deParticles() {
         assertEquals(listOf("de"), readings("他慢慢地走过来。", "地"))
         assertEquals(listOf("de"), readings("她不耐烦地问。", "地"))
-        assertEquals(listOf("dì"), readings("魁地奇比赛开始了。", "地"))
+        val quidditch = ChapterBuilder.build(TxtBook("魁地奇比赛开始了。".toByteArray(), "x"), 0, engine)
+            .blocks.filterIsInstance<ReaderBlock.Text>().first().tokens.first { it.text == "魁地奇" }
+        assertEquals("dì", quidditch.syllables[1])
         assertEquals(listOf("de"), readings("他说得很快。", "得"))
         assertEquals(listOf("děi"), readings("我得走了。", "得"))
     }

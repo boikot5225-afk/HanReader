@@ -52,10 +52,10 @@ class ZhRulesTest {
             .filter { it.isNotBlank() && !it.startsWith("#") && !it.startsWith("set\t") }
         val sets = File("src/main/assets/zh/context.tsv").readLines().filter { it.startsWith("set\t") }.map { it.split('\t')[1] }.toSet()
         val known = setOf("*", "prev", "next", "long-prev")
-        val prefixes = listOf("next-any:", "earlier:", "later:", "prev0:", "prev:", "next:", "prev=", "next=", "prev~", "next^")
+        val prefixes = listOf("next-any:", "earlier:", "later:", "near:", "prev0:", "prev:", "next:", "prev=", "next=", "prev~", "next~", "next^")
         for (l in lines) {
             val p = l.split('\t')
-            assertEquals("columns: $l", true, p.size >= 4 && p[0] in setOf("read", "split"))
+            assertEquals("columns: $l", true, p.size >= 4 && p[0] in setOf("read", "split", "sense"))
             for (c in p[2].split(" & ")) {
                 val bare = c.trim().removePrefix("!")
                 assertEquals("condition «$bare» in: $l", true, bare in known || prefixes.any { bare.startsWith(it) && bare.length > it.length })

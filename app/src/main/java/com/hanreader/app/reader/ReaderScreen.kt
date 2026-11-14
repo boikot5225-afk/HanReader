@@ -280,9 +280,9 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 }
                 tokens.forEach { t ->
                     // Spanish: a word read in context (se alza: alzar, not alza) carries that reading too.
-                    if ((t.text.length == 1 || zhless) && t.text in words && t.pinyin.isNotEmpty() && t.text !in userMeanings) {
-                        val key = t.text + "|" + t.pinyin
-                        if (key !in this) eng.glossShort(t.text, t.pinyin)?.let { put(key, it) }
+                    if ((t.text.length == 1 || zhless || t.contextMeaning != null) && t.text in words && t.pinyin.isNotEmpty() && t.text !in userMeanings) {
+                        val key = t.glossKey
+                        if (key !in this) eng.glossShort(t)?.let { put(key, it) }
                     }
                 }
             }
@@ -1474,11 +1474,12 @@ private fun WordSheet(
     // The word cards and «Знаю» are about: Spanish hablo → hablar; Chinese: the word itself.
     val cardWord = remember(word, esLemma, engine) { if (zh != null) word else esLemma ?: engine.lemma(word) }
     // One token: its reading in context (慢慢地 de, not the dictionary's dì).
-    val reading = if (zh == null) "" else if (selection.first == selection.last && first.pinyin.isNotEmpty() && first.text.length == 1) first.pinyin
+    val reading = if (zh == null) "" else if (selection.first == selection.last && first.pinyin.isNotEmpty()) first.pinyin
         else entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
-    // A single character: the meanings of the reading on the page (得 de after a verb, not dé «получить»).
-    val pageReading = if (selection.first == selection.last && first.text.length == 1) first.pinyin.takeIf { it.isNotEmpty() } else null
-    val russian = zh?.russianSenses(word, pageReading) ?: es.firstOrNull()?.entry?.let { alpha?.senses(it) }.orEmpty()
+    // A single token keeps the meanings of its reading on the page (得 de, 重重 zhòng zhòng).
+    val pageReading = if (zh != null && selection.first == selection.last) first.pinyin.takeIf { it.isNotEmpty() } else null
+    val selectedMeaning = first.contextMeaning.takeIf { selection.first == selection.last }
+    val russian = zh?.russianSenses(word, pageReading, selectedMeaning) ?: es.firstOrNull()?.entry?.let { alpha?.senses(it) }.orEmpty()
     val otherReadings = remember(word, pageReading) { zh?.otherReadings(word, pageReading).orEmpty() }
     // A tapped marker of a Chinese construction in this sentence (把, 虽然 … 但是): what the construction means.
     val grammar = remember(word, selection) {
@@ -1504,7 +1505,7 @@ private fun WordSheet(
     }
     // A language with an alphabet: the reading the sentence chose (with its meaning, «durmiente#шпала»), else the card's first.
     val alphaReading = first.pinyin.takeIf { selection.first == selection.last && '#' in it } ?: es.firstOrNull()?.entry?.key
-    val translation = userMeaning ?: nameInRussian ?: (if (zh == null) engine.cardTranslation(word, alphaReading) else engine.cardTranslation(word, pageReading))
+    val translation = userMeaning ?: nameInRussian ?: (if (zh == null) engine.cardTranslation(word, alphaReading) else zh.cardTranslation(word, pageReading, selectedMeaning))
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
     var status by remember(word) { mutableStateOf<String?>(null) }
@@ -1590,8 +1591,8 @@ private fun WordSheet(
                 if (previous != null && previous != scope) onUserMeaning(meaningKeys.getValue(previous), "")
                 onUserMeaning(meaningKeys.getValue(scope), text)
             }
-            if (alpha != null && russian.size > 1) {
-                Text(if ('#' in first.pinyin && selection.first == selection.last) "Первое значение — по контекстному правилу"
+            if ((alpha != null || zh != null) && russian.size > 1) {
+                Text(if (selection.first == selection.last && (selectedMeaning != null || '#' in first.pinyin)) "Первое значение — по контекстному правилу"
                     else "Словарные значения: контекст может требовать другого смысла",
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -1599,7 +1600,7 @@ private fun WordSheet(
                 russian.forEachIndexed { i, sense ->
                     Text("${i + 1}. $sense", style = MaterialTheme.typography.bodyLarge)
                 }
-                (zh?.russianSource(word)?.label ?: es.firstOrNull()?.let { if (it.entry.machine) "машинный перевод Викисловаря" else "Викисловарь" })?.let { src ->
+                (if (zh != null && selectedMeaning != null) "локальное контекстное правило" else zh?.russianSource(word)?.label ?: es.firstOrNull()?.let { if (it.entry.machine) "машинный перевод Викисловаря" else "Викисловарь" })?.let { src ->
                     Text(
                         "Русский · $src",
                         style = MaterialTheme.typography.labelSmall,

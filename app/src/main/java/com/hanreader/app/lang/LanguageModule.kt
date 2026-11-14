@@ -92,6 +92,9 @@ interface LanguageModule {
     /** A few words to write above an unknown word; null if there is no meaning. */
     fun glossShort(word: String, reading: String? = null): String?
 
+    /** An occurrence's selected sense must not alter the pronunciation or dictionary cache. */
+    fun glossShort(token: RToken): String? = token.contextMeaning ?: glossShort(token.text, token.pinyin)
+
     /** The meaning stored on a flash card; null if there is none. */
     fun cardTranslation(word: String, reading: String? = null): String?
 
