@@ -34,7 +34,9 @@ class ContextRules private constructor(private val byLemma: Map<String, List<Rul
         /** The dictionary words each word can be. */
         val lemmas: (Int) -> Set<String>,
         /** Whether the word is a verb here. */
-        val isVerb: (Int) -> Boolean
+        val isVerb: (Int) -> Boolean,
+        /** Whether two neighbouring words have no intervening punctuation. Default preserves existing callers. */
+        val adjacent: (Int,Int) -> Boolean = { _,_ -> true }
     )
 
     val isEmpty: Boolean get() = byLemma.isEmpty()
@@ -60,8 +62,8 @@ class ContextRules private constructor(private val byLemma: Map<String, List<Rul
 
     private fun holds(c: Condition, s: Sentence, i: Int): Boolean = when (c) {
         is Near -> s.words.indices.any { j -> j != i && (s.words[j] in c.words || s.lemmas(j).any { it in c.words }) }
-        is Next -> matches(s, i + 1, c.words)
-        is Prev -> matches(s, i - 1, c.words)
+        is Next -> i + 1 in s.words.indices && s.adjacent(i,i+1) && matches(s, i + 1, c.words)
+        is Prev -> i - 1 in s.words.indices && s.adjacent(i-1,i) && matches(s, i - 1, c.words)
         is Within -> (maxOf(0, i - c.distance)..minOf(s.words.lastIndex, i + c.distance)).any { it != i && matches(s, it, c.words) }
         is After -> (0..3 - c.words.size).any { off -> c.words.indices.all { k -> s.words.getOrNull(i + 1 + off + k) == c.words[k] } }
         is Before -> (0..5 - c.words.size).any { off ->

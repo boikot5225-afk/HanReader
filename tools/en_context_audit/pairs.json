@@ -1,0 +1,242 @@
+[
+  {
+    "id": "pair:0:1",
+    "unit": "bank",
+    "left": "best:4:12:189:193",
+    "right": "complete:1392:21:263:267"
+  },
+  {
+    "id": "pair:0:2",
+    "unit": "bank",
+    "left": "best:4:12:189:193",
+    "right": "synthetic:0:2"
+  },
+  {
+    "id": "pair:1:1",
+    "unit": "charge",
+    "left": "best:69:1:164:170",
+    "right": "synthetic:1:1"
+  },
+  {
+    "id": "pair:1:2",
+    "unit": "charge",
+    "left": "best:69:1:164:170",
+    "right": "synthetic:1:2"
+  },
+  {
+    "id": "pair:2:1",
+    "unit": "company",
+    "left": "best:36:15:73:80",
+    "right": "biography:1:45:152:159"
+  },
+  {
+    "id": "pair:2:2",
+    "unit": "company",
+    "left": "best:36:15:73:80",
+    "right": "synthetic:2:2"
+  },
+  {
+    "id": "pair:3:1",
+    "unit": "arms",
+    "left": "best:21:9:104:108",
+    "right": "biography:1:52:743:747"
+  },
+  {
+    "id": "pair:3:2",
+    "unit": "arms",
+    "left": "best:21:9:104:108",
+    "right": "synthetic:3:2"
+  },
+  {
+    "id": "pair:4:1",
+    "unit": "private",
+    "left": "best:9:53:0:7",
+    "right": "complete:133:6:759:766"
+  },
+  {
+    "id": "pair:4:2",
+    "unit": "private",
+    "left": "best:9:53:0:7",
+    "right": "synthetic:4:2"
+  },
+  {
+    "id": "pair:5:1",
+    "unit": "rank",
+    "left": "best:67:14:616:620",
+    "right": "biography:1:68:252:256"
+  },
+  {
+    "id": "pair:5:2",
+    "unit": "rank",
+    "left": "best:67:14:616:620",
+    "right": "synthetic:5:2"
+  },
+  {
+    "id": "pair:6:1",
+    "unit": "line",
+    "left": "best:9:48:1422:1426",
+    "right": "synthetic:6:1"
+  },
+  {
+    "id": "pair:6:2",
+    "unit": "line",
+    "left": "best:9:48:1422:1426",
+    "right": "synthetic:6:2"
+  },
+  {
+    "id": "pair:7:1",
+    "unit": "order",
+    "left": "best:28:41:573:578",
+    "right": "complete:30:295:1316:1321"
+  },
+  {
+    "id": "pair:7:2",
+    "unit": "order",
+    "left": "best:28:41:573:578",
+    "right": "synthetic:7:2"
+  },
+  {
+    "id": "pair:8:1",
+    "unit": "grave",
+    "left": "best:11:59:24:29",
+    "right": "complete:1330:16:156:161"
+  },
+  {
+    "id": "pair:8:2",
+    "unit": "grave",
+    "left": "best:11:59:24:29",
+    "right": "synthetic:8:2"
+  },
+  {
+    "id": "pair:9:1",
+    "unit": "right",
+    "left": "best:17:15:93:98",
+    "right": "complete:171:13:757:762"
+  },
+  {
+    "id": "pair:9:2",
+    "unit": "right",
+    "left": "best:17:15:93:98",
+    "right": "synthetic:9:2"
+  },
+  {
+    "id": "pair:10:1",
+    "unit": "left",
+    "left": "best:8:5:284:288",
+    "right": "best:32:9:121:125"
+  },
+  {
+    "id": "pair:10:2",
+    "unit": "left",
+    "left": "best:8:5:284:288",
+    "right": "synthetic:10:2"
+  },
+  {
+    "id": "pair:11:1",
+    "unit": "present",
+    "left": "complete:1248:4:414:421",
+    "right": "synthetic:11:1"
+  },
+  {
+    "id": "pair:11:2",
+    "unit": "present",
+    "left": "complete:1248:4:414:421",
+    "right": "synthetic:11:2"
+  },
+  {
+    "id": "pair:12:1",
+    "unit": "train",
+    "left": "best:67:3:305:310",
+    "right": "biography:1:126:137:142"
+  },
+  {
+    "id": "pair:12:2",
+    "unit": "train",
+    "left": "best:67:3:305:310",
+    "right": "synthetic:12:2"
+  },
+  {
+    "id": "pair:13:1",
+    "unit": "lie",
+    "left": "best:24:34:530:533",
+    "right": "synthetic:13:1"
+  },
+  {
+    "id": "pair:13:2",
+    "unit": "lie",
+    "left": "best:24:34:530:533",
+    "right": "synthetic:13:2"
+  },
+  {
+    "id": "pair:14:1",
+    "unit": "lead",
+    "left": "best:11:30:374:378",
+    "right": "biography:1:47:381:385"
+  },
+  {
+    "id": "pair:14:2",
+    "unit": "lead",
+    "left": "best:11:30:374:378",
+    "right": "synthetic:14:2"
+  },
+  {
+    "id": "pair:15:1",
+    "unit": "fire",
+    "left": "best:25:16:414:418",
+    "right": "synthetic:15:1"
+  },
+  {
+    "id": "pair:15:2",
+    "unit": "fire",
+    "left": "best:25:16:414:418",
+    "right": "synthetic:15:2"
+  },
+  {
+    "id": "pair:16:1",
+    "unit": "watch",
+    "left": "complete:245:3:26:31",
+    "right": "synthetic:16:1"
+  },
+  {
+    "id": "pair:16:2",
+    "unit": "watch",
+    "left": "complete:245:3:26:31",
+    "right": "synthetic:16:2"
+  },
+  {
+    "id": "pair:17:1",
+    "unit": "still",
+    "left": "best:36:16:306:311",
+    "right": "synthetic:17:1"
+  },
+  {
+    "id": "pair:17:2",
+    "unit": "still",
+    "left": "best:36:16:306:311",
+    "right": "synthetic:17:2"
+  },
+  {
+    "id": "pair:18:1",
+    "unit": "mean",
+    "left": "best:51:12:121:125",
+    "right": "complete:1325:3:266:270"
+  },
+  {
+    "id": "pair:18:2",
+    "unit": "mean",
+    "left": "best:51:12:121:125",
+    "right": "synthetic:18:2"
+  },
+  {
+    "id": "pair:19:1",
+    "unit": "wound",
+    "left": "best:6:13:392:397",
+    "right": "synthetic:19:1"
+  },
+  {
+    "id": "pair:19:2",
+    "unit": "wound",
+    "left": "best:6:13:392:397",
+    "right": "synthetic:19:2"
+  }
+]

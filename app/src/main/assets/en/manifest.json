@@ -35,6 +35,14 @@
     "ranks.tsv": {
       "bytes": 211581,
       "sha256": "fd498d3b0eeaf716af0653272839f3a2c4433f3b9dce19668ace55a461d70b30"
+    },
+    "manual.tsv": {
+      "bytes": 484,
+      "sha256": "2af9f04ac84434e33b2d19bafa55efc15f7a1407fd98e375f6e4ed2d7838cc68"
+    },
+    "context.tsv": {
+      "bytes": 2003,
+      "sha256": "6fed6feae06ac69aa0f91bee9f1cc40e3202105d3f7e12336a2fba286356115f"
     }
   }
 }

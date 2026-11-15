@@ -57,4 +57,15 @@ class ContextRulesTest {
         assertEquals("быть (там), чтобы", hint("Ellos estarán para ayudarle.", "estarán"))
         assertEquals("достаточно, хватает", hint("Basta mirar con atención.", "Basta"))
     }
+    @Test fun callersCanRequirePunctuationFreeAdjacencyWithoutChangingDefaults() {
+        val rules=ContextRules.parse(sequenceOf("x\tnext:y\tследующий","y\tprev:x\tпредыдущий"))
+        val words=listOf("x","y")
+        val ordinary=ContextRules.Sentence(words,{setOf(words[it])},{false})
+        val separated=ContextRules.Sentence(words,{setOf(words[it])},{false},{_,_->false})
+        assertEquals("следующий",rules.meaning(listOf("x"),ordinary,0))
+        assertEquals("предыдущий",rules.meaning(listOf("y"),ordinary,1))
+        assertNull(rules.meaning(listOf("x"),separated,0))
+        assertNull(rules.meaning(listOf("y"),separated,1))
+    }
+
 }

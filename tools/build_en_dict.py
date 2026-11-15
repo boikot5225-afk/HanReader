@@ -57,6 +57,24 @@ def russian_translations(entry):
     return [{"g": sense, "r": words} for sense, words in list(groups.items())[:8]]
 
 
+def valid_form_link(surface, lemma, pos, tags):
+    if pos == "noun" and "plural" in tags and lemma.endswith("man"):
+        return surface in (lemma[:-3] + "men", lemma + "s")
+    return True
+
+
+def sync_reader_data(out, source):
+    """Sync small reviewed overlays; never regenerate/download the large source dictionaries."""
+    manifest = out / "manifest.json"
+    summary = json.loads(manifest.read_text(encoding="utf-8"))
+    for name in ("manual.tsv", "context.tsv"):
+        data = (source / name).read_bytes()
+        (out / name).write_bytes(data)
+        summary["files"][name] = {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+    manifest.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return summary
+
+
 class Builder:
     def __init__(self, frequency_rows):
         self.ranks = {word: rank for rank, word, _ in reversed(frequency_rows)}
@@ -75,6 +93,8 @@ class Builder:
             return
         sensitive = pos == "name" or (raw.isupper() and not (raw == "I" and pos == "pron"))
         glosses = list(definitions(entry))
+        if raw[:1].isupper() and any(re.search(r"фамилия|(?:мужское|женское|личное) имя|surname|given name", g, re.I) for g in glosses):
+            sensitive = True
         ru = [clean(g) for g in glosses if CYRILLIC.search(g)] if edition == "ru" else []
         en = [clean(g) for g in glosses] if edition == "en" else []
         translated = russian_translations(entry) if edition == "en" else []
@@ -105,7 +125,7 @@ class Builder:
             for field, link_tag in (("form_of", "form-of"), ("alt_of", "alternative")):
                 for ref in sense.get(field, []):
                     lemma = normalize(ref.get("word", ""))
-                    if valid_key(lemma) and lemma != key:
+                    if valid_key(lemma) and lemma != key and valid_form_link(key,lemma,pos,tags):
                         kept = sorted(tags & INFLECTION_TAGS) if field == "form_of" else [link_tag]
                         self.links.add((key, lemma, pos, tuple(kept or [link_tag]), raw if sensitive else ""))
             spelling = spelling_redirect(sense)
@@ -120,7 +140,7 @@ class Builder:
             if surface == key or not valid_key(surface) or tags & (SKIP_TAGS | NON_LEMMA_LINKS):
                 continue
             grammar = tags & INFLECTION_TAGS
-            if grammar:
+            if grammar and valid_form_link(surface,key,pos,grammar):
                 self.links.add((surface, key, pos, tuple(sorted(grammar)), raw_form if sensitive else ""))
             elif "alternative" in tags:
                 self.links.add((surface, key, pos, ("alternative",), raw_form if sensitive else ""))
@@ -200,11 +220,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sources", type=Path, default=Path(".work/en-dictionary/sources"))
     parser.add_argument("--out", type=Path, default=Path("app/src/main/assets/en"))
+    parser.add_argument("--reader-data", type=Path, default=Path(__file__).resolve().parents[1] / "data/en")
+    parser.add_argument("--sync-reader-data", action="store_true", help="Only sync manual/context data into an existing dictionary")
     args = parser.parse_args()
+    if args.sync_reader_data:
+        print(json.dumps(sync_reader_data(args.out,args.reader_data),ensure_ascii=False,indent=2))
+        return
     rows, _ = frequencies(args.sources / "en_50k.txt")
     summary = Builder(rows).build(args.sources, args.out)
     notice = Path(__file__).resolve().parents[1] / "data/en/NOTICE.txt"
     (args.out / "NOTICE.txt").write_bytes(notice.read_bytes())
+    summary = sync_reader_data(args.out,args.reader_data)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 

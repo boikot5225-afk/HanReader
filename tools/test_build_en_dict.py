@@ -4,10 +4,31 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from build_en_dict import Builder
+from build_en_dict import Builder, valid_form_link, sync_reader_data
 
 
 class EnglishBuilderTest(unittest.TestCase):
+    def test_capitalized_surnames_require_case(self):
+        b=Builder([])
+        b.add({'word':'Arms','lang_code':'en','pos':'noun','senses':[{'glosses':['английская фамилия']}]},'ru')
+        self.assertTrue(next(iter(b.entries.values()))['c'])
+
+    def test_plural_links_preserve_man_stems(self):
+        self.assertFalse(valid_form_link('men','welshman','noun',{'plural'}))
+        self.assertTrue(valid_form_link('men','man','noun',{'plural'}))
+        self.assertTrue(valid_form_link('women','woman','noun',{'plural'}))
+        self.assertTrue(valid_form_link('humans','human','noun',{'plural'}))
+
+    def test_small_reader_data_sync_keeps_dictionary_manifest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);out=root/'out';source=root/'source';out.mkdir();source.mkdir()
+            (out/'manifest.json').write_text(json.dumps({'format':2,'keys':1,'files':{'dict.tsv':{'sha256':'unchanged'}}}))
+            for name in ['context.tsv','manual.tsv']:(source/name).write_text('# original synthetic fixture\n')
+            result=sync_reader_data(out,source)
+            self.assertEqual('unchanged',result['files']['dict.tsv']['sha256'])
+            self.assertEqual(2,result['format'])
+            self.assertTrue((out/'manual.tsv').read_text().startswith('# original'))
+
     def build(self, folder):
         source = folder / 'sources'
         source.mkdir(exist_ok=True)

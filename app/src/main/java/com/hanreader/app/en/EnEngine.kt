@@ -11,7 +11,7 @@ import com.hanreader.app.zh.TokenKind
 import kotlinx.coroutines.*
 
 /** First offline English reader module. Context rules are local and intentionally conservative. */
-class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : AlphabeticModule {
+class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0, private val rules: ContextRules = ContextRules.EMPTY) : AlphabeticModule {
     override val info get() = Languages.ENGLISH
     private val posNames = mapOf("noun" to "сущ.", "verb" to "гл.", "adj" to "прил.", "adv" to "нар.",
         "pron" to "мест.", "det" to "опред.", "article" to "артикль", "prep" to "предл.", "conj" to "союз",
@@ -21,14 +21,14 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : Al
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<LexAnalysis>>?) = size > 2_000
     }
 
-    private fun convert(a: EnAnalysis, possessive: Boolean = false): LexAnalysis {
+    private fun convert(a: EnAnalysis, possessive: Boolean = false, canonical: EnAnalysis? = null): LexAnalysis {
         val e = a.entry
-        val entry = LexEntry(e.word, posNames[e.pos] ?: e.pos, e.russian, e.english, rank = e.rank,
-            key = e.word + "/" + e.pos, pronunciation = e.pronunciations.map { it.ipa }.distinct().take(2).joinToString(" · "),
+        val entry = LexEntry(canonical?.entry?.word ?: e.word, posNames[e.pos] ?: e.pos, e.russian.sortedBy { if (LOW_PRIORITY.containsMatchIn(it)) 1 else 0 }, e.english, rank = canonical?.entry?.rank ?: e.rank,
+            key = (canonical?.entry?.word ?: e.word) + "/" + e.pos, pronunciation = (canonical?.entry ?: e).pronunciations.map { it.ipa }.distinct().take(2).joinToString(" · "),
             source = e.russianSource)
         val description = buildList {
             if (possessive) add("притяжательная форма")
-            if ("plural" in a.tags && e.pos != "verb") add("мн. ч.")
+            if (("plural" in a.tags || canonical != null) && e.pos != "verb") add("мн. ч.")
             if ("participle" in a.tags) add(if ("past" in a.tags) "причастие прошедшего времени" else "-ing форма")
             else if ("past" in a.tags) add("Past Simple")
             else if ("third-person" in a.tags) add("3-е лицо ед. ч., настоящее время")
@@ -42,7 +42,13 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : Al
 
     private fun lexical(word: String): List<LexAnalysis> {
         synchronized(cache) { cache[word] }?.let { return it }
-        val decoded = dictionary.analyses(word).map { convert(it) }.distinctBy { it.entry.key to it.grammar }
+        val raw = dictionary.analyses(word)
+        val nounBases = raw.filter { it.entry.pos == "noun" && "plural" in it.tags && EnForms.key(it.entry.word) != EnForms.key(word) }
+            .distinctBy { it.entry.word }
+        val base = nounBases.singleOrNull()
+        // Preserve the plural article's Russian meaning while using its attested singular for study.
+        val decoded = raw.map { a -> convert(a, canonical=base?.takeIf { a.entry.pos == "noun" && a.tags.isEmpty() && EnForms.key(a.entry.word)==EnForms.key(word) }) }
+            .distinctBy { it.entry.key to it.grammar }
         return synchronized(cache) { cache.getOrPut(word) { decoded } }
     }
 
@@ -71,13 +77,39 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : Al
         if (expansions.isEmpty()) expansions = lookup.form.expansions
         val own = lexical(word).firstOrNull { it.entry.ru.isNotEmpty() }
         val shown = EnForms.key(word).let { if (it.startsWith("i'")) "I" + it.drop(1) else it }
-        val entry = LexEntry(shown, "сокр.", own?.entry?.ru.orEmpty().ifEmpty { expansions.map { "Сокращение: ${it.text}" } },
+        val ownRussian = own?.entry?.ru.orEmpty().takeIf { expansions==lookup.form.expansions }.orEmpty()
+        val explained = expansions.mapNotNull { explain(it) }
+        val entry = LexEntry(shown, "сокр.", ownRussian.ifEmpty { explained.ifEmpty { expansions.map { "Сокращение: ${it.text}" } } },
             expansions.map { it.text }, key = shown + "/contraction", pronunciation = own?.entry?.pronunciation.orEmpty(),
             source = own?.entry?.source ?: "грамматический разбор")
         return LexAnalysis(word, entry, "сокращение: " + expansions.joinToString(" / ") { it.text })
     }
 
-    private fun choices(word: String, before: String? = null, after: String? = null): List<LexAnalysis> {
+    private fun explain(expansion: EnExpansion): String? {
+        val words=expansion.words
+        val first=words.firstOrNull() ?: return null
+        val keys=words.map(EnForms::key)
+        val pronouns=mapOf("i" to "я","you" to "ты / вы","he" to "он","she" to "она","it" to "это / оно",
+            "we" to "мы","they" to "они","who" to "кто","what" to "что","where" to "где","when" to "когда",
+            "why" to "почему","how" to "как","that" to "это","there" to "там","here" to "здесь","this" to "это")
+        if(keys.size==2 && keys.last()=="not") return when(keys.first()) {
+            "did" -> "не (${expansion.text} — отрицание в прошедшем времени)"
+            "do","does" -> "не (${expansion.text} — отрицание в настоящем времени)"
+            "can","could" -> "не мочь; не иметь возможности (${expansion.text})"
+            "will","shall" -> "не (${expansion.text} — отрицание будущего или отказ)"
+            else -> "не (${expansion.text} — отрицательная форма)"
+        }
+        val subject=pronouns[keys.first()] ?: lexical(first).firstOrNull { it.entry.pos=="сущ." }?.entry?.ru?.firstOrNull()?.substringBefore(',')?.substringBefore(';') ?: return null
+        return when(keys.getOrNull(1)) {
+            "am","is","are" -> "$subject (${expansion.text}; форма глагола «быть»)"
+            "have","has","had" -> "$subject (${expansion.text}; вспомогательный глагол перфекта)"
+            "would" -> "$subject бы (${expansion.text}; также будущее в прошедшем)"
+            "will" -> "$subject (${expansion.text}; будущее время)"
+            else -> null
+        }
+    }
+
+    private fun choices(word: String, before: String? = null, after: String? = null, before2: String? = null, after2: String? = null): List<LexAnalysis> {
         val ordinary = lexical(word)
         val lookup = if (word.any { it in "'’‘" }) dictionary.lookup(word) else null
         val possessive = lookup?.possessiveAnalyses.orEmpty().map { convert(it, true) }
@@ -86,8 +118,11 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : Al
         val next = after?.let { lexical(it) }.orEmpty()
         if (lookup?.form?.possessive == null && contracted != null) return listOf(contracted) + ordinary
         if (possessive.isNotEmpty()) {
-            val contractionFirst = next.any { "причастие" in it.grammar || "-ing" in it.grammar } ||
-                (next.any { it.entry.pos == "прил." } && next.none { it.entry.pos == "сущ." })
+            val nounPhraseAfter = after2?.let { EnForms.key(it) !in (OBJECTS+SUBJECTS+NOUN_MARKERS) && lexical(it).any { x -> x.entry.pos == "сущ." } } == true &&
+                next.any { it.entry.pos == "прил." } &&
+                (next.none { it.entry.pos == "сущ." } || dictionary.contains("$after $after2"))
+            val contractionFirst = !nounPhraseAfter && (next.any { "причастие" in it.grammar || "-ing" in it.grammar } ||
+                (next.any { it.entry.pos == "прил." } && next.none { it.entry.pos == "сущ." }))
             return if (contractionFirst && contracted != null) listOf(contracted) + possessive + ordinary
             else possessive + listOfNotNull(contracted) + ordinary
         }
@@ -96,9 +131,25 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : Al
         val previous = before?.let(EnForms::key)
         val following = after?.let(EnForms::key)
         val preferredLemma = PAST_FIRST[key]
+        val previousChoices = before?.let(::lexical).orEmpty()
+        val pastCandidate = ordinary.any { it.entry.isVerb && ("Past Simple" in it.grammar || "причастие прошедшего" in it.grammar) }
+        val infinitive = previous in setOf("can","could","may","might","will","would","shall","should","must","to")
+        val title = key in setOf("private","general","major","captain","colonel","lieutenant","corporal") &&
+            word.firstOrNull()?.isUpperCase()==true && after?.firstOrNull()?.isUpperCase()==true
+        val secondBefore = before2?.let(EnForms::key)
         fun score(a: LexAnalysis): Int {
             var value = if (a.entry.ru.isEmpty()) 5 else 0
             if (a.entry.isName) value += 3
+            if (a.entry.isVerb && a.entry.rank==0) value+=2
+            if (key in MODALS && a.entry.isVerb && EnForms.key(a.entry.lemma)==key && (previous in SUBJECTS || following !in (FINITE_AUX+MODALS) && next.any { it.entry.isVerb && EnForms.key(it.entry.lemma)==following && it.grammar.isEmpty() })) value-=12
+            if (pastCandidate && key !in MODALS && a.entry.isVerb && ("Past Simple" in a.grammar || "причастие прошедшего" in a.grammar)) value-=5
+            if (a.entry.isVerb && infinitive) value-=24
+            if (a.entry.isVerb && following in (OBJECTS + setOf("myself","yourself","himself","herself","itself","ourselves","yourselves","themselves"))) value-=26
+            if (a.entry.isVerb && previousChoices.firstOrNull()?.let { it.entry.pos=="сущ." && "мн. ч." in it.grammar }==true) value-=12
+            if (a.entry.pos=="сущ." && next.firstOrNull()?.entry?.pos!="сущ." && secondBefore in NOUN_MARKERS && previousChoices.any { it.entry.pos=="прил." }) value-=16
+            if (a.entry.pos=="мест." && (previous in BE_FORMS || secondBefore in BE_FORMS && previous in SUBJECTS)) value-=24
+            if (a.entry.pos=="нар." && previous in OBJECTS && before2?.let { lexical(it).any { x->x.entry.isVerb } }==true) value-=25
+            if (title && a.entry.pos=="сущ.") value-=24
             if (preferredLemma != null && EnForms.key(a.entry.lemma) == preferredLemma && a.entry.isVerb) value -= 3
             if (previous in NOUN_MARKERS) {
                 if (next.any { it.entry.pos == "сущ." } && a.entry.pos == "прил.") value -= 15
@@ -113,7 +164,7 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : Al
             if (key == "left" && next.any { it.entry.pos == "сущ." } && a.entry.pos == "прил.") value -= 20
             return value
         }
-        return ordinary.sortedBy(::score)
+        return ordinary.sortedWith(compareBy<LexAnalysis>(::score).thenBy { if (it.entry.isVerb && it.grammar.isNotEmpty()) it.entry.rank.takeIf { r -> r>0 } ?: Int.MAX_VALUE else 0 })
     }
 
     fun tokenize(text: String): List<RToken> {
@@ -148,11 +199,10 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : Al
         val out = tokens.mapIndexed { i, token ->
             if (token.kind != TokenKind.HAN) token else {
                 val chosen = choices(token.text, nextWord(tokens, i, -1)?.let { tokens[it].text },
-                    nextWord(tokens, i, 1)?.let { tokens[it].text }).firstOrNull()
-                val contextualContraction = chosen?.takeIf { it.entry.pos == "сокр." &&
-                    it.entry.en != choices(token.text).firstOrNull()?.entry?.en }
-                token.copy(pinyin = chosen?.entry?.key.orEmpty(), defined = chosen != null,
-                    contextMeaning = contextualContraction?.entry?.let(::short))
+                    nextWord(tokens, i, 1)?.let { tokens[it].text },
+                    nextWord(tokens,i,-1)?.let { nextWord(tokens,it,-1) }?.let { tokens[it].text },
+                    nextWord(tokens,i,1)?.let { nextWord(tokens,it,1) }?.let { tokens[it].text }).firstOrNull()
+                token.copy(pinyin = chosen?.entry?.key.orEmpty(), defined = chosen != null)
             }
         }.toMutableList()
         // One hint per adjacent expression; never join across punctuation or a paragraph break.
@@ -166,16 +216,61 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : Al
                 i = range.last + 1
             } else i++
         }
+        applySenses(out,text)
         PreparedText(text, text, out)
     }
 
     override fun cardAnalyses(tokens: List<RToken>, text: String, a: Int, b: Int): List<LexAnalysis> {
         val word = text.substring(tokens[a].start, tokens[b].end)
-        if (a != b) return choices(phraseKey(tokens, text, a, b) ?: word)
         val reading = tokens[a].pinyin
-        if (' ' in reading && reading != IN_PHRASE) return choices(reading) + choices(word)
-        val all = choices(word, nextWord(tokens, a, -1)?.let { tokens[it].text }, nextWord(tokens, a, 1)?.let { tokens[it].text })
-        return all.sortedBy { if (it.entry.key == reading) 0 else 1 }
+        val phrase = if (a!=b) phraseKey(tokens,text,a,b) else null
+        val all = if (a!=b) choices(phrase ?: word)
+            else if (' ' in reading && reading!=IN_PHRASE) choices(reading) + choices(word)
+            else choices(word, nextWord(tokens,a,-1)?.let { tokens[it].text },nextWord(tokens,a,1)?.let { tokens[it].text },
+                nextWord(tokens,a,-1)?.let { nextWord(tokens,it,-1) }?.let { tokens[it].text },
+                nextWord(tokens,a,1)?.let { nextWord(tokens,it,1) }?.let { tokens[it].text }).sortedBy { if(it.entry.key==reading) 0 else 1 }
+        val selected = tokens[a].contextMeaning.takeIf { a==b || phrase==reading }
+        return all.mapIndexed { i,analysis -> if(i!=0 || selected==null || analysis.entry.pos=="сокр.") analysis
+            else analysis.copy(entry=analysis.entry.copy(contextMeaning=selected,source="локальное контекстное правило")) }
+    }
+
+    override fun senses(entry: LexEntry): List<String> = entry.contextMeaning?.let { listOf(it) + entry.ru.filterNot { x -> x==it } } ?: entry.ru
+
+    /** Choose an occurrence sense after morphology and expressions; lexical caches stay context-free. */
+    private fun applySenses(tokens: MutableList<RToken>, text: String) {
+        if (rules.isEmpty) return
+        val words=tokens.indices.filter { tokens[it].kind==TokenKind.HAN }
+        var start=0
+        while(start<words.size) {
+            var end=start
+            while(end+1<words.size && (words[end]+1 until words[end+1]).none { j ->
+                tokens[j].text.any { it=='\n' || it=='\r' } ||
+                    tokens[j].kind==TokenKind.PUNCT && tokens[j].text.indices.any { k ->
+                        tokens[j].text[k] in ".!?…;" && SentenceBoundary.ends(text,tokens[j].start+k) }
+            }) end++
+            val indices=words.subList(start,end+1)
+            val candidates=HashMap<Int,List<LexAnalysis>>()
+            fun analyses(k:Int)=candidates.getOrPut(k) {
+                val t=tokens[indices[k]]
+                if (' ' in t.pinyin && t.pinyin!=IN_PHRASE) lexical(t.pinyin) else lexical(t.text)
+            }
+            val sentence=ContextRules.Sentence(indices.map { EnForms.key(tokens[it].text) },
+                { k -> analyses(k).flatMap { listOf(it.entry.key,it.entry.lemma) }.toSet() },
+                { k -> analyses(k).firstOrNull { it.entry.key==tokens[indices[k]].pinyin }?.entry?.isVerb==true },
+                { a,b -> (minOf(indices[a],indices[b])+1 until maxOf(indices[a],indices[b])).all { tokens[it].kind==TokenKind.SPACE } })
+            for(k in indices.indices) {
+                val t=tokens[indices[k]]
+                if(t.pinyin==IN_PHRASE) continue
+                val options=analyses(k)
+                val keys=options.flatMap { listOf(it.entry.key,it.entry.lemma) }.toSet()
+                if(!rules.covers(keys)) continue
+                val selected=rules.resolve(keys,sentence,k) ?: continue
+                val candidate=options.firstOrNull { it.entry.key==selected.lemma || it.entry.lemma==selected.lemma } ?: continue
+                val key=if(' ' in t.pinyin && candidate.entry.lemma==t.pinyin) t.pinyin else candidate.entry.key
+                tokens[indices[k]]=t.copy(pinyin=key,contextMeaning=selected.meaning)
+            }
+            start=end+1
+        }
     }
 
     override fun phraseKey(tokens: List<RToken>, text: String, a: Int, b: Int): String? {
@@ -184,11 +279,17 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : Al
         if (selected.any { it.kind !in setOf(TokenKind.HAN, TokenKind.SPACE) || '\n' in it.text || '\r' in it.text }) return null
         val surface = selected.filter { it.kind == TokenKind.HAN }.joinToString(" ") { it.text }
         val exact = if (dictionary.contains(surface)) lexical(surface).firstOrNull { usefulPhrase(it.entry.lemma) } else null
-        if (exact != null) return exact.entry.lemma
+        fun valid(key: String): Boolean {
+            val parts=EnForms.key(key).split(' ')
+            if (parts.size!=2 || parts.last() !in OBJECTS) return true
+            val first=selected.first().text
+            return EnForms.key(first)==parts.first() && nextWord(tokens,a,-1)?.let { EnForms.key(tokens[it].text) } !in (SUBJECTS + BE_FORMS + setOf("have","has","had","would","will","could","can","should","must"))
+        }
+        if (exact != null && valid(exact.entry.lemma)) return exact.entry.lemma
         val words = selected.filter { it.kind == TokenKind.HAN }
         val rest = words.drop(1).joinToString(" ") { EnForms.key(it.text) }
         return choices(words.first().text).asSequence().filter { it.entry.isVerb }.map { it.entry.lemma + " " + rest }
-            .firstOrNull { usefulPhrase(it) && dictionary.contains(it) && lexical(it).isNotEmpty() }
+            .firstOrNull { usefulPhrase(it) && valid(it) && dictionary.contains(it) && lexical(it).isNotEmpty() }
     }
 
     private fun usefulPhrase(word: String): Boolean {
@@ -218,7 +319,7 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : Al
     }
 
     private fun short(entry: LexEntry): String? = entry.ru.firstOrNull()?.let {
-        if (entry.pos == "сокр.") entry.en.joinToString(" / ") else it.substringBefore(';').substringBefore(',').take(48)
+        it.substringBefore(';').substringBefore(',').take(48)
     } ?: entry.en.firstOrNull()?.take(48)
 
     private fun pick(word: String, reading: String?): LexEntry? {
@@ -315,6 +416,11 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : Al
     }
 
     companion object {
+        private val LOW_PRIORITY = Regex("^(?:устар\\.|редк\\.|obsolete\\b|archaic\\b)",RegexOption.IGNORE_CASE)
+        private val FINITE_AUX = setOf("am","is","are","was","were","has","had","does","did")
+        private val MODALS = setOf("may","might","can","could","will","would","shall","should","must")
+        private val BE_FORMS = setOf("am","is","are","was","were","be","been")
+        private val OBJECTS = setOf("me","you","him","her","us","them","it")
         private val SUBJECTS = setOf("i", "you", "he", "she", "it", "we", "they", "who")
         private val UNCHANGED_PARTICIPLES = setOf("read", "cut", "put", "set", "hit", "hurt", "let", "shut", "split",
             "spread", "cost", "cast", "burst", "fit", "bet", "quit", "come", "become", "run")
@@ -330,7 +436,8 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0) : Al
             loading ?: CompletableDeferred<EnEngine>().also { deferred ->
                 loading = deferred
                 scope.launch {
-                    runCatching { val start = System.nanoTime(); EnEngine(EnDictionary.load(context), (System.nanoTime() - start) / 1_000_000) }
+                    runCatching { val start = System.nanoTime(); EnEngine(EnDictionary.load(context), (System.nanoTime() - start) / 1_000_000,
+                        runCatching { context.assets.open("en/context.tsv").bufferedReader().useLines { ContextRules.parse(it) } }.getOrDefault(ContextRules.EMPTY)) }
                         .fold({ deferred.complete(it) }, { deferred.completeExceptionally(it) })
                 }
             }
