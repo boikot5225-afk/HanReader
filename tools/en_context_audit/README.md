@@ -1,6 +1,17 @@
 # English contextual audit (JVM only)
 
 Results and limits: [REPORT_ru.md](REPORT_ru.md), machine-readable [results.json](results.json).
+Next iteration: [COMFORT_ru.md](COMFORT_ru.md), [comfort-results.json](comfort-results.json).
+For everyday regression, reuse the verified JVM compilation:
+
+```sh
+python3 tools/en_context_audit/check.py
+```
+
+The first run compiles the JVM tests; unchanged runs reuse the jar. Source/assets/test/library
+changes invalidate the cache. An optional `--gold /absolute/private.jsonl` runs a small local audit
+after tests succeed. This does not trigger Gradle, Android, APK, CI or cloud requests.
+
 This harness exercises production English dictionary, morphology, phrase/card and EPUB code.
 It does not launch Android, Gradle, CI, cloud inference or an APK build. Android host APIs are
 small adapters; Compose rendering, installation and phone performance remain untested.

@@ -1,0 +1,881 @@
+{
+  "base_commit": "b4af04d4ae50690121d438bab52244f81d343229",
+  "version": "0.25.1",
+  "versionCode": 67,
+  "apk_android_gradle_ci_build_run": false,
+  "cloud_requests": 0,
+  "fresh40": {
+    "sampling": "targeted new paragraphs, known lexical families; provisional annotation, not a population accuracy estimate",
+    "frozen_gold_sha256": "86b9567e1926173266080d0ab3f1f76fea9cf03d5f5fefff8376b37c1ea68ee9",
+    "before": {
+      "all": {
+        "total": 40,
+        "statuses": {
+          "WRONG_SENSE": 20,
+          "PHRASE_ERROR": 8,
+          "CORRECT": 12
+        },
+        "top1": {
+          "n": 12,
+          "denominator": 40,
+          "percent": 30.0
+        },
+        "usable": {
+          "n": 12,
+          "denominator": 40,
+          "percent": 30.0
+        },
+        "top3": {
+          "n": 12,
+          "denominator": 40,
+          "percent": 30.0
+        },
+        "mwe": {
+          "n": 0,
+          "denominator": 8,
+          "percent": 0.0
+        },
+        "morphology": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "contraction_expansion": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "russian": {
+          "n": 32,
+          "denominator": 40,
+          "percent": 80.0
+        },
+        "wrong_russian_primary": {
+          "n": 20,
+          "denominator": 40,
+          "percent": 50.0
+        },
+        "context_marks": 0,
+        "wrong_context_marks": 0,
+        "lists_without_choice": 32
+      },
+      "by_book": {
+        "best": {
+          "total": 20,
+          "statuses": {
+            "WRONG_SENSE": 9,
+            "PHRASE_ERROR": 3,
+            "CORRECT": 8
+          },
+          "top1": {
+            "n": 8,
+            "denominator": 20,
+            "percent": 40.0
+          },
+          "usable": {
+            "n": 8,
+            "denominator": 20,
+            "percent": 40.0
+          },
+          "top3": {
+            "n": 8,
+            "denominator": 20,
+            "percent": 40.0
+          },
+          "mwe": {
+            "n": 0,
+            "denominator": 3,
+            "percent": 0.0
+          },
+          "morphology": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "contraction_expansion": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "russian": {
+            "n": 17,
+            "denominator": 20,
+            "percent": 85.0
+          },
+          "wrong_russian_primary": {
+            "n": 9,
+            "denominator": 20,
+            "percent": 45.0
+          },
+          "context_marks": 0,
+          "wrong_context_marks": 0,
+          "lists_without_choice": 17
+        },
+        "complete": {
+          "total": 20,
+          "statuses": {
+            "WRONG_SENSE": 11,
+            "PHRASE_ERROR": 5,
+            "CORRECT": 4
+          },
+          "top1": {
+            "n": 4,
+            "denominator": 20,
+            "percent": 20.0
+          },
+          "usable": {
+            "n": 4,
+            "denominator": 20,
+            "percent": 20.0
+          },
+          "top3": {
+            "n": 4,
+            "denominator": 20,
+            "percent": 20.0
+          },
+          "mwe": {
+            "n": 0,
+            "denominator": 5,
+            "percent": 0.0
+          },
+          "morphology": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "contraction_expansion": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "russian": {
+            "n": 15,
+            "denominator": 20,
+            "percent": 75.0
+          },
+          "wrong_russian_primary": {
+            "n": 11,
+            "denominator": 20,
+            "percent": 55.0
+          },
+          "context_marks": 0,
+          "wrong_context_marks": 0,
+          "lists_without_choice": 15
+        }
+      },
+      "by_split": {
+        "fresh40": {
+          "total": 40,
+          "statuses": {
+            "WRONG_SENSE": 20,
+            "PHRASE_ERROR": 8,
+            "CORRECT": 12
+          },
+          "top1": {
+            "n": 12,
+            "denominator": 40,
+            "percent": 30.0
+          },
+          "usable": {
+            "n": 12,
+            "denominator": 40,
+            "percent": 30.0
+          },
+          "top3": {
+            "n": 12,
+            "denominator": 40,
+            "percent": 30.0
+          },
+          "mwe": {
+            "n": 0,
+            "denominator": 8,
+            "percent": 0.0
+          },
+          "morphology": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "contraction_expansion": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "russian": {
+            "n": 32,
+            "denominator": 40,
+            "percent": 80.0
+          },
+          "wrong_russian_primary": {
+            "n": 20,
+            "denominator": 40,
+            "percent": 50.0
+          },
+          "context_marks": 0,
+          "wrong_context_marks": 0,
+          "lists_without_choice": 32
+        }
+      },
+      "by_category": {
+        "phrase": {
+          "total": 8,
+          "statuses": {
+            "PHRASE_ERROR": 8
+          },
+          "top1": {
+            "n": 0,
+            "denominator": 8,
+            "percent": 0.0
+          },
+          "usable": {
+            "n": 0,
+            "denominator": 8,
+            "percent": 0.0
+          },
+          "top3": {
+            "n": 0,
+            "denominator": 8,
+            "percent": 0.0
+          },
+          "mwe": {
+            "n": 0,
+            "denominator": 8,
+            "percent": 0.0
+          },
+          "morphology": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "contraction_expansion": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "russian": {
+            "n": 0,
+            "denominator": 8,
+            "percent": 0.0
+          },
+          "wrong_russian_primary": {
+            "n": 0,
+            "denominator": 8,
+            "percent": 0.0
+          },
+          "context_marks": 0,
+          "wrong_context_marks": 0,
+          "lists_without_choice": 0
+        },
+        "sense": {
+          "total": 32,
+          "statuses": {
+            "WRONG_SENSE": 20,
+            "CORRECT": 12
+          },
+          "top1": {
+            "n": 12,
+            "denominator": 32,
+            "percent": 37.5
+          },
+          "usable": {
+            "n": 12,
+            "denominator": 32,
+            "percent": 37.5
+          },
+          "top3": {
+            "n": 12,
+            "denominator": 32,
+            "percent": 37.5
+          },
+          "mwe": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "morphology": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "contraction_expansion": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "russian": {
+            "n": 32,
+            "denominator": 32,
+            "percent": 100.0
+          },
+          "wrong_russian_primary": {
+            "n": 20,
+            "denominator": 32,
+            "percent": 62.5
+          },
+          "context_marks": 0,
+          "wrong_context_marks": 0,
+          "lists_without_choice": 32
+        }
+      }
+    },
+    "after_first_blind": {
+      "all": {
+        "total": 40,
+        "statuses": {
+          "CORRECT": 32,
+          "PHRASE_ERROR": 2,
+          "WRONG_SENSE": 6
+        },
+        "top1": {
+          "n": 32,
+          "denominator": 40,
+          "percent": 80.0
+        },
+        "usable": {
+          "n": 32,
+          "denominator": 40,
+          "percent": 80.0
+        },
+        "top3": {
+          "n": 32,
+          "denominator": 40,
+          "percent": 80.0
+        },
+        "mwe": {
+          "n": 6,
+          "denominator": 8,
+          "percent": 75.0
+        },
+        "morphology": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "contraction_expansion": {
+          "n": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "russian": {
+          "n": 38,
+          "denominator": 40,
+          "percent": 95.0
+        },
+        "wrong_russian_primary": {
+          "n": 6,
+          "denominator": 40,
+          "percent": 15.0
+        },
+        "context_marks": 14,
+        "wrong_context_marks": 0,
+        "lists_without_choice": 24
+      },
+      "by_book": {
+        "best": {
+          "total": 20,
+          "statuses": {
+            "CORRECT": 15,
+            "PHRASE_ERROR": 1,
+            "WRONG_SENSE": 4
+          },
+          "top1": {
+            "n": 15,
+            "denominator": 20,
+            "percent": 75.0
+          },
+          "usable": {
+            "n": 15,
+            "denominator": 20,
+            "percent": 75.0
+          },
+          "top3": {
+            "n": 15,
+            "denominator": 20,
+            "percent": 75.0
+          },
+          "mwe": {
+            "n": 2,
+            "denominator": 3,
+            "percent": 66.67
+          },
+          "morphology": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "contraction_expansion": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "russian": {
+            "n": 19,
+            "denominator": 20,
+            "percent": 95.0
+          },
+          "wrong_russian_primary": {
+            "n": 4,
+            "denominator": 20,
+            "percent": 20.0
+          },
+          "context_marks": 5,
+          "wrong_context_marks": 0,
+          "lists_without_choice": 14
+        },
+        "complete": {
+          "total": 20,
+          "statuses": {
+            "CORRECT": 17,
+            "PHRASE_ERROR": 1,
+            "WRONG_SENSE": 2
+          },
+          "top1": {
+            "n": 17,
+            "denominator": 20,
+            "percent": 85.0
+          },
+          "usable": {
+            "n": 17,
+            "denominator": 20,
+            "percent": 85.0
+          },
+          "top3": {
+            "n": 17,
+            "denominator": 20,
+            "percent": 85.0
+          },
+          "mwe": {
+            "n": 4,
+            "denominator": 5,
+            "percent": 80.0
+          },
+          "morphology": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "contraction_expansion": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "russian": {
+            "n": 19,
+            "denominator": 20,
+            "percent": 95.0
+          },
+          "wrong_russian_primary": {
+            "n": 2,
+            "denominator": 20,
+            "percent": 10.0
+          },
+          "context_marks": 9,
+          "wrong_context_marks": 0,
+          "lists_without_choice": 10
+        }
+      },
+      "by_split": {
+        "fresh40": {
+          "total": 40,
+          "statuses": {
+            "CORRECT": 32,
+            "PHRASE_ERROR": 2,
+            "WRONG_SENSE": 6
+          },
+          "top1": {
+            "n": 32,
+            "denominator": 40,
+            "percent": 80.0
+          },
+          "usable": {
+            "n": 32,
+            "denominator": 40,
+            "percent": 80.0
+          },
+          "top3": {
+            "n": 32,
+            "denominator": 40,
+            "percent": 80.0
+          },
+          "mwe": {
+            "n": 6,
+            "denominator": 8,
+            "percent": 75.0
+          },
+          "morphology": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "contraction_expansion": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "russian": {
+            "n": 38,
+            "denominator": 40,
+            "percent": 95.0
+          },
+          "wrong_russian_primary": {
+            "n": 6,
+            "denominator": 40,
+            "percent": 15.0
+          },
+          "context_marks": 14,
+          "wrong_context_marks": 0,
+          "lists_without_choice": 24
+        }
+      },
+      "by_category": {
+        "phrase": {
+          "total": 8,
+          "statuses": {
+            "PHRASE_ERROR": 2,
+            "CORRECT": 6
+          },
+          "top1": {
+            "n": 6,
+            "denominator": 8,
+            "percent": 75.0
+          },
+          "usable": {
+            "n": 6,
+            "denominator": 8,
+            "percent": 75.0
+          },
+          "top3": {
+            "n": 6,
+            "denominator": 8,
+            "percent": 75.0
+          },
+          "mwe": {
+            "n": 6,
+            "denominator": 8,
+            "percent": 75.0
+          },
+          "morphology": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "contraction_expansion": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "russian": {
+            "n": 6,
+            "denominator": 8,
+            "percent": 75.0
+          },
+          "wrong_russian_primary": {
+            "n": 0,
+            "denominator": 8,
+            "percent": 0.0
+          },
+          "context_marks": 0,
+          "wrong_context_marks": 0,
+          "lists_without_choice": 6
+        },
+        "sense": {
+          "total": 32,
+          "statuses": {
+            "CORRECT": 26,
+            "WRONG_SENSE": 6
+          },
+          "top1": {
+            "n": 26,
+            "denominator": 32,
+            "percent": 81.25
+          },
+          "usable": {
+            "n": 26,
+            "denominator": 32,
+            "percent": 81.25
+          },
+          "top3": {
+            "n": 26,
+            "denominator": 32,
+            "percent": 81.25
+          },
+          "mwe": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "morphology": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "contraction_expansion": {
+            "n": 0,
+            "denominator": 0,
+            "percent": null
+          },
+          "russian": {
+            "n": 32,
+            "denominator": 32,
+            "percent": 100.0
+          },
+          "wrong_russian_primary": {
+            "n": 6,
+            "denominator": 32,
+            "percent": 18.75
+          },
+          "context_marks": 14,
+          "wrong_context_marks": 0,
+          "lists_without_choice": 18
+        }
+      }
+    }
+  },
+  "previous370_diagnostic": {
+    "original310_before": {
+      "total": 310,
+      "statuses": {
+        "CORRECT": 237,
+        "UNRESOLVED": 10,
+        "WRONG_SENSE": 42,
+        "NOT_FOUND": 2,
+        "ACCEPTABLE": 1,
+        "MORPHOLOGY_ERROR": 5,
+        "PHRASE_ERROR": 5,
+        "MISSING_SENSE": 7,
+        "LANGUAGE_FALLBACK": 1
+      },
+      "top1": {
+        "n": 237,
+        "denominator": 310,
+        "percent": 76.45
+      },
+      "usable": {
+        "n": 238,
+        "denominator": 310,
+        "percent": 76.77
+      },
+      "top3": {
+        "n": 256,
+        "denominator": 310,
+        "percent": 82.58
+      },
+      "mwe": {
+        "n": 40,
+        "denominator": 53,
+        "percent": 75.47
+      },
+      "morphology": {
+        "n": 64,
+        "denominator": 69,
+        "percent": 92.75
+      },
+      "contraction_expansion": {
+        "n": 13,
+        "denominator": 13,
+        "percent": 100.0
+      },
+      "russian": {
+        "n": 302,
+        "denominator": 310,
+        "percent": 97.42
+      },
+      "wrong_russian_primary": {
+        "n": 54,
+        "denominator": 310,
+        "percent": 17.42
+      },
+      "context_marks": 23,
+      "wrong_context_marks": 0,
+      "lists_without_choice": 240
+    },
+    "original310_after": {
+      "total": 310,
+      "statuses": {
+        "CORRECT": 237,
+        "UNRESOLVED": 10,
+        "WRONG_SENSE": 42,
+        "NOT_FOUND": 2,
+        "ACCEPTABLE": 1,
+        "MORPHOLOGY_ERROR": 5,
+        "PHRASE_ERROR": 5,
+        "MISSING_SENSE": 7,
+        "LANGUAGE_FALLBACK": 1
+      },
+      "top1": {
+        "n": 237,
+        "denominator": 310,
+        "percent": 76.45
+      },
+      "usable": {
+        "n": 238,
+        "denominator": 310,
+        "percent": 76.77
+      },
+      "top3": {
+        "n": 256,
+        "denominator": 310,
+        "percent": 82.58
+      },
+      "mwe": {
+        "n": 40,
+        "denominator": 53,
+        "percent": 75.47
+      },
+      "morphology": {
+        "n": 64,
+        "denominator": 69,
+        "percent": 92.75
+      },
+      "contraction_expansion": {
+        "n": 13,
+        "denominator": 13,
+        "percent": 100.0
+      },
+      "russian": {
+        "n": 302,
+        "denominator": 310,
+        "percent": 97.42
+      },
+      "wrong_russian_primary": {
+        "n": 54,
+        "denominator": 310,
+        "percent": 17.42
+      },
+      "context_marks": 23,
+      "wrong_context_marks": 0,
+      "lists_without_choice": 240
+    },
+    "original60_before": {
+      "total": 60,
+      "statuses": {
+        "WRONG_SENSE": 21,
+        "CORRECT": 36,
+        "UNRESOLVED": 2,
+        "ACCEPTABLE": 1
+      },
+      "top1": {
+        "n": 36,
+        "denominator": 60,
+        "percent": 60.0
+      },
+      "usable": {
+        "n": 37,
+        "denominator": 60,
+        "percent": 61.67
+      },
+      "top3": {
+        "n": 40,
+        "denominator": 60,
+        "percent": 66.67
+      },
+      "mwe": {
+        "n": 3,
+        "denominator": 3,
+        "percent": 100.0
+      },
+      "morphology": {
+        "n": 0,
+        "denominator": 0,
+        "percent": null
+      },
+      "contraction_expansion": {
+        "n": 0,
+        "denominator": 0,
+        "percent": null
+      },
+      "russian": {
+        "n": 60,
+        "denominator": 60,
+        "percent": 100.0
+      },
+      "wrong_russian_primary": {
+        "n": 21,
+        "denominator": 60,
+        "percent": 35.0
+      },
+      "context_marks": 1,
+      "wrong_context_marks": 0,
+      "lists_without_choice": 56
+    },
+    "original60_after": {
+      "total": 60,
+      "statuses": {
+        "CORRECT": 37,
+        "WRONG_SENSE": 20,
+        "UNRESOLVED": 2,
+        "ACCEPTABLE": 1
+      },
+      "top1": {
+        "n": 37,
+        "denominator": 60,
+        "percent": 61.67
+      },
+      "usable": {
+        "n": 38,
+        "denominator": 60,
+        "percent": 63.33
+      },
+      "top3": {
+        "n": 41,
+        "denominator": 60,
+        "percent": 68.33
+      },
+      "mwe": {
+        "n": 3,
+        "denominator": 3,
+        "percent": 100.0
+      },
+      "morphology": {
+        "n": 0,
+        "denominator": 0,
+        "percent": null
+      },
+      "contraction_expansion": {
+        "n": 0,
+        "denominator": 0,
+        "percent": null
+      },
+      "russian": {
+        "n": 60,
+        "denominator": 60,
+        "percent": 100.0
+      },
+      "wrong_russian_primary": {
+        "n": 20,
+        "denominator": 60,
+        "percent": 33.33
+      },
+      "context_marks": 2,
+      "wrong_context_marks": 0,
+      "lists_without_choice": 55
+    }
+  },
+  "production_source_sha256": {
+    "app/src/main/java/com/hanreader/app/en/EnDictionary.kt": "75d233a14daa6606590a976a941d5ab3bd9c798947f6b25f09e19473228cf250",
+    "app/src/main/java/com/hanreader/app/en/EnEngine.kt": "0d302f6518a375d26ed632e91b836f5e15c87bc8ee6c22c3671f612822a2914b",
+    "app/src/main/java/com/hanreader/app/en/EnForms.kt": "e53ecfbdb35f3cd0cff5dbd86a65e9cdf2ae70d6556d88b037baa8aba6df072f",
+    "app/src/main/java/com/hanreader/app/en/EnSenseEvidence.kt": "f9c01192ff20cb59ab204a7a5fa58ac5930fd69fea95864fb83f77af0c11f076"
+  },
+  "mmap_parity": {
+    "contexts": 40,
+    "equal_all_prediction_fields": true,
+    "routes": [
+      "EnDictionary.load + SortedTsv mmap",
+      "EnDictionary.read"
+    ]
+  },
+  "tests": {
+    "english_jvm": 62,
+    "spanish_jvm": 29,
+    "chinese_jvm": 14,
+    "python": 22,
+    "android_compose_run": false
+  },
+  "fast_tool": {
+    "first_compile_and_tests_seconds": 35.42,
+    "cached_tests_seconds": 2.15,
+    "environment": "desktop JVM, no phone/SDK/Gradle; timings are not reader latency"
+  },
+  "separable_frames": 21
+}

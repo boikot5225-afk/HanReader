@@ -61,7 +61,7 @@ sources=[*(p for p in gen.glob('*.kt') if p.name!='Main.kt'),*(src/'zh').glob('*
 # Other lang sources currently require Android Activity/Application; include only pure contracts.
 sources=[p for p in sources if p.parent!=src/'lang' or p.name in ['LanguageModule.kt','Alphabetic.kt','ContextRules.kt','SentenceBoundary.kt']]
 if args.tests:
- for name in ['EnDictionaryTest.kt','EnFormsTest.kt','EnEngineTest.kt','EnBookContextAuditTest.kt']:
+ for name in ['EnDictionaryTest.kt','EnFormsTest.kt','EnEngineTest.kt','EnBookContextAuditTest.kt','EnReadingComfortTest.kt']:
   p=root/'app/src/test/java/com/hanreader/app/en'/name
   if p.exists():sources.append(p)
 cp=os.pathsep.join(str(p) for p in [tc/'jsoup.jar',tc/'json.jar',tc/'junit.jar',tc/'hamcrest.jar',tc/'kotlinc/lib/kotlinx-coroutines-core-jvm.jar',tc/'kotlinc/lib/kotlin-stdlib.jar'])
@@ -69,4 +69,4 @@ subprocess.run(['java','-cp',str(tc/'kotlinc/lib/*'),'org.jetbrains.kotlin.cli.j
 (w/f'classpath-{args.label}').write_text(os.pathsep.join([str(w/f'audit-{args.label}.jar'),cp,str(tc/'kotlinc/lib/*')]))
 
 if args.tests:
-    subprocess.run(['java','-Xmx1g','-cp',(w/f'classpath-{args.label}').read_text(),'org.junit.runner.JUnitCore','com.hanreader.app.en.EnDictionaryTest','com.hanreader.app.en.EnFormsTest','com.hanreader.app.en.EnEngineTest','com.hanreader.app.en.EnBookContextAuditTest'],cwd=root/'app',check=True)
+    subprocess.run(['java','-Xmx1g','-cp',(w/f'classpath-{args.label}').read_text(),'org.junit.runner.JUnitCore','com.hanreader.app.en.EnDictionaryTest','com.hanreader.app.en.EnFormsTest','com.hanreader.app.en.EnEngineTest','com.hanreader.app.en.EnBookContextAuditTest','com.hanreader.app.en.EnReadingComfortTest'],cwd=root/'app',check=True)

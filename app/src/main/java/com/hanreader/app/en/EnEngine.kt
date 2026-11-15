@@ -208,11 +208,14 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0, priv
         // One hint per adjacent expression; never join across punctuation or a paragraph break.
         var i = 0
         while (i < out.size) {
-            val range = phraseStarting(out, text, i)
+            val separated = separatedStarting(out, i)
+            val range = separated?.first ?: phraseStarting(out, text, i)
             if (range != null) {
-                val key = phraseKey(out, text, range.first, range.last)!!
-                out[i] = out[i].copy(pinyin = key, contextMeaning = null)
-                for (j in i + 1..range.last) if (out[j].kind == TokenKind.HAN) out[j] = out[j].copy(pinyin = IN_PHRASE, contextMeaning = null)
+                val key = separated?.second ?: phraseKey(out, text, range.first, range.last)!!
+                out[i] = out[i].copy(pinyin = key, contextMeaning = null, defined = true)
+                // The object remains an ordinary, independently tappable word.
+                for (j in i + 1..range.last) if (out[j].kind == TokenKind.HAN && (separated == null || j == range.last))
+                    out[j] = out[j].copy(pinyin = IN_PHRASE, contextMeaning = null)
                 i = range.last + 1
             } else i++
         }
@@ -222,23 +225,25 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0, priv
 
     override fun cardAnalyses(tokens: List<RToken>, text: String, a: Int, b: Int): List<LexAnalysis> {
         val word = text.substring(tokens[a].start, tokens[b].end)
-        val reading = tokens[a].pinyin
+        val separated = if (a == b) separatedAt(tokens, a) else null
+        val head = separated?.first?.first ?: a
+        val reading = tokens[head].pinyin
         val phrase = if (a!=b) phraseKey(tokens,text,a,b) else null
         val all = if (a!=b) choices(phrase ?: word)
+            else if (separated != null) choices(separated.second) + choices(word)
             else if (' ' in reading && reading!=IN_PHRASE) choices(reading) + choices(word)
             else choices(word, nextWord(tokens,a,-1)?.let { tokens[it].text },nextWord(tokens,a,1)?.let { tokens[it].text },
                 nextWord(tokens,a,-1)?.let { nextWord(tokens,it,-1) }?.let { tokens[it].text },
                 nextWord(tokens,a,1)?.let { nextWord(tokens,it,1) }?.let { tokens[it].text }).sortedBy { if(it.entry.key==reading) 0 else 1 }
-        val selected = tokens[a].contextMeaning.takeIf { a==b || phrase==reading }
+        val selected = tokens[head].contextMeaning.takeIf { a==b || phrase==reading }
         return all.mapIndexed { i,analysis -> if(i!=0 || selected==null || analysis.entry.pos=="сокр.") analysis
-            else analysis.copy(entry=analysis.entry.copy(contextMeaning=selected,source="локальное контекстное правило")) }
+            else analysis.copy(entry=analysis.entry.copy(contextMeaning=selected,source=(analysis.entry.source ?: "Словарь") + "; локальный выбор по контексту")) }
     }
 
     override fun senses(entry: LexEntry): List<String> = entry.contextMeaning?.let { listOf(it) + entry.ru.filterNot { x -> x==it } } ?: entry.ru
 
     /** Choose an occurrence sense after morphology and expressions; lexical caches stay context-free. */
     private fun applySenses(tokens: MutableList<RToken>, text: String) {
-        if (rules.isEmpty) return
         val words=tokens.indices.filter { tokens[it].kind==TokenKind.HAN }
         var start=0
         while(start<words.size) {
@@ -258,16 +263,30 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0, priv
                 { k -> analyses(k).flatMap { listOf(it.entry.key,it.entry.lemma) }.toSet() },
                 { k -> analyses(k).firstOrNull { it.entry.key==tokens[indices[k]].pinyin }?.entry?.isVerb==true },
                 { a,b -> (minOf(indices[a],indices[b])+1 until maxOf(indices[a],indices[b])).all { tokens[it].kind==TokenKind.SPACE } })
+            val contextLemmas = indices.map {
+                val t = tokens[it]
+                t.pinyin.takeUnless { key -> key == IN_PHRASE }?.substringBefore('/')?.substringBefore(' ')
+                    ?.takeIf(String::isNotEmpty) ?: EnForms.key(t.text)
+            }
             for(k in indices.indices) {
                 val t=tokens[indices[k]]
                 if(t.pinyin==IN_PHRASE) continue
                 val options=analyses(k)
                 val keys=options.flatMap { listOf(it.entry.key,it.entry.lemma) }.toSet()
-                if(!rules.covers(keys)) continue
-                val selected=rules.resolve(keys,sentence,k) ?: continue
-                val candidate=options.firstOrNull { it.entry.key==selected.lemma || it.entry.lemma==selected.lemma } ?: continue
-                val key=if(' ' in t.pinyin && candidate.entry.lemma==t.pinyin) t.pinyin else candidate.entry.key
-                tokens[indices[k]]=t.copy(pinyin=key,contextMeaning=selected.meaning)
+                val selected = if (rules.covers(keys)) rules.resolve(keys,sentence,k) else null
+                if (selected != null) {
+                    val candidate=options.firstOrNull { it.entry.key==selected.lemma || it.entry.lemma==selected.lemma } ?: continue
+                    val key=if(' ' in t.pinyin && candidate.entry.lemma==t.pinyin) t.pinyin else candidate.entry.key
+                    tokens[indices[k]]=t.copy(pinyin=key,contextMeaning=selected.meaning)
+                } else if (' ' !in t.pinyin && t.pinyin.endsWith("/noun")) {
+                    val raw = dictionary.analyses(t.text).filter { it.entry.word + "/noun" == t.pinyin && it.entry.pos == "noun" }
+                    val previous = tokens.getOrNull(indices[k]-2)
+                    val number = previous?.let { p -> p.text.all(Char::isDigit) || EnForms.key(p.text) in NUMBER_WORDS } == true &&
+                        tokens.getOrNull(indices[k]-1)?.let { it.kind == TokenKind.SPACE && '\n' !in it.text && '\r' !in it.text } == true
+                    val meaning = EnSenseEvidence.select(raw.flatMap { it.entry.translations }, EnForms.key(t.text), sentence.words,
+                        contextLemmas, k, number)
+                    if (meaning != null) tokens[indices[k]] = t.copy(contextMeaning=meaning)
+                }
             }
             start=end+1
         }
@@ -277,6 +296,7 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0, priv
         if (a >= b || tokens[a].kind != TokenKind.HAN || tokens[b].kind != TokenKind.HAN) return null
         val selected = tokens.subList(a, b + 1)
         if (selected.any { it.kind !in setOf(TokenKind.HAN, TokenKind.SPACE) || '\n' in it.text || '\r' in it.text }) return null
+        separatedStarting(tokens,a)?.takeIf { it.first.last == b }?.let { return it.second }
         val surface = selected.filter { it.kind == TokenKind.HAN }.joinToString(" ") { it.text }
         val exact = if (dictionary.contains(surface)) lexical(surface).firstOrNull { usefulPhrase(it.entry.lemma) } else null
         fun valid(key: String): Boolean {
@@ -300,13 +320,46 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0, priv
 
     override fun phraseAt(tokens: List<RToken>, text: String, index: Int): IntRange? {
         if (tokens.getOrNull(index)?.kind != TokenKind.HAN) return null
+        separatedAt(tokens,index)?.let { return it.first }
         var best: IntRange? = null
         val left = generateSequence(index) { nextWord(tokens, it, -1) }.take(6).toList()
         for (a in left) {
             val range = phraseStarting(tokens, text, a) ?: continue
+            val gap = separatedStarting(tokens,a)?.first
+            if (gap == range && index != range.first && index != range.last) continue
             if (index in range && (best == null || range.last - range.first > best!!.last - best!!.first)) best = range
         }
         return best
+    }
+
+    /** A conservative lexical frame, not a rule that every verb + preposition is separable.
+     * Only one object pronoun may intervene. Never cross punctuation or a newline. */
+    private fun separatedStarting(tokens: List<RToken>, start: Int): Pair<IntRange,String>? {
+        val head = tokens.getOrNull(start)?.takeIf { it.kind == TokenKind.HAN } ?: return null
+        if (head.pinyin == IN_PHRASE) return null
+        val objectIndex = nextWord(tokens,start,1) ?: return null
+        if (EnForms.key(tokens[objectIndex].text) !in OBJECTS) return null
+        val end = nextWord(tokens,objectIndex,1) ?: return null
+        val particle = EnForms.key(tokens[end].text)
+        if (particle !in SEPARABLE_PARTICLES) return null
+        val following = nextWord(tokens,end,1)?.let { EnForms.key(tokens[it].text) }
+        // A following preposition may introduce another construction (take it out on,
+        // put it down to, give them up to). Do not truncate it to a two-word sense.
+        if (following in setOf("to","for","with","on","at","of","over","through","under")) return null
+        // A particle starting another noun phrase may be an ordinary preposition instead.
+        if (particle in setOf("on","off","up","down","in","out") && following in NOUN_MARKERS) return null
+        val verb = choices(head.text, nextWord(tokens,start,-1)?.let { tokens[it].text },tokens[objectIndex].text).firstOrNull()?.entry
+            ?.takeIf { it.isVerb } ?: return null
+        val key = EnForms.key(verb.lemma) + " " + particle
+        if (key !in SEPARABLE_FRAMES || !dictionary.contains(key) || lexical(key).isEmpty()) return null
+        return (start..end) to key
+    }
+
+    private fun separatedAt(tokens: List<RToken>, index: Int): Pair<IntRange,String>? {
+        separatedStarting(tokens,index)?.let { return it }
+        val objectIndex = nextWord(tokens,index,-1) ?: return null
+        val head = nextWord(tokens,objectIndex,-1) ?: return null
+        return separatedStarting(tokens,head)?.takeIf { it.first.last == index }
     }
 
     private fun phraseStarting(tokens: List<RToken>, text: String, start: Int): IntRange? {
@@ -324,7 +377,11 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0, priv
 
     private fun pick(word: String, reading: String?): LexEntry? {
         if (reading == IN_PHRASE) return null
-        if (reading != null && ' ' in reading) return choices(reading).firstOrNull()?.entry
+        if (reading != null && ' ' in reading) {
+            val key = ContextRules.key(reading)
+            val entries = choices(key.substringBeforeLast('/', key))
+            return entries.firstOrNull { it.entry.key == key }?.entry ?: entries.firstOrNull()?.entry
+        }
         val all = choices(word)
         return all.firstOrNull { it.entry.key == reading }?.entry ?: all.firstOrNull()?.entry
     }
@@ -416,6 +473,14 @@ class EnEngine(val dictionary: EnDictionary, override val loadMs: Long = 0, priv
     }
 
     companion object {
+        // Separable transitive frames; English dictionary entries alone do not retain this syntax.
+        // Translations still come from those entries; prepositional look after/look into are excluded.
+        private val SEPARABLE_FRAMES = setOf("turn on","turn off","turn up","turn down","pick up","look up",
+            "take off","take away","take out","put on","put off","put away","put down","put back",
+            "bring up","bring back","call off","give up","set up","let in","let out")
+        private val SEPARABLE_PARTICLES = SEPARABLE_FRAMES.map { it.substringAfter(' ') }.toSet()
+        private val NUMBER_WORDS = setOf("a","an","one","two","three","four","five","six","seven","eight","nine","ten",
+            "eleven","twelve","twenty","thirty","forty","fifty","sixty","hundred","thousand")
         private val LOW_PRIORITY = Regex("^(?:устар\\.|редк\\.|obsolete\\b|archaic\\b)",RegexOption.IGNORE_CASE)
         private val FINITE_AUX = setOf("am","is","are","was","were","has","had","does","did")
         private val MODALS = setOf("may","might","can","could","will","would","shall","should","must")
