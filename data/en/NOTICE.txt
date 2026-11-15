@@ -1,0 +1,25 @@
+English dictionary and source audit, November 2026
+
+Dictionary definitions, pronunciations, inflections and Russian translation items:
+- Russian Wiktionary contributors, English-language entries, via Kaikki / Wiktextract:
+  https://kaikki.org/ruwiktionary/Английский/
+- English Wiktionary contributors, English-language entries, via Kaikki / Wiktextract:
+  https://kaikki.org/dictionary/English/
+Wiktionary text, the derived audit/probes.json and generated en/dict.tsv /
+en/forms.tsv: CC BY-SA 4.0.
+https://creativecommons.org/licenses/by-sa/4.0/
+The tools normalize lookup keys, filter records and export selected dictionary fields.
+No example sentences, quotations, etymologies or audio files are redistributed.
+Input snapshot dates and SHA-256 hashes: audit/sources.json.
+
+Word frequencies used in coverage statistics, audit/gaps_top5000.tsv and generated dictionary ranks:
+Hermit Dave, FrequencyWords, English OpenSubtitles 2018, CC BY-SA 4.0.
+https://github.com/hermitdave/FrequencyWords/tree/master/content/2018/en
+Frequency ranks are original subtitle ranks, not an official CEFR vocabulary.
+
+Book coverage tests (only aggregate counts exported):
+- Lewis Carroll, Alice's Adventures in Wonderland, Project Gutenberg ebook 11.
+  https://www.gutenberg.org/ebooks/11
+- Arthur Conan Doyle, The Adventures of Sherlock Holmes, Project Gutenberg ebook 1661.
+  https://www.gutenberg.org/ebooks/1661
+Book texts are stored locally for the audit and are not included here.

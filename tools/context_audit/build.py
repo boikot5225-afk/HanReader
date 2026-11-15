@@ -66,7 +66,7 @@ if args.revision:
 
 r=(src/'reader/ReaderModel.kt').read_text(); stubs['Reader.kt']+='\n'+r[r.index('data class RToken('):r.index('/** A footnote mark',r.index('data class RToken('))]
 for name,txt in stubs.items(): (gen/name).write_text(txt)
-sources=[*(gen/name for name in stubs),* (src/'es').glob('*.kt'),src/'lang/LanguageModule.kt',src/'lang/Alphabetic.kt',src/'lang/ContextRules.kt',*(src/'epub').glob('*.kt'),root/'tools/context_audit/Main.kt']
+sources=[*(gen/name for name in stubs),* (src/'es').glob('*.kt'),*(src/'en').glob('*.kt'),src/'lang/LanguageModule.kt',src/'lang/Alphabetic.kt',src/'lang/ContextRules.kt',*(src/'epub').glob('*.kt'),root/'tools/context_audit/Main.kt']
 # Include new, pure presentation/boundary helpers as they appear.
 for name in ['AlphabeticCard.kt','SentenceBoundary.kt']:
  p=src/'lang'/name

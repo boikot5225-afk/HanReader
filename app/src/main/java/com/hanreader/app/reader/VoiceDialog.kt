@@ -38,6 +38,12 @@ private const val SAMPLE = "你好！我们一起读中文书吧。"
 /** Choice of the voice for reading aloud: the phone's or the server's neural voice, and which one. */
 @Composable
 fun VoiceDialog(onDismiss: () -> Unit) {
+    if (com.hanreader.app.lang.Languages.current != com.hanreader.app.lang.Languages.CHINESE) {
+        AlertDialog(onDismissRequest = onDismiss, title = { Text("Голос для чтения") },
+            text = { Text("Читает голос телефона. Нужный голос можно установить в настройках синтеза речи Android.") },
+            confirmButton = { TextButton(onClick = onDismiss) { Text("Понятно") } })
+        return
+    }
     val context = LocalContext.current
     val voice = remember { NeuralVoice.get(context) }
     var neural by remember { mutableStateOf(voice.enabled) }

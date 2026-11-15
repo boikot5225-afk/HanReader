@@ -31,7 +31,11 @@ data class LexEntry(
     /** Names this reading among the readings of a word: the lemma, for another part of speech «haber/сущ.». */
     val key: String = lemma,
     /** A rule's sense for this occurrence only; never stored in the dictionary cache. */
-    val contextMeaning: String? = null
+    val contextMeaning: String? = null,
+    /** Optional pronunciation for the word card, independent of the line above text. */
+    val pronunciation: String = "",
+    /** A more precise source label when the module has one. */
+    val source: String? = null
 ) {
     /** «сущ., ж. р.», «сущ., м. и ж. р.», «гл.». */
     val posLabel: String get() = when (gender) {

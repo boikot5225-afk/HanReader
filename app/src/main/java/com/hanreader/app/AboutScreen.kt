@@ -44,13 +44,16 @@ internal fun appTitle(): String =
     else BuildConfig.APP_NAME
 
 /** One source the app is built from: what it gives, who made it, its licence, the file with the details. */
-internal data class Credit(val what: String, val source: String, val license: String, val file: String, val language: String? = null)
+internal data class Credit(val what: String, val source: String, val license: String, val file: String, val language: String? = null) {
+    val assetPath: String get() = if ('/' in file) file else "licenses/$file"
+}
 
 internal val CREDITS = listOf(
     Credit("Китайско-английский словарь", "CC-CEDICT, MDBG", "CC BY-SA 4.0", "CC-CEDICT_NOTICE.txt", "zh"),
     Credit("Русские значения", "Русский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "RU_WIKTIONARY_NOTICE.txt", "zh"),
     Credit("Идиомы, пословицы и слова", "Английский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "EN_WIKTIONARY_NOTICE.txt", "zh"),
     Credit("Испанский словарь", "Русский и английский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "ES_WIKTIONARY_NOTICE.txt", "es"),
+    Credit("Английский словарь", "Русский и английский Викисловарь (через kaikki.org)", "CC BY-SA 4.0", "en/NOTICE.txt"),
     Credit("Машинный перевод значений на русский", "производная от CC-CEDICT и Викисловаря, перевод DeepSeek", "CC BY-SA 4.0", "RU_AI_NOTICE.txt", "zh"),
     Credit("Разбивка текста на слова", "Jieba 0.42.1", "MIT", "JIEBA_NOTICE.txt", "zh"),
     Credit("Имена собственные", "разметка словаря Jieba", "MIT", "NAMES_NOTICE.txt", "zh"),
@@ -165,9 +168,10 @@ fun AboutDialog(onClose: () -> Unit) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("${appTitle()} $version", style = MaterialTheme.typography.headlineSmall, fontFamily = WordFont)
                 Text(
-                    (if (com.hanreader.app.lang.Languages.AVAILABLE.size > 1) "Читалка книг на испанском и китайском со словарём, разбором грамматики, пиньинем и карточками."
-                        else if (com.hanreader.app.lang.Languages.current.readingTitle != null) "Читалка китайских книг с пиньинем, словарём и карточками."
-                        else "Читалка книг на испанском со словарём, разбором грамматики и карточками.") + " Работает без интернета и не собирает личные данные.",
+                    "Читалка книг со словарём, подсказками и карточками. " +
+                        (if (com.hanreader.app.lang.Languages.AVAILABLE.size > 1) "Языки книг: " else "Язык книг: ") +
+                        com.hanreader.app.lang.Languages.AVAILABLE.joinToString(", ") { it.title.lowercase(java.util.Locale.ROOT) } +
+                        ". Работает без интернета и не собирает личные данные.",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Overline("Связь с разработчиком", Modifier.padding(top = 4.dp))
@@ -185,7 +189,7 @@ fun AboutDialog(onClose: () -> Unit) {
                 )
                 // Only the sources of the languages this app reads.
                 CREDITS.filter { c -> c.language == null || com.hanreader.app.lang.Languages.AVAILABLE.any { it.tag.startsWith(c.language) } }.forEach { c ->
-                    Column(Modifier.fillMaxWidth().clickable { shown = c.what to "licenses/${c.file}" }.padding(vertical = 6.dp)) {
+                    Column(Modifier.fillMaxWidth().clickable { shown = c.what to c.assetPath }.padding(vertical = 6.dp)) {
                         Text(c.what, style = MaterialTheme.typography.titleSmall)
                         Text("${c.source} · ${c.license}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }

@@ -613,13 +613,15 @@ object ChapterBuilder {
         extra: Set<String> = emptySet(),
         script: ScriptMode = ScriptMode.AS_BOOK,
         /** Words the reader split: never kept whole. */
-        blocked: Set<String> = emptySet()
+        blocked: Set<String> = emptySet(),
+        checkCancelled: () -> Unit = {}
     ): ChapterContent {
         val t = System.nanoTime()
         var chars = 0
         val source = book.blocks(index)
         val prepare = engine.chapter(source.mapNotNull { (it as? EpubBlock.Text)?.text }, TextOptions(extra, blocked, script))
         val blocks = source.map { b ->
+            checkCancelled()
             when (b) {
                 is EpubBlock.Image -> ReaderBlock.Image(b.path)
                 is EpubBlock.Text -> {
@@ -729,10 +731,11 @@ object KnownExpansion {
  * the language module says ([LanguageModule.knownByParts]; Chinese: 一个人, 看着, 走进).
  */
 class KnownMatcher(private val known: Set<String>, private val engine: LanguageModule?) {
-    private val cache = HashMap<String, Boolean>()
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
     private val unknown: Set<String> = (known as? KnownWords)?.unknown ?: emptySet()
 
     fun isKnown(word: String): Boolean {
+        if (known.isEmpty()) return false
         if (word in unknown) return false
         if (word in known) return true
         val e = engine ?: return false

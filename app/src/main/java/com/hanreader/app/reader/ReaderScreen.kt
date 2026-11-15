@@ -125,10 +125,21 @@ import kotlinx.coroutines.launch
  */
 internal data class Selection(val block: Int, val first: Int, val last: Int, val phrase: Boolean = false, val done: Boolean = true)
 
+/** Keep dictionary work off Compose's main thread. Obsolete results are cancelled on key changes. */
+@Composable
+private fun <T> readerWork(initial: T, vararg keys: Any?, work: () -> T): T {
+    val result by produceState(initial, *keys) {
+        value = initial
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { work() }
+    }
+    return result
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class, FlowPreview::class, ExperimentalLayoutApi::class)
 @Composable
 fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
+    BackHandler(onBack = onClose)
     val open by vm.open.collectAsState()
     val saved by vm.savedWords.collectAsState()
     // Underlined as "in study": once learned (30+ days) a word reads like any known word.
@@ -138,7 +149,14 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val pinyinMode by vm.pinyinMode.collectAsState()
     val speed by vm.speed.collectAsState()
     val book = open ?: run {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        val error by vm.openingError.collectAsState()
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (error == null) CircularProgressIndicator()
+                Text(error ?: "Открываю книгу…", Modifier.padding(horizontal = 24.dp))
+                TextButton(onClick = onClose) { Text("Назад") }
+            }
+        }
         return
     }
     val context = LocalContext.current
@@ -190,7 +208,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val chapter = book.chapter
     val matcher = remember(known, engine) { KnownMatcher(known, engine) }
     // Words of this chapter treated as known (marked, learned or transparent compounds of them).
-    val knownHere = remember(chapter, matcher) { chapter?.let { matcher.knownIn(it) } ?: emptySet() }
+    val knownHere = readerWork(emptySet<String>(), chapter, matcher) { chapter?.let { matcher.knownIn(it) } ?: emptySet() }
     val bookWordsFlow = remember(book.entity.id) { vm.bookWords(book.entity.id) }
     val bookWords by bookWordsFlow.collectAsState(initial = emptyList())
     val userNames by vm.userNames.collectAsState()
@@ -214,18 +232,18 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         out
     }
     val names = remember(bookWords, userNames, chapterNames) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word }.apply { addAll(userNames); addAll(chapterNames) } }
-    val coverage = remember(chapter, matcher, names) { chapter?.let { KnownCoverage.of(it, matcher, names, engine) } }
+    val coverage = readerWork<KnownCoverage?>(null, chapter, matcher, names, engine) { chapter?.let { KnownCoverage.of(it, matcher, names, engine) } }
     // A language without a line above words (Spanish) never reserves room for it.
     val showPinyin = pinyinMode != PinyinMode.OFF && com.hanreader.app.lang.Languages.current.readingTitle != null
     // Recommended words for the reader's level (blue), words not known yet (red).
     val levelMark by vm.levelMark.collectAsState()
-    val readerLevel = remember(matcher, levelMark, engine) { engine?.let { e ->
+    val readerLevel = readerWork<ReaderLevel?>(null, matcher, levelMark, engine) { engine?.let { e ->
         if (e is ZhEngine) Recommendations.level(levelMark, matcher, e.hsk)
         else e.levels?.let { Recommendations.level(levelMark.level, matcher, it) }
     } }
     val bookWordMap = remember(bookWords) { bookWords.associateBy { it.word } }
     val wantRecommended = appearance.markRecommended || pinyinMode == PinyinMode.RECOMMENDED || appearance.gloss == GlossMode.RECOMMENDED
-    val recommended = remember(chapter, matcher, saved, names, bookWordMap, readerLevel, appearance.recommendedPerChapter, wantRecommended) {
+    val recommended = readerWork(emptyList<Recommendation>(), chapter, matcher, saved, names, bookWordMap, readerLevel, appearance.recommendedPerChapter, wantRecommended, engine) {
         val eng = engine
         if (!wantRecommended || chapter == null || eng == null || readerLevel == null) emptyList()
         else Recommendations.forChapter(chapter, matcher, saved, names, bookWordMap, eng, readerLevel, appearance.recommendedPerChapter)
@@ -235,19 +253,19 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     }
     // Recommendations are dictionary forms (Spanish hablar); the marks and hints go on the words of
     // the page that are forms of them (habló, hablaban).
-    val recommendedSet = remember(recommended, chapterWords, engine) {
+    val recommendedSet = readerWork(emptySet<String>(), recommended, chapterWords, engine) {
         val lemmas = recommended.mapTo(HashSet()) { it.word }
         val eng = engine
         if (eng == null || eng is ZhEngine) lemmas else chapterWords.filterTo(HashSet()) { eng.lemma(it) in lemmas }
     }
     val wantUnknown = appearance.markUnknown || appearance.gloss == GlossMode.UNKNOWN
-    val unknownSet = remember(chapterWords, knownHere, saved, names, wantUnknown) {
+    val unknownSet = readerWork(emptySet<String>(), chapterWords, knownHere, saved, names, wantUnknown, engine) {
         val eng = engine
         if (!wantUnknown) emptySet()
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
     // Short translations above the pinyin: over unknown words or over recommended ones.
-    val glossFor: Map<String, String>? = remember(appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, bookWide, known) {
+    val glossFor: Map<String, String>? = readerWork(null, appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, bookWide, known) {
         val eng = engine
         // A language with an alphabet: phrases carry one hint, words their reading in context.
         val zhless = eng is com.hanreader.app.lang.AlphabeticModule
@@ -315,14 +333,15 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val highlightsHere = remember(highlights, chapter?.index) { highlights.filter { it.chapterIndex == chapter?.index }.groupBy { it.blockIndex } }
     // Words tapped in this chapter: they come first in its review.
     val tappedHere = remember(chapter?.index) { androidx.compose.runtime.mutableStateListOf<String>() }
-    val summaryItems: List<SummaryItem> = remember(chapter, glossFor, known, saved, studying, names, tappedHere.size, appearance.chapterSummary) {
+    val tappedSnapshot = tappedHere.toSet()
+    val summaryItems: List<SummaryItem> = readerWork(emptyList(), chapter, glossFor, known, saved, studying, names, tappedSnapshot, appearance.chapterSummary, engine, matcher) {
         val eng = engine
         if (chapter == null || eng == null || !appearance.chapterSummary) emptyList()
         else ChapterSummary.items(
             chapter, eng, glossFor, com.hanreader.app.Appearance.GLOSS_REPEATS,
             isKnown = { word, key -> key in known || (' ' !in key && matcher.isKnown(word)) },
             skip = { word, key -> key in saved || key in studying || word in names || key in names || VocabularyStats.isName(word, eng) },
-            tapped = tappedHere.toSet()
+            tapped = tappedSnapshot
         )
     }
     val paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit = { block, i, lines ->
@@ -1545,7 +1564,10 @@ internal fun WordSheet(
             val markFlow = remember(cardWord) { markOf(cardWord) }
             val mark by markFlow.collectAsState(initial = null)
             val knownNow = isKnown(word)
-            val canMark = (zh == null || word.length <= 8) && word.all { com.hanreader.app.lang.Languages.current.isWordChar(it) }
+            val wordChar = com.hanreader.app.lang.Languages.current.isWordChar
+            val canMark = if (alpha != null) word.any(wordChar) && word.all {
+                wordChar(it) || it in "'’- " || Character.getType(it) == Character.NON_SPACING_MARK.toInt()
+            } else word.length <= 8 && word.all(wordChar)
             val knownReason = when {
                 mark?.source == ReaderViewModel.UNKNOWN -> "отмечено «Не знаю»"
                 mark?.source == "manual" -> "отмечено «Знаю»"
@@ -1566,13 +1588,13 @@ internal fun WordSheet(
                     Text(word, fontFamily = WordFont, style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.alignByBaseline())
                 }
-                Text(reading, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.alignByBaseline())
                 // A form of another word: hablo → hablar.
-                if (zh == null && cardWord != word.lowercase()) {
+                if (zh == null && !cardWord.equals(word, ignoreCase = true)) {
                     Text("→ $cardWord", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.alignByBaseline())
                 }
+                Text(if (zh == null) es.firstOrNull()?.entry?.pronunciation.orEmpty() else reading, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.alignByBaseline())
             }
             // Beside the word: the switch, and under it what each character means (目 глаз, 不 не…).
             val charRows = remember(word, selection) {
@@ -1637,7 +1659,7 @@ internal fun WordSheet(
             }
             if (details) {
                 (if (zh != null && selectedMeaning != null) "локальное контекстное правило" else zh?.russianSource(word)?.label
-                    ?: es.firstOrNull()?.let { if (it.entry.machine) "машинный перевод Викисловаря" else "Викисловарь" })?.let {
+                    ?: es.firstOrNull()?.let { it.entry.source ?: if (it.entry.machine) "машинный перевод Викисловаря" else "Викисловарь" })?.let {
                     Text("Русский · $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 val measureWords = remember(word) { zh?.measureWords(word).orEmpty() }
@@ -1770,7 +1792,9 @@ internal fun WordSheet(
             Surface(
                 onClick = {
                     // Spanish: the card's second line is the part of speech and gender («сущ., ж. р.»).
-                    onSave(cardWord, if (zh == null) es.firstOrNull()?.entry?.posLabel.orEmpty() else reading, primaryMeaning, sentence) { r ->
+                    onSave(cardWord, if (zh == null) es.firstOrNull()?.entry?.let { e ->
+                        listOf(e.pronunciation, e.posLabel).filter { it.isNotEmpty() }.joinToString(" · ")
+                    }.orEmpty() else reading, primaryMeaning, sentence) { r ->
                         scope.launch {
                             status = r.fold(
                                 onSuccess = { created -> if (created) "Добавлено в карточки" else "Уже в карточках: добавлен новый пример" },

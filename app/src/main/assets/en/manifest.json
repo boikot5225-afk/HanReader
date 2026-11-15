@@ -1,0 +1,40 @@
+{
+  "format": 2,
+  "source_entries": {
+    "ru": 72487,
+    "en": 1499161
+  },
+  "keys": 102043,
+  "pos_entries": 135408,
+  "form_keys": 167851,
+  "form_links": 225407,
+  "russian_keys": 90373,
+  "sources": {
+    "ru-english.jsonl": {
+      "bytes": 87009307,
+      "sha256": "8cff3c5121393abf82909c5946217cc44fa9b06c640876705edb38d65dfe6894"
+    },
+    "en-english.jsonl.gz": {
+      "bytes": 534186395,
+      "sha256": "4d03b6cba283744756c57ff661c2c6cbfe34fcf8ff513a966576cf7d97e91a99"
+    },
+    "en_50k.txt": {
+      "bytes": 622749,
+      "sha256": "5351ff405b1126ef555791dd4d9798a48e3e9a501a9fc481a9da957752cfb458"
+    }
+  },
+  "files": {
+    "dict.tsv": {
+      "bytes": 43932490,
+      "sha256": "b3fc2157b05aedb02830970a427903ccf965c909d18edf01d36aea2be5ad8259"
+    },
+    "forms.tsv": {
+      "bytes": 14959173,
+      "sha256": "faaffffb17f328b7167ecbaefac2f4db2e512306697e173241ff5020d2867add"
+    },
+    "ranks.tsv": {
+      "bytes": 211581,
+      "sha256": "fd498d3b0eeaf716af0653272839f3a2c4433f3b9dce19668ace55a461d70b30"
+    }
+  }
+}

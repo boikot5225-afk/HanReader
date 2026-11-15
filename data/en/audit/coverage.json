@@ -1,0 +1,376 @@
+{
+  "source_stats": {
+    "ru": {
+      "entries": 72487,
+      "distinct_headwords": 65561,
+      "excluded_uppercase_or_nonlexical_entries": 427,
+      "multiword_headwords": 6278,
+      "usable_glosses": 96127,
+      "headwords_with_target_forms": 4491,
+      "russian_translation_items": 0
+    },
+    "en": {
+      "entries": 1499161,
+      "distinct_headwords": 1361228,
+      "excluded_uppercase_or_nonlexical_entries": 27223,
+      "multiword_headwords": 318562,
+      "usable_glosses": 1083649,
+      "headwords_with_target_forms": 14130,
+      "russian_translation_items": 141710
+    }
+  },
+  "definitions": {
+    "ru_headwords": 57287,
+    "en_headwords": 713628,
+    "en_headwords_with_russian_translations": 58324,
+    "extra_russian_headwords": 33797
+  },
+  "frequency_excluded": {
+    "rows": 1336,
+    "tokens": 40788628,
+    "first_20": [
+      [
+        6,
+        "'s",
+        14291013
+      ],
+      [
+        10,
+        "'t",
+        9628970
+      ],
+      [
+        26,
+        "'m",
+        4386306
+      ],
+      [
+        32,
+        "'re",
+        4059719
+      ],
+      [
+        44,
+        "'ll",
+        2913428
+      ],
+      [
+        63,
+        "'ve",
+        1991871
+      ],
+      [
+        104,
+        "'d",
+        1109205
+      ],
+      [
+        177,
+        "mr.",
+        515685
+      ],
+      [
+        492,
+        "dr.",
+        141231
+      ],
+      [
+        550,
+        "mrs.",
+        123530
+      ],
+      [
+        579,
+        "'cause",
+        112193
+      ],
+      [
+        737,
+        "'am",
+        76751
+      ],
+      [
+        1167,
+        "'ii",
+        44152
+      ],
+      [
+        1287,
+        "ms.",
+        39904
+      ],
+      [
+        1426,
+        "i.",
+        35384
+      ],
+      [
+        1606,
+        "'all",
+        30283
+      ],
+      [
+        2055,
+        "'clock",
+        22311
+      ],
+      [
+        2346,
+        "st.",
+        18766
+      ],
+      [
+        2465,
+        "'mon",
+        17576
+      ],
+      [
+        2564,
+        "i-",
+        16759
+      ]
+    ]
+  },
+  "frequency": {
+    "1000": {
+      "types": 988,
+      "tokens": 568474985,
+      "ru_direct": {
+        "types": 821,
+        "tokens": 506393224,
+        "type_pct": 83.097,
+        "token_pct": 89.079
+      },
+      "ru_with_forms": {
+        "types": 954,
+        "tokens": 561145277,
+        "type_pct": 96.559,
+        "token_pct": 98.711
+      },
+      "ru_combined_with_forms": {
+        "types": 966,
+        "tokens": 563754154,
+        "type_pct": 97.773,
+        "token_pct": 99.17
+      },
+      "en_with_forms": {
+        "types": 973,
+        "tokens": 563428942,
+        "type_pct": 98.482,
+        "token_pct": 99.112
+      },
+      "ipa_with_forms": {
+        "types": 975,
+        "tokens": 565019124,
+        "type_pct": 98.684,
+        "token_pct": 99.392
+      }
+    },
+    "3000": {
+      "types": 2976,
+      "tokens": 620392637,
+      "ru_direct": {
+        "types": 2297,
+        "tokens": 545079815,
+        "type_pct": 77.184,
+        "token_pct": 87.86
+      },
+      "ru_with_forms": {
+        "types": 2845,
+        "tokens": 610565001,
+        "type_pct": 95.598,
+        "token_pct": 98.416
+      },
+      "ru_combined_with_forms": {
+        "types": 2922,
+        "tokens": 614848926,
+        "type_pct": 98.185,
+        "token_pct": 99.106
+      },
+      "en_with_forms": {
+        "types": 2953,
+        "tokens": 615158702,
+        "type_pct": 99.227,
+        "token_pct": 99.156
+      },
+      "ipa_with_forms": {
+        "types": 2949,
+        "tokens": 616620097,
+        "type_pct": 99.093,
+        "token_pct": 99.392
+      }
+    },
+    "5000": {
+      "types": 4962,
+      "tokens": 639440286,
+      "ru_direct": {
+        "types": 3646,
+        "tokens": 558031017,
+        "type_pct": 73.478,
+        "token_pct": 87.269
+      },
+      "ru_with_forms": {
+        "types": 4702,
+        "tokens": 628370974,
+        "type_pct": 94.76,
+        "token_pct": 98.269
+      },
+      "ru_combined_with_forms": {
+        "types": 4867,
+        "tokens": 633482491,
+        "type_pct": 98.085,
+        "token_pct": 99.068
+      },
+      "en_with_forms": {
+        "types": 4925,
+        "tokens": 634066621,
+        "type_pct": 99.254,
+        "token_pct": 99.16
+      },
+      "ipa_with_forms": {
+        "types": 4912,
+        "tokens": 635446882,
+        "type_pct": 98.992,
+        "token_pct": 99.375
+      }
+    },
+    "10000": {
+      "types": 9866,
+      "tokens": 659812144,
+      "ru_direct": {
+        "types": 6697,
+        "tokens": 570880757,
+        "type_pct": 67.88,
+        "token_pct": 86.522
+      },
+      "ru_with_forms": {
+        "types": 9016,
+        "tokens": 646427580,
+        "type_pct": 91.385,
+        "token_pct": 97.971
+      },
+      "ru_combined_with_forms": {
+        "types": 9533,
+        "tokens": 652948132,
+        "type_pct": 96.625,
+        "token_pct": 98.96
+      },
+      "en_with_forms": {
+        "types": 9749,
+        "tokens": 654129732,
+        "type_pct": 98.814,
+        "token_pct": 99.139
+      },
+      "ipa_with_forms": {
+        "types": 9574,
+        "tokens": 654913211,
+        "type_pct": 97.04,
+        "token_pct": 99.258
+      }
+    },
+    "50000": {
+      "types": 48660,
+      "tokens": 684330746,
+      "ru_direct": {
+        "types": 21287,
+        "tokens": 582061294,
+        "type_pct": 43.746,
+        "token_pct": 85.056
+      },
+      "ru_with_forms": {
+        "types": 32041,
+        "tokens": 663518476,
+        "type_pct": 65.847,
+        "token_pct": 96.959
+      },
+      "ru_combined_with_forms": {
+        "types": 37954,
+        "tokens": 673102708,
+        "type_pct": 77.998,
+        "token_pct": 98.359
+      },
+      "en_with_forms": {
+        "types": 44258,
+        "tokens": 676974076,
+        "type_pct": 90.954,
+        "token_pct": 98.925
+      },
+      "ipa_with_forms": {
+        "types": 37075,
+        "tokens": 674580188,
+        "type_pct": 76.192,
+        "token_pct": 98.575
+      }
+    }
+  },
+  "books": {
+    "alice": {
+      "types": 2669,
+      "tokens": 26630,
+      "ru_direct": {
+        "types": 1618,
+        "tokens": 21975,
+        "type_pct": 60.622,
+        "token_pct": 82.52
+      },
+      "ru_with_forms": {
+        "types": 2376,
+        "tokens": 25565,
+        "type_pct": 89.022,
+        "token_pct": 96.001
+      },
+      "ru_combined_with_forms": {
+        "types": 2467,
+        "tokens": 25988,
+        "type_pct": 92.432,
+        "token_pct": 97.589
+      },
+      "en_with_forms": {
+        "types": 2548,
+        "tokens": 26132,
+        "type_pct": 95.466,
+        "token_pct": 98.13
+      },
+      "ipa_with_forms": {
+        "types": 2509,
+        "tokens": 26352,
+        "type_pct": 94.005,
+        "token_pct": 98.956
+      }
+    },
+    "sherlock": {
+      "types": 8230,
+      "tokens": 104548,
+      "ru_direct": {
+        "types": 4511,
+        "tokens": 86059,
+        "type_pct": 54.812,
+        "token_pct": 82.315
+      },
+      "ru_with_forms": {
+        "types": 6777,
+        "tokens": 101252,
+        "type_pct": 82.345,
+        "token_pct": 96.847
+      },
+      "ru_combined_with_forms": {
+        "types": 7318,
+        "tokens": 102712,
+        "type_pct": 88.919,
+        "token_pct": 98.244
+      },
+      "en_with_forms": {
+        "types": 7712,
+        "tokens": 103504,
+        "type_pct": 93.706,
+        "token_pct": 99.001
+      },
+      "ipa_with_forms": {
+        "types": 7363,
+        "tokens": 102794,
+        "type_pct": 89.465,
+        "token_pct": 98.322
+      }
+    }
+  }
+}

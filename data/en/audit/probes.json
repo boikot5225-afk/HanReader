@@ -1,0 +1,7376 @@
+{
+  "went": {
+    "candidates": [
+      "gan",
+      "go",
+      "went"
+    ],
+    "russian_candidates": [
+      "go"
+    ],
+    "translated_candidates": [
+      "gan",
+      "go"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "went",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [
+          "[wɛnt]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "went",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [
+          "/wɛnt/",
+          "/wɛnt/",
+          "[wɛnʔ(t̚)]",
+          "/wɪnt/",
+          "/went/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "went",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [
+          "/wɛnt/",
+          "/wɛnt/",
+          "[wɛnʔ(t̚)]",
+          "/wɪnt/",
+          "/went/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "wents",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "Went",
+        "pos": "name",
+        "glosses": [
+          "A surname from Middle English.",
+          "The River Went, a river in West Yorkshire, North Yorkshire, South Yorkshire and East Riding of Yorkshire, England, a tributary of the River Don. It forms the boundary between South Yorkshire and both North Yorkshire and the East Riding in its lower reaches."
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "Wents",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "gone": {
+    "candidates": [
+      "go",
+      "gone"
+    ],
+    "russian_candidates": [
+      "go"
+    ],
+    "translated_candidates": [
+      "go"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "gone",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "gone",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "gone",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [
+          "/ɡɒn/",
+          "/ɡɔːn/",
+          "/ɡɔn/",
+          "/ɡɑn/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "gone",
+        "pos": "adj",
+        "glosses": [
+          "Away, having left.",
+          "No longer existing, having passed.",
+          "Used up.",
+          "Broken, failed.",
+          "Dead.",
+          "Doomed, done for.",
+          "Not fully aware of one's surroundings, often through intoxication or mental decline.",
+          "Infatuated; in love (+ on, for, in)."
+        ],
+        "ipa": [
+          "/ɡɒn/",
+          "/ɡɔːn/",
+          "/ɡɔn/",
+          "/ɡɑn/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "further gone",
+            "tags": [
+              "comparative"
+            ]
+          },
+          {
+            "form": "farther gone",
+            "tags": [
+              "comparative"
+            ]
+          },
+          {
+            "form": "goner",
+            "tags": [
+              "comparative"
+            ]
+          },
+          {
+            "form": "furthest gone",
+            "tags": [
+              "superlative"
+            ]
+          },
+          {
+            "form": "farthest gone",
+            "tags": [
+              "superlative"
+            ]
+          },
+          {
+            "form": "gonest",
+            "tags": [
+              "superlative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "gone",
+        "pos": "prep",
+        "glosses": [
+          "Past, after, later than (a time)."
+        ],
+        "ipa": [
+          "/ɡɒn/",
+          "/ɡɔːn/",
+          "/ɡɔn/",
+          "/ɡɑn/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "gone",
+        "pos": "contraction",
+        "glosses": [],
+        "ipa": [
+          "/ɡɒn/",
+          "/ɡɔːn/",
+          "/ɡɔn/",
+          "/ɡɑn/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "saw": {
+    "candidates": [
+      "saw",
+      "see"
+    ],
+    "russian_candidates": [
+      "saw",
+      "see"
+    ],
+    "translated_candidates": [
+      "saw",
+      "see"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "saw",
+        "pos": "noun",
+        "glosses": [
+          "пила"
+        ],
+        "ipa": [
+          "[sɔː]",
+          "[sɔːz]",
+          "[sɑ]",
+          "[soː]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "saws",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "ru",
+        "word": "saw",
+        "pos": "verb",
+        "glosses": [
+          "пилить; распиливать",
+          "пилиться; распиливаться"
+        ],
+        "ipa": [
+          "[sɔː]",
+          "[sɑ]",
+          "[soː]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "saws",
+            "tags": [
+              "third-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "sawed",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "sawn",
+            "tags": [
+              "past",
+              "participle"
+            ]
+          },
+          {
+            "form": "sawing",
+            "tags": [
+              "gerund"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "ru",
+        "word": "saw",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [
+          "sɔː"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "saw",
+        "pos": "noun",
+        "glosses": [
+          "A tool used for cutting hard substances, in particular wood or metal.",
+          "Such a tool with a toothed blade.",
+          "A tool used for cutting hard substances, in particular wood or metal.",
+          "Such a tool with an abrasive coating instead of teeth.",
+          "A musical saw.",
+          "A sawtooth wave.",
+          "The situation where two partners agree to trump a suit alternately, playing that suit to each other for the express purpose."
+        ],
+        "ipa": [
+          "/sɔː/",
+          "/soː/",
+          "/sɔ/",
+          "[sɔɹ]",
+          "/sɑ/",
+          "/sɒ/",
+          "/sɔ/",
+          "/sɑl/"
+        ],
+        "ru_translations": [
+          {
+            "word": "пила",
+            "sense": "tool",
+            "tags": [
+              "feminine"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "saws",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "saw",
+        "pos": "verb",
+        "glosses": [
+          "To cut (something) with a saw.",
+          "To make a motion back and forth similar to cutting something with a saw.",
+          "To be cut with a saw.",
+          "To form or produce (something) by cutting with a saw."
+        ],
+        "ipa": [
+          "/sɔː/",
+          "/soː/",
+          "/sɔ/",
+          "[sɔɹ]",
+          "/sɑ/",
+          "/sɒ/",
+          "/sɔ/",
+          "/sɑl/"
+        ],
+        "ru_translations": [
+          {
+            "word": "пилить",
+            "sense": "cut with a saw",
+            "tags": [
+              "imperfective"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "saws",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "sawing",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "sawed",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "sawed",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "sawn",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "saw",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [
+          "/sɔː/",
+          "/soː/",
+          "/sɔ/",
+          "[sɔɹ]",
+          "/sɑ/",
+          "/sɒ/",
+          "/sɔ/",
+          "/sɑl/"
+        ],
+        "ru_translations": [
+          {
+            "word": "пословица",
+            "sense": "saying or proverb",
+            "tags": [
+              "feminine"
+            ]
+          },
+          {
+            "word": "поговорка",
+            "sense": "saying or proverb",
+            "tags": [
+              "feminine"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "saws",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "saw",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [
+          "/sɔː/",
+          "/soː/",
+          "/sɔ/",
+          "[sɔɹ]",
+          "/sɑ/",
+          "/sɒ/",
+          "/sɔ/",
+          "/sɑl/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "Saw",
+        "pos": "name",
+        "glosses": [
+          "A surname."
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "Saws",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "Sawh",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "Saw",
+        "pos": "noun",
+        "glosses": [
+          "A Bahamian."
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "Saws",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "Sawh",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "left": {
+    "candidates": [
+      "leaue",
+      "leave",
+      "left"
+    ],
+    "russian_candidates": [
+      "leave",
+      "left"
+    ],
+    "translated_candidates": [
+      "leave",
+      "left"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "left",
+        "pos": "adj",
+        "glosses": [
+          "левый",
+          "полит. левый"
+        ],
+        "ipa": [
+          "[ˈlɛft]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "left",
+        "pos": "adv",
+        "glosses": [
+          "налево, слева"
+        ],
+        "ipa": [
+          "[left]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "left",
+        "pos": "noun",
+        "glosses": [
+          "левая сторона; левый фланг",
+          "полит. левые, левая партия"
+        ],
+        "ipa": [
+          "[left]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "left",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [
+          "ˈlɛft"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "left",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "left",
+        "pos": "adj",
+        "glosses": [
+          "Designating the side of the body toward the west when one is facing north; the side of the body on which the heart is located in most humans; the opposite of right. This arrow points to the reader's left: ←",
+          "Anticlockwise, particularly when describing a change in direction or orientation.",
+          "Designating the bank of a river (etc.) on one's left when facing downstream (i.e. facing forward while floating with the current); that is, the north bank of a river that flows eastward. If this arrow: ⥲ shows the direction of the current, the tilde is on the left side of the river.",
+          "Left-wing; pertaining to the political left.",
+          "Relating to the beginning or earlier part of a phrase."
+        ],
+        "ipa": [
+          "/ˈlɛft/",
+          "/ˈɫɛft/",
+          "/ˈlɛf/",
+          "/ˈlɛfʔ/"
+        ],
+        "ru_translations": [
+          {
+            "word": "левый",
+            "sense": "west side of the body when one is facing north",
+            "tags": []
+          },
+          {
+            "word": "левый",
+            "sense": "pertaining to the political left — see also leftist",
+            "tags": []
+          },
+          {
+            "word": "либеральный",
+            "sense": "pertaining to the political left — see also leftist",
+            "tags": []
+          }
+        ],
+        "forms": [
+          {
+            "form": "further left",
+            "tags": [
+              "comparative"
+            ]
+          },
+          {
+            "form": "farther left",
+            "tags": [
+              "comparative"
+            ]
+          },
+          {
+            "form": "more left",
+            "tags": [
+              "comparative"
+            ]
+          },
+          {
+            "form": "lefter",
+            "tags": [
+              "comparative"
+            ]
+          },
+          {
+            "form": "furthest left",
+            "tags": [
+              "superlative"
+            ]
+          },
+          {
+            "form": "farthest left",
+            "tags": [
+              "superlative"
+            ]
+          },
+          {
+            "form": "most left",
+            "tags": [
+              "superlative"
+            ]
+          },
+          {
+            "form": "leftmost",
+            "tags": [
+              "superlative"
+            ]
+          },
+          {
+            "form": "leftest",
+            "tags": [
+              "superlative"
+            ]
+          },
+          {
+            "form": "Left",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "left",
+        "pos": "adv",
+        "glosses": [
+          "On the left side.",
+          "Towards the left side.",
+          "Towards the political left."
+        ],
+        "ipa": [
+          "/ˈlɛft/",
+          "/ˈɫɛft/",
+          "/ˈlɛf/",
+          "/ˈlɛfʔ/"
+        ],
+        "ru_translations": [
+          {
+            "word": "слева",
+            "sense": "on the left side",
+            "tags": []
+          },
+          {
+            "word": "налево",
+            "sense": "towards the left side",
+            "tags": []
+          },
+          {
+            "word": "влево",
+            "sense": "towards the left side",
+            "tags": []
+          }
+        ],
+        "forms": [
+          {
+            "form": "Left",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "left",
+        "pos": "noun",
+        "glosses": [
+          "The left side or direction.",
+          "The left-wing political parties as a group; citizens holding left-wing views as a group.",
+          "The left hand or fist.",
+          "A punch delivered with the left fist.",
+          "A wave breaking from left to right (viewed from the shore)."
+        ],
+        "ipa": [
+          "/ˈlɛft/",
+          "/ˈɫɛft/",
+          "/ˈlɛf/",
+          "/ˈlɛfʔ/"
+        ],
+        "ru_translations": [
+          {
+            "word": "левый",
+            "sense": "the left side",
+            "tags": []
+          },
+          {
+            "word": "левый",
+            "sense": "the ensemble of left-wing political parties",
+            "tags": []
+          }
+        ],
+        "forms": [
+          {
+            "form": "lefts",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "Left",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "left",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "left",
+        "pos": "adj",
+        "glosses": [
+          "leftover, remaining"
+        ],
+        "ipa": [],
+        "ru_translations": [
+          {
+            "word": "оставшийся",
+            "sense": "leftover",
+            "tags": []
+          },
+          {
+            "word": "остальной",
+            "sense": "leftover",
+            "tags": []
+          }
+        ],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "left",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "Left",
+        "pos": "name",
+        "glosses": [
+          "The political left wing seen as a whole, as distinguished from an individual left-wing political party."
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "the Left",
+            "tags": [
+              "canonical"
+            ]
+          },
+          {
+            "form": "left",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "better": {
+    "candidates": [
+      "better",
+      "good",
+      "good and well",
+      "we'll",
+      "well"
+    ],
+    "russian_candidates": [
+      "better",
+      "good",
+      "well"
+    ],
+    "translated_candidates": [
+      "better",
+      "good",
+      "well"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "better",
+        "pos": "adj",
+        "glosses": [
+          "лучший",
+          "сравн. ст. к прил. good: лучший, более хороший",
+          "более подходящий",
+          "чувствующий себя лучше, выздоравливающий, поправляющийся",
+          "больший"
+        ],
+        "ipa": [
+          "[ˈbɛtə]",
+          "[ˈbɛtəɹ]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "better",
+        "pos": "adv",
+        "glosses": [
+          "сравн. ст. к нареч. good: лучше, более хорошо",
+          "лучше",
+          "больше; в большей степени"
+        ],
+        "ipa": [
+          "[ˈbɛtə]",
+          "[ˈbɛtəɹ]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "better",
+        "pos": "noun",
+        "glosses": [
+          "лучший; лучшее"
+        ],
+        "ipa": [
+          "[ˈbɛtə]",
+          "[ˈbɛtəɹ]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "better",
+        "pos": "verb",
+        "glosses": [
+          "улучшать; поправлять, исправлять, совершенствовать",
+          "улучшаться; совершенствоваться",
+          "превосходить, превышать",
+          "улучшаться, увеличиваться, расти"
+        ],
+        "ipa": [
+          "[ˈbɛtə]",
+          "[ˈbɛtəɹ]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "better",
+        "pos": "noun",
+        "glosses": [
+          "спорщик, тот, кто заключает пари"
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "betters",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "better",
+        "pos": "adj",
+        "glosses": [
+          "Greater in amount or quantity",
+          "Greater or lesser (whichever is seen as more advantageous), in reference to value, distance, time, etc.",
+          "Healed or recovered from an injury or illness."
+        ],
+        "ipa": [
+          "/ˈbɛt.ə/",
+          "[ˈbɛtʰ.ə]",
+          "[ˈbeɾ.ə]",
+          "[ˈbeɾ.ɐ]",
+          "[ˈbɛʔ.ə]",
+          "[ˈbɛʔ.ɐ]",
+          "/ˈbɛt.ɚ/",
+          "[ˈbɛɾ.ɚ]"
+        ],
+        "ru_translations": [
+          {
+            "word": "лучше",
+            "sense": "comparative of the adjectives good or well",
+            "tags": []
+          },
+          {
+            "word": "лучший",
+            "sense": "comparative of the adjectives good or well",
+            "tags": []
+          }
+        ],
+        "forms": [
+          {
+            "form": "good",
+            "tags": [
+              "positive"
+            ]
+          },
+          {
+            "form": "well",
+            "tags": [
+              "adverb"
+            ]
+          },
+          {
+            "form": "betterer",
+            "tags": [
+              "comparative",
+              "humorous"
+            ]
+          },
+          {
+            "form": "best",
+            "tags": [
+              "superlative"
+            ]
+          },
+          {
+            "form": "betterest",
+            "tags": [
+              "humorous"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "better",
+        "pos": "adv",
+        "glosses": [],
+        "ipa": [
+          "/ˈbɛt.ə/",
+          "[ˈbɛtʰ.ə]",
+          "[ˈbeɾ.ə]",
+          "[ˈbeɾ.ɐ]",
+          "[ˈbɛʔ.ə]",
+          "[ˈbɛʔ.ɐ]",
+          "/ˈbɛt.ɚ/",
+          "[ˈbɛɾ.ɚ]"
+        ],
+        "ru_translations": [
+          {
+            "word": "лучше",
+            "sense": "comparative of the adverb well",
+            "tags": []
+          }
+        ],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "better",
+        "pos": "noun",
+        "glosses": [
+          "An entity, usually animate, deemed superior to another; one who has a claim to precedence; a superior."
+        ],
+        "ipa": [
+          "/ˈbɛt.ə/",
+          "[ˈbɛtʰ.ə]",
+          "[ˈbeɾ.ə]",
+          "[ˈbeɾ.ɐ]",
+          "[ˈbɛʔ.ə]",
+          "[ˈbɛʔ.ɐ]",
+          "/ˈbɛt.ɚ/",
+          "[ˈbɛɾ.ɚ]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "betters",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "better",
+        "pos": "verb",
+        "glosses": [
+          "Had better."
+        ],
+        "ipa": [
+          "/ˈbɛt.ə/",
+          "[ˈbɛtʰ.ə]",
+          "[ˈbeɾ.ə]",
+          "[ˈbeɾ.ɐ]",
+          "[ˈbɛʔ.ə]",
+          "[ˈbɛʔ.ɐ]",
+          "/ˈbɛt.ɚ/",
+          "[ˈbɛɾ.ɚ]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "better",
+        "pos": "verb",
+        "glosses": [
+          "To improve.",
+          "To become better; to improve.",
+          "To surpass in excellence; to exceed; to excel; to improve on.",
+          "To give advantage to; to support; to advance the interest of."
+        ],
+        "ipa": [
+          "/ˈbɛt.ə/",
+          "[ˈbɛtʰ.ə]",
+          "[ˈbeɾ.ə]",
+          "[ˈbeɾ.ɐ]",
+          "[ˈbɛʔ.ə]",
+          "[ˈbɛʔ.ɐ]",
+          "/ˈbɛt.ɚ/",
+          "[ˈbɛɾ.ɚ]"
+        ],
+        "ru_translations": [
+          {
+            "word": "улучшать",
+            "sense": "to improve",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "улучшить",
+            "sense": "to improve",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "улучшаться",
+            "sense": "to become better",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "улучшиться",
+            "sense": "to become better",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "превосходить",
+            "sense": "to surpass in excellence",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "превзойти",
+            "sense": "to surpass in excellence",
+            "tags": [
+              "perfective"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "betters",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "bettering",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "bettered",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "bettered",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "no-table-tags",
+            "tags": [
+              "table-tags"
+            ]
+          },
+          {
+            "form": "glossary",
+            "tags": [
+              "inflection-template"
+            ]
+          },
+          {
+            "form": "better",
+            "tags": [
+              "infinitive"
+            ]
+          },
+          {
+            "form": "better",
+            "tags": [
+              "first-person",
+              "present",
+              "singular"
+            ]
+          },
+          {
+            "form": "bettered",
+            "tags": [
+              "first-person",
+              "past",
+              "singular"
+            ]
+          },
+          {
+            "form": "better",
+            "tags": [
+              "present",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "bettered",
+            "tags": [
+              "past",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "betters",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "bettered",
+            "tags": [
+              "past",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "better",
+            "tags": [
+              "plural",
+              "present"
+            ]
+          },
+          {
+            "form": "bettered",
+            "tags": [
+              "past",
+              "plural"
+            ]
+          },
+          {
+            "form": "better",
+            "tags": [
+              "present",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "bettered",
+            "tags": [
+              "past",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "better",
+            "tags": [
+              "imperative",
+              "present"
+            ]
+          },
+          {
+            "form": "-",
+            "tags": [
+              "imperative",
+              "past"
+            ]
+          },
+          {
+            "form": "bettering",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "bettered",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "better",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [
+          "/ˈbɛt.ə/",
+          "[ˈbɛtʰ.ə]",
+          "[ˈbeɾ.ə]",
+          "[ˈbeɾ.ɐ]",
+          "[ˈbɛʔ.ə]",
+          "[ˈbɛʔ.ɐ]",
+          "/ˈbɛt.ɚ/",
+          "[ˈbɛɾ.ɚ]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "betters",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "best": {
+    "candidates": [
+      "best",
+      "better",
+      "good",
+      "we'll",
+      "well"
+    ],
+    "russian_candidates": [
+      "best",
+      "better",
+      "good",
+      "well"
+    ],
+    "translated_candidates": [
+      "best",
+      "better",
+      "good",
+      "well"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "best",
+        "pos": "noun",
+        "glosses": [
+          "что-то самое лучшее"
+        ],
+        "ipa": [
+          "[bɛst]",
+          "[bɛsts]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "bests",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "ru",
+        "word": "best",
+        "pos": "noun",
+        "glosses": [
+          "вариант beast"
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "Best",
+        "pos": "noun",
+        "glosses": [
+          "английская фамилия"
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "best",
+        "pos": "adj",
+        "glosses": [
+          "Most; largest.",
+          "Most superior; most favorable."
+        ],
+        "ipa": [
+          "/bɛst/",
+          "/best/"
+        ],
+        "ru_translations": [
+          {
+            "word": "лучший",
+            "sense": "superlative of the adjective good",
+            "tags": []
+          },
+          {
+            "word": "наилучший",
+            "sense": "superlative of the adjective good",
+            "tags": []
+          }
+        ],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "best",
+        "pos": "adv",
+        "glosses": [
+          "To the most advantage; with the most success, cause, profit, benefit, or propriety."
+        ],
+        "ipa": [
+          "/bɛst/",
+          "/best/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "best",
+        "pos": "noun",
+        "glosses": [
+          "The supreme effort one can make, or has made.",
+          "One's best behavior.",
+          "The person (or persons; or thing or things) that is (are) most excellent."
+        ],
+        "ipa": [
+          "/bɛst/",
+          "/best/"
+        ],
+        "ru_translations": [
+          {
+            "word": "всё возможное",
+            "sense": "effort",
+            "tags": [
+              "neuter"
+            ]
+          },
+          {
+            "word": "лучший",
+            "sense": "effort",
+            "tags": []
+          },
+          {
+            "word": "лучший",
+            "sense": "person",
+            "tags": [
+              "masculine"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "bests",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "best",
+        "pos": "verb",
+        "glosses": [
+          "To surpass in skill or achievement.",
+          "To beat in a contest."
+        ],
+        "ipa": [
+          "/bɛst/",
+          "/best/"
+        ],
+        "ru_translations": [
+          {
+            "word": "превзойти",
+            "sense": "to beat",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "победить",
+            "sense": "to beat",
+            "tags": [
+              "perfective"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "bests",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "besting",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "bested",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "bested",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "no-table-tags",
+            "tags": [
+              "table-tags"
+            ]
+          },
+          {
+            "form": "glossary",
+            "tags": [
+              "inflection-template"
+            ]
+          },
+          {
+            "form": "best",
+            "tags": [
+              "infinitive"
+            ]
+          },
+          {
+            "form": "best",
+            "tags": [
+              "first-person",
+              "present",
+              "singular"
+            ]
+          },
+          {
+            "form": "bested",
+            "tags": [
+              "first-person",
+              "past",
+              "singular"
+            ]
+          },
+          {
+            "form": "best",
+            "tags": [
+              "present",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "bested",
+            "tags": [
+              "past",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "bests",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "bested",
+            "tags": [
+              "past",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "best",
+            "tags": [
+              "plural",
+              "present"
+            ]
+          },
+          {
+            "form": "bested",
+            "tags": [
+              "past",
+              "plural"
+            ]
+          },
+          {
+            "form": "best",
+            "tags": [
+              "present",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "bested",
+            "tags": [
+              "past",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "best",
+            "tags": [
+              "imperative",
+              "present"
+            ]
+          },
+          {
+            "form": "-",
+            "tags": [
+              "imperative",
+              "past"
+            ]
+          },
+          {
+            "form": "besting",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "bested",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "best",
+        "pos": "verb",
+        "glosses": [
+          "Had best."
+        ],
+        "ipa": [
+          "/bɛst/",
+          "/best/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "Best",
+        "pos": "name",
+        "glosses": [
+          "A surname.",
+          "A village and municipality in North Brabant province, Netherlands."
+        ],
+        "ipa": [
+          "/bɛst/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "Bests",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "children": {
+    "candidates": [
+      "child",
+      "childer",
+      "children"
+    ],
+    "russian_candidates": [
+      "child"
+    ],
+    "translated_candidates": [
+      "child"
+    ],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "children",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [
+          "/ˈt͡ʃɪldɹən/",
+          "/ˈtʃɪl.ɹən/",
+          "/ˈtʃɪl.ə(ɹ)n/",
+          "/ˈt͡ʃʊldɹən/",
+          "/ˈt͡ʃɪldɹən/",
+          "/ˈt͡ʃɪl.dən/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "childer",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "chillen",
+            "tags": [
+              "alternative",
+              "pronunciation-spelling"
+            ]
+          },
+          {
+            "form": "chillun",
+            "tags": [
+              "alternative",
+              "pronunciation-spelling"
+            ]
+          },
+          {
+            "form": "chirren",
+            "tags": [
+              "alternative",
+              "pronunciation-spelling"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "Children",
+        "pos": "name",
+        "glosses": [
+          "A surname."
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "mice": {
+    "candidates": [
+      "mice",
+      "mouse"
+    ],
+    "russian_candidates": [
+      "mouse"
+    ],
+    "translated_candidates": [
+      "mouse"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "mice",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "mice",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [
+          "/maɪs/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "mice",
+        "pos": "verb",
+        "glosses": [
+          "To be distracted or inattentive (possibly alluding to a cat being distracted by a mouse)."
+        ],
+        "ipa": [
+          "/maɪs/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "mices",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "micing",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "miced",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "miced",
+            "tags": [
+              "past"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "feet": {
+    "candidates": [
+      "feet",
+      "foot",
+      "fut"
+    ],
+    "russian_candidates": [
+      "foot"
+    ],
+    "translated_candidates": [
+      "foot"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "feet",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "feet",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [
+          "/ˈfiːt/",
+          "[ˈfɪi̯t]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "feet",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "written": {
+    "candidates": [
+      "write",
+      "written"
+    ],
+    "russian_candidates": [
+      "write",
+      "written"
+    ],
+    "translated_candidates": [
+      "write",
+      "written"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "written",
+        "pos": "adj",
+        "glosses": [
+          "написанный, письменный"
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "written",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "written",
+        "pos": "adj",
+        "glosses": [
+          "Of, relating, or characteristic of writing (i.e., of that which has been written).",
+          "Having been written."
+        ],
+        "ipa": [
+          "/ˈɹɪ.tn̩/",
+          "[ˈɹɪʔt̚n̩]",
+          "[ˈɹɪ.ʔn̩]",
+          "[ˈɹɪ.ɾn̩]",
+          "/ˈɾɪtən/"
+        ],
+        "ru_translations": [
+          {
+            "word": "письменный",
+            "sense": "of, relating or characteristic of writing",
+            "tags": []
+          },
+          {
+            "word": "написанный",
+            "sense": "of, relating or characteristic of writing",
+            "tags": []
+          }
+        ],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "written",
+        "pos": "noun",
+        "glosses": [
+          "A rap that was written in advance, as opposed to a freestyle."
+        ],
+        "ipa": [
+          "/ˈɹɪ.tn̩/",
+          "[ˈɹɪʔt̚n̩]",
+          "[ˈɹɪ.ʔn̩]",
+          "[ˈɹɪ.ɾn̩]",
+          "/ˈɾɪtən/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "writtens",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "written",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [
+          "/ˈɹɪ.tn̩/",
+          "[ˈɹɪʔt̚n̩]",
+          "[ˈɹɪ.ʔn̩]",
+          "[ˈɹɪ.ɾn̩]",
+          "/ˈɾɪtən/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "does": {
+    "candidates": [
+      "do",
+      "doe",
+      "does"
+    ],
+    "russian_candidates": [
+      "do",
+      "doe"
+    ],
+    "translated_candidates": [
+      "do",
+      "doe"
+    ],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "does",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [
+          "/dəz/",
+          "/dʌz/",
+          "/dʊz/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "duz",
+            "tags": [
+              "alternative",
+              "pronunciation-spelling"
+            ]
+          },
+          {
+            "form": "diz",
+            "tags": [
+              "alternative",
+              "Northumbria",
+              "dialectal"
+            ]
+          },
+          {
+            "form": "'s",
+            "tags": [
+              "alternative",
+              "colloquial"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "does",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [
+          "/dəʊz/",
+          "/doʊz/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "Does",
+        "pos": "name",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "don't": {
+    "candidates": [
+      "don't"
+    ],
+    "russian_candidates": [],
+    "translated_candidates": [
+      "don't"
+    ],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "don't",
+        "pos": "verb",
+        "glosses": [
+          "Do not (negative auxiliary).",
+          "Used before an emphatic negative subject."
+        ],
+        "ipa": [
+          "/dəʊnt/",
+          "[dəʊ̯nt̚]",
+          "/doʊnt/",
+          "[doʊ̯nt̚]",
+          "[dõʊ̯̃(ʔ)t̚]",
+          "[doʊ̯ɾ̃]",
+          "/doːnt/",
+          "/dʊnt/"
+        ],
+        "ru_translations": [
+          {
+            "word": "не",
+            "sense": "do not",
+            "tags": []
+          }
+        ],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "don't",
+        "pos": "intj",
+        "glosses": [
+          "Stop!"
+        ],
+        "ipa": [
+          "/dəʊnt/",
+          "[dəʊ̯nt̚]",
+          "/doʊnt/",
+          "[doʊ̯nt̚]",
+          "[dõʊ̯̃(ʔ)t̚]",
+          "[doʊ̯ɾ̃]",
+          "/doːnt/",
+          "/dʊnt/"
+        ],
+        "ru_translations": [
+          {
+            "word": "стой!",
+            "sense": "interjection",
+            "tags": []
+          },
+          {
+            "word": "не надо!",
+            "sense": "interjection",
+            "tags": []
+          }
+        ],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "don't",
+        "pos": "noun",
+        "glosses": [
+          "Chiefly in dos and don'ts: something that must or should not be done."
+        ],
+        "ipa": [
+          "/dəʊnt/",
+          "[dəʊ̯nt̚]",
+          "/doʊnt/",
+          "[doʊ̯nt̚]",
+          "[dõʊ̯̃(ʔ)t̚]",
+          "[doʊ̯ɾ̃]",
+          "/doːnt/",
+          "/dʊnt/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "don'ts",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "don't's",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "don't",
+        "pos": "contraction",
+        "glosses": [],
+        "ipa": [
+          "/dʌnt/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "doesn't": {
+    "candidates": [
+      "doesn't"
+    ],
+    "russian_candidates": [],
+    "translated_candidates": [],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "doesn't",
+        "pos": "verb",
+        "glosses": [
+          "Does not (negative auxiliary)"
+        ],
+        "ipa": [
+          "/ˈdʌz.ənt/",
+          "[ˈdʌz.n̩t]",
+          "/ˈdʌn(t)/",
+          "/ˈdʌz.ənt/",
+          "[ˈdʌz.n̩t]",
+          "/ˈdʌd.ənt/",
+          "/ˈdʌd(ə)nt/",
+          "/ˈdʊ(nə)nt/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "does n't",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "do's n't",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "can't": {
+    "candidates": [
+      "can't"
+    ],
+    "russian_candidates": [
+      "can't"
+    ],
+    "translated_candidates": [],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "can’t",
+        "pos": "verb",
+        "glosses": [
+          "не иметь возможности",
+          "не уметь, быть неспособным",
+          "не иметь разрешения"
+        ],
+        "ipa": [
+          "[kɑːnt], [kʰɑːnt]",
+          "[kænt], [kʰænt], [kʰeənt]",
+          "[kaːnt], [kʰäːnt]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "can't",
+        "pos": "verb",
+        "glosses": [
+          "Cannot (negative modal auxiliary); be unable to; not have the ability to (whether due to lacking relevant strength or skill or knowledge or supplies, or due to logical impossibility, etc).",
+          "To be forbidden to; to be not permitted to.",
+          "To be unwilling to; to not have the desire of; to don’t want to."
+        ],
+        "ipa": [
+          "/kɑːnt/",
+          "[kʰɑːnt]",
+          "/käːnt/",
+          "[ˈkʰäːnt]",
+          "/kɐːnt/",
+          "[kʰɐ̞ːnt]",
+          "/kaːɳʈ/",
+          "[kaːɳʈ]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "cain't",
+            "tags": [
+              "alternative",
+              "Southern-US",
+              "dialectal"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "won't": {
+    "candidates": [
+      "won't"
+    ],
+    "russian_candidates": [
+      "won't"
+    ],
+    "translated_candidates": [],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "won't",
+        "pos": "verb",
+        "glosses": [
+          "разг. то же, что will not"
+        ],
+        "ipa": [
+          "[wəʊnt]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "wouldn't",
+            "tags": [
+              "past"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "won't",
+        "pos": "verb",
+        "glosses": [
+          "will not (negative auxiliary); used to indicate a future non-occurring action.",
+          "doesn't want to"
+        ],
+        "ipa": [
+          "/wəʊnt/",
+          "/ˈwɪnɪt/",
+          "/woʊnt/",
+          "[wõt(ˀ)]",
+          "[wõʔ]",
+          "/wʌnt/",
+          "/wunt/",
+          "/wʊnt/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "I'm": {
+    "candidates": [
+      "i'm"
+    ],
+    "russian_candidates": [],
+    "translated_candidates": [],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "I'm",
+        "pos": "contraction",
+        "glosses": [],
+        "ipa": [
+          "/aɪm/",
+          "/aːm/",
+          "/a(ɪ)m/",
+          "/əm/",
+          "/ʌm/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "I'd": {
+    "candidates": [
+      "i'd"
+    ],
+    "russian_candidates": [],
+    "translated_candidates": [],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "I'd",
+        "pos": "contraction",
+        "glosses": [],
+        "ipa": [
+          "/aɪd/",
+          "/aːd/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "he's": {
+    "candidates": [
+      "he's",
+      "hes"
+    ],
+    "russian_candidates": [],
+    "translated_candidates": [],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "he's",
+        "pos": "contraction",
+        "glosses": [],
+        "ipa": [
+          "/ˈhiːz/",
+          "/iːz/",
+          "/ˈhiz/",
+          "/ˈiz/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "he’s",
+            "tags": [
+              "canonical"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "we've": {
+    "candidates": [
+      "we've"
+    ],
+    "russian_candidates": [],
+    "translated_candidates": [],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "we've",
+        "pos": "contraction",
+        "glosses": [],
+        "ipa": [
+          "/wiːv/",
+          "/wiv/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "John's": {
+    "candidates": [
+      "john's"
+    ],
+    "russian_candidates": [],
+    "translated_candidates": [],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "John's",
+        "pos": "name",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "teachers'": {
+    "candidates": [
+      "teachers'"
+    ],
+    "russian_candidates": [],
+    "translated_candidates": [],
+    "entries": []
+  },
+  "get": {
+    "candidates": [
+      "get"
+    ],
+    "russian_candidates": [
+      "get"
+    ],
+    "translated_candidates": [
+      "get"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "get",
+        "pos": "verb",
+        "glosses": [
+          "доставать; добывать",
+          "доставать и приносить",
+          "получать (в собственность), становиться обладателем",
+          "получать, наживать (неприятности), навлекать на себя",
+          "(пойти и) получить",
+          "(пойти и) принести",
+          "купить, приобрести",
+          "извлекать, добывать, получать (в результате собственных усилий)"
+        ],
+        "ipa": [
+          "[ɡet]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "gets",
+            "tags": [
+              "third-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "got",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "got, gotten",
+            "tags": [
+              "past",
+              "participle"
+            ]
+          },
+          {
+            "form": "getting",
+            "tags": [
+              "gerund"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "ru",
+        "word": "get",
+        "pos": "noun",
+        "glosses": [
+          "приплод, потомство (у животных)",
+          "дурак, идиот"
+        ],
+        "ipa": [
+          "[get]",
+          "[gets]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "gets",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "get",
+        "pos": "verb",
+        "glosses": [
+          "To obtain; to acquire.",
+          "To receive.",
+          "To have. See usage notes.",
+          "To fetch, bring, take.",
+          "To become, or cause oneself to become (often with temporary states, past participle adjectives and comparatives).",
+          "To cause to become; to bring about.",
+          "To cause to do.",
+          "To cause to come or go or move."
+        ],
+        "ipa": [
+          "/ɡɛt/",
+          "/ɡɪt/",
+          "/ɡet/"
+        ],
+        "ru_translations": [
+          {
+            "word": "доставать",
+            "sense": "to obtain",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "достать",
+            "sense": "to obtain",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "получать",
+            "sense": "to receive",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "получить",
+            "sense": "to receive",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "приносить",
+            "sense": "to fetch",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "принести",
+            "sense": "to fetch",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "становиться",
+            "sense": "to become",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "стать",
+            "sense": "to become",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "делаться",
+            "sense": "to become",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "сделаться",
+            "sense": "to become",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "добираться",
+            "sense": "to arrive at",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "добраться",
+            "sense": "to arrive at",
+            "tags": [
+              "perfective"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "gets",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "getting",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "got",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "got",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "gotten",
+            "tags": [
+              "Australia",
+              "Canada",
+              "Ireland",
+              "New-Zealand",
+              "UK",
+              "US",
+              "error-unknown-tag",
+              "participle",
+              "past",
+              "recently"
+            ]
+          },
+          {
+            "form": "getten",
+            "tags": [
+              "Geordie",
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "no-table-tags",
+            "tags": [
+              "table-tags"
+            ]
+          },
+          {
+            "form": "glossary",
+            "tags": [
+              "inflection-template"
+            ]
+          },
+          {
+            "form": "get",
+            "tags": [
+              "infinitive"
+            ]
+          },
+          {
+            "form": "get",
+            "tags": [
+              "first-person",
+              "present",
+              "singular"
+            ]
+          },
+          {
+            "form": "got",
+            "tags": [
+              "first-person",
+              "past",
+              "singular"
+            ]
+          },
+          {
+            "form": "get",
+            "tags": [
+              "present",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "got",
+            "tags": [
+              "past",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "gets",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "got",
+            "tags": [
+              "past",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "get",
+            "tags": [
+              "plural",
+              "present"
+            ]
+          },
+          {
+            "form": "got",
+            "tags": [
+              "past",
+              "plural"
+            ]
+          },
+          {
+            "form": "get",
+            "tags": [
+              "present",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "got",
+            "tags": [
+              "past",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "get",
+            "tags": [
+              "imperative",
+              "present"
+            ]
+          },
+          {
+            "form": "-",
+            "tags": [
+              "imperative",
+              "past"
+            ]
+          },
+          {
+            "form": "getting",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "got",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "gotten",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "getten",
+            "tags": [
+              "dialectal",
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "git",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "get",
+        "pos": "noun",
+        "glosses": [
+          "Offspring, especially illegitimate.",
+          "Lineage.",
+          "A difficult return or block of a shot.",
+          "Something gotten, something gained or won; an acquisition.",
+          "A message or post on an online platform, particularly imageboards, with a unique identifier deemed special or rare, usually due to patterns in the ID."
+        ],
+        "ipa": [
+          "/ɡɛt/",
+          "/ɡɪt/",
+          "/ɡet/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "gets",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "git",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "get",
+        "pos": "noun",
+        "glosses": [
+          "Synonym of git (“contemptible person”)."
+        ],
+        "ipa": [
+          "/ɡɛt/",
+          "/ɡɪt/",
+          "/ɡet/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "gets",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "get",
+        "pos": "noun",
+        "glosses": [
+          "A Jewish writ of divorce."
+        ],
+        "ipa": [
+          "/ɡɛt/",
+          "/ɡɪt/",
+          "/ɡet/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "gets",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "gittim",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "gitten",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "gett",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "ghet",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "Get",
+        "pos": "noun",
+        "glosses": [
+          "A member of the Getae."
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "Gets",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "set": {
+    "candidates": [
+      "set"
+    ],
+    "russian_candidates": [
+      "set"
+    ],
+    "translated_candidates": [
+      "set"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "set",
+        "pos": "noun",
+        "glosses": [
+          "комплект, набор; коллекция",
+          "матем. множество",
+          "компания, круг, общество",
+          "спорт. сет (в теннисе, волейболе)",
+          "приёмник; прибор, аппарат",
+          "посадка; расположение"
+        ],
+        "ipa": [
+          "[sɛt]",
+          "[sɛts]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "sets",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "ru",
+        "word": "set",
+        "pos": "adj",
+        "glosses": [
+          "установленный, определённый; назначенный, намеченный",
+          "фиксированный, установленный",
+          "неподвижный, застывший",
+          "обдуманный, намеренный, умышленный, решённый",
+          "стиснутый (о зубах, челюстях)",
+          "встроенный, вделанный, укреплённый"
+        ],
+        "ipa": [
+          "[sɛt]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "set",
+        "pos": "verb",
+        "glosses": [
+          "ставить, класть; размещать, располагать, устанавливать",
+          "сажать, усаживать",
+          "придавать определённое положение",
+          "настраивать против; натравливать, науськивать",
+          "приводить в определённое состояние",
+          "устанавливать; регулировать, настраивать",
+          "накрывать на стол",
+          "укладывать (волосы), делать укладку"
+        ],
+        "ipa": [
+          "[sɛt]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "sets",
+            "tags": [
+              "third-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "setting",
+            "tags": [
+              "gerund"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "set",
+        "pos": "verb",
+        "glosses": [
+          "To put (something) down, to rest.",
+          "To attach or affix (something) to something else, or in or upon a certain place.",
+          "To put in a specified condition or state; to cause to be.",
+          "To start (a fire).",
+          "To cause to stop or stick; to obstruct; to fasten to a spot.",
+          "To determine or settle.",
+          "To adjust.",
+          "To punch (a nail) into wood so that its head is below the surface."
+        ],
+        "ipa": [
+          "/sɛt/"
+        ],
+        "ru_translations": [
+          {
+            "word": "класть",
+            "sense": "to put something down",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "положить",
+            "sense": "to put something down",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "ставить",
+            "sense": "to put something down",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "поставить",
+            "sense": "to put something down",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "задавать",
+            "sense": "to determine",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "задать",
+            "sense": "to determine",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "устанавливать",
+            "sense": "to determine",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "установить",
+            "sense": "to determine",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "определять",
+            "sense": "to determine",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "определить",
+            "sense": "to determine",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "устанавливать",
+            "sense": "to adjust",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "установить",
+            "sense": "to adjust",
+            "tags": [
+              "perfective"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "sets",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "setting",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "setten",
+            "tags": [
+              "dialectal",
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "no-table-tags",
+            "tags": [
+              "table-tags"
+            ]
+          },
+          {
+            "form": "glossary",
+            "tags": [
+              "inflection-template"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "infinitive"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "first-person",
+              "present",
+              "singular"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "first-person",
+              "past",
+              "singular"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "present",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "past",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "sets",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "past",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "plural",
+              "present"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "past",
+              "plural"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "present",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "past",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "imperative",
+              "present"
+            ]
+          },
+          {
+            "form": "-",
+            "tags": [
+              "imperative",
+              "past"
+            ]
+          },
+          {
+            "form": "setting",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "set",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "setten",
+            "tags": [
+              "dialectal",
+              "participle",
+              "past"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "set",
+        "pos": "noun",
+        "glosses": [
+          "A punch for setting nails in wood.",
+          "A device for receiving broadcast radio waves (or, more recently, broadcast data); a radio or television.",
+          "A small tuber or bulb used instead of seed, particularly onion sets and potato sets.",
+          "The amount by which the teeth of a saw protrude to the side in order to create the kerf.",
+          "A permanent change of shape caused by excessive strain, as from compression, tension, bending, twisting, etc.",
+          "A bias of mind; an attitude or pattern of behaviour.",
+          "A piece placed temporarily upon the head of a pile when the latter cannot otherwise be reached by the weight, or hammer.",
+          "The width of the body of a type."
+        ],
+        "ipa": [
+          "/sɛt/"
+        ],
+        "ru_translations": [
+          {
+            "word": "приёмник",
+            "sense": "device for receiving broadcast radio waves",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "аппарат",
+            "sense": "device for receiving broadcast radio waves",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "устройство",
+            "sense": "device for receiving broadcast radio waves",
+            "tags": [
+              "neuter"
+            ]
+          },
+          {
+            "word": "развод зубьев пилы",
+            "sense": "amount the teeth of a saw diverge",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "набор",
+            "sense": "series of, a group of",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "серия",
+            "sense": "series of, a group of",
+            "tags": [
+              "feminine"
+            ]
+          },
+          {
+            "word": "группа",
+            "sense": "series of, a group of",
+            "tags": [
+              "feminine"
+            ]
+          },
+          {
+            "word": "комплект",
+            "sense": "series of, a group of",
+            "tags": [
+              "masculine"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "sets",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "set",
+        "pos": "adj",
+        "glosses": [
+          "Fixed in position.",
+          "Rigid, solidified.",
+          "Ready, prepared.",
+          "Intent, determined (to do something).",
+          "Prearranged.",
+          "Fixed in one’s opinion.",
+          "Fixed in a certain style."
+        ],
+        "ipa": [
+          "/sɛt/"
+        ],
+        "ru_translations": [
+          {
+            "word": "устойчивый",
+            "sense": "fixed in position",
+            "tags": []
+          },
+          {
+            "word": "неподвижный",
+            "sense": "fixed in position",
+            "tags": []
+          },
+          {
+            "word": "установленный",
+            "sense": "ready, prepared",
+            "tags": []
+          },
+          {
+            "word": "готовый",
+            "sense": "ready, prepared",
+            "tags": []
+          },
+          {
+            "word": "готовый",
+            "sense": "intent, determined",
+            "tags": []
+          },
+          {
+            "word": "решительный",
+            "sense": "intent, determined",
+            "tags": []
+          },
+          {
+            "word": "приверженный",
+            "sense": "fixed in one’s opinion",
+            "tags": []
+          },
+          {
+            "word": "уложенный",
+            "sense": "of hair: fixed in a certain style",
+            "tags": []
+          }
+        ],
+        "forms": [
+          {
+            "form": "more set",
+            "tags": [
+              "comparative"
+            ]
+          },
+          {
+            "form": "most set",
+            "tags": [
+              "superlative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "set",
+        "pos": "noun",
+        "glosses": [
+          "A young plant fit for setting out; a slip; shoot.",
+          "A rudimentary fruit.",
+          "The setting of the sun or other luminary; (by extension) the close of the day.",
+          "General movement; direction; drift; tendency.",
+          "A matching collection of similar things. (Note the similar meaning in Etymology 2, Noun.)",
+          "A collection of various objects for a particular purpose.",
+          "An object made up of several parts.",
+          "A collection of zero or more objects, possibly infinite in size, and disregarding any order or repetition of the objects which may be contained within it."
+        ],
+        "ipa": [
+          "/sɛt/"
+        ],
+        "ru_translations": [
+          {
+            "word": "пас",
+            "sense": "volleyball",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "набор",
+            "sense": "matching collection of similar things, such as a set of tables",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "комплект",
+            "sense": "matching collection of similar things, such as a set of tables",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "коллекция",
+            "sense": "collection of various objects for a particular purpose, such as a set of tools",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "набор",
+            "sense": "collection of various objects for a particular purpose, such as a set of tools",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "сет",
+            "sense": "collection of various objects for a particular purpose, such as a set of tools",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "серия",
+            "sense": "object made up several parts, such as a set of steps",
+            "tags": [
+              "feminine"
+            ]
+          },
+          {
+            "word": "множество",
+            "sense": "set theory: collection of objects",
+            "tags": [
+              "neuter"
+            ]
+          },
+          {
+            "word": "группа",
+            "sense": "group of people, usually meeting socially",
+            "tags": [
+              "feminine"
+            ]
+          },
+          {
+            "word": "сет",
+            "sense": "in tennis",
+            "tags": [
+              "masculine"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "sets",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "set",
+        "pos": "verb",
+        "glosses": [
+          "To divide a class group in a subject according to ability."
+        ],
+        "ipa": [
+          "/sɛt/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "sets",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "setting",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "setted",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "setted",
+            "tags": [
+              "past"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "Set",
+        "pos": "name",
+        "glosses": [
+          "An ancient Egyptian god, variously described as the god of chaos, the god of thunder and storms, or the god of destruction."
+        ],
+        "ipa": [
+          "/ˈsɛt/"
+        ],
+        "ru_translations": [
+          {
+            "word": "Сет",
+            "sense": "Egyptian god",
+            "tags": [
+              "masculine"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "Seth",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "Sutekh",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "run": {
+    "candidates": [
+      "rin",
+      "run"
+    ],
+    "russian_candidates": [
+      "run"
+    ],
+    "translated_candidates": [
+      "run"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "run",
+        "pos": "verb",
+        "glosses": [
+          "бежать, бегать",
+          "управлять",
+          "проехать (практически всегда имеется в виду красный сигнал светофора)"
+        ],
+        "ipa": [
+          "[rʌn]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "runs",
+            "tags": [
+              "third-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "ran",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "running",
+            "tags": [
+              "gerund"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "ru",
+        "word": "run",
+        "pos": "noun",
+        "glosses": [
+          "бег",
+          "работа"
+        ],
+        "ipa": [
+          "[rʌn]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "runs",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "run",
+        "pos": "verb",
+        "glosses": [
+          "To move swiftly.",
+          "To move forward quickly upon two feet by alternately making a short jump off either foot.",
+          "To move swiftly.",
+          "To go at a fast pace; to move quickly.",
+          "To move swiftly.",
+          "To cover (a course or a distance) by running.",
+          "To move swiftly.",
+          "To complete a running course or event in (a given time)."
+        ],
+        "ipa": [
+          "/ɹʌn/",
+          "/ɹʊn/",
+          "/ɾʌn/"
+        ],
+        "ru_translations": [
+          {
+            "word": "бегать",
+            "sense": "to move quickly on two feet",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "побегать",
+            "sense": "to move quickly on two feet",
+            "tags": [
+              "abstract",
+              "perfective"
+            ]
+          },
+          {
+            "word": "бежать",
+            "sense": "to move quickly on two feet",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "побежать",
+            "sense": "to move quickly on two feet",
+            "tags": [
+              "concrete",
+              "perfective"
+            ]
+          },
+          {
+            "word": "бегать",
+            "sense": "to move quickly",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "побегать",
+            "sense": "to move quickly",
+            "tags": [
+              "abstract",
+              "perfective"
+            ]
+          },
+          {
+            "word": "бежать",
+            "sense": "to move quickly",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "побежать",
+            "sense": "to move quickly",
+            "tags": [
+              "concrete",
+              "perfective"
+            ]
+          },
+          {
+            "word": "течь",
+            "sense": "to flow",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "гнать",
+            "sense": "to cause to move quickly",
+            "tags": []
+          },
+          {
+            "word": "гонять",
+            "sense": "to cause to move quickly",
+            "tags": [
+              "abstract",
+              "imperfective"
+            ]
+          },
+          {
+            "word": "погонять",
+            "sense": "to cause to move quickly",
+            "tags": [
+              "imperfective"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "runs",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "running",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "ran",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "run",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "no-table-tags",
+            "tags": [
+              "table-tags"
+            ]
+          },
+          {
+            "form": "glossary",
+            "tags": [
+              "inflection-template"
+            ]
+          },
+          {
+            "form": "run",
+            "tags": [
+              "infinitive"
+            ]
+          },
+          {
+            "form": "run",
+            "tags": [
+              "first-person",
+              "present",
+              "singular"
+            ]
+          },
+          {
+            "form": "ran",
+            "tags": [
+              "first-person",
+              "past",
+              "singular"
+            ]
+          },
+          {
+            "form": "run",
+            "tags": [
+              "present",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "ran",
+            "tags": [
+              "past",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "runs",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "ran",
+            "tags": [
+              "past",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "run",
+            "tags": [
+              "plural",
+              "present"
+            ]
+          },
+          {
+            "form": "ran",
+            "tags": [
+              "past",
+              "plural"
+            ]
+          },
+          {
+            "form": "run",
+            "tags": [
+              "present",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "ran",
+            "tags": [
+              "past",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "run",
+            "tags": [
+              "imperative",
+              "present"
+            ]
+          },
+          {
+            "form": "-",
+            "tags": [
+              "imperative",
+              "past"
+            ]
+          },
+          {
+            "form": "running",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "run",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "rin",
+            "tags": [
+              "alternative",
+              "dialectal"
+            ]
+          },
+          {
+            "form": "ren",
+            "tags": [
+              "alternative",
+              "dialectal"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "run",
+        "pos": "noun",
+        "glosses": [
+          "Act or instance of running, of moving rapidly using the feet.",
+          "Act or instance of hurrying (to or from a place) (not necessarily on foot); dash or errand, trip.",
+          "A pleasure trip.",
+          "Flight, instance or period of fleeing.",
+          "Migration of fish.",
+          "A group of fish that migrate, or ascend a river for the purpose of spawning.",
+          "A literal or figurative path or course for movement relating to:",
+          "A (regular) trip or route."
+        ],
+        "ipa": [
+          "/ɹʌn/",
+          "/ɹʊn/",
+          "/ɾʌn/"
+        ],
+        "ru_translations": [
+          {
+            "word": "бег",
+            "sense": "quick pace",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "бег",
+            "sense": "act of running",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "пробежка",
+            "sense": "act of running",
+            "tags": [
+              "feminine"
+            ]
+          },
+          {
+            "word": "бег",
+            "sense": "route taken while running",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "путь",
+            "sense": "route taken while running",
+            "tags": [
+              "feminine"
+            ]
+          },
+          {
+            "word": "маршрут",
+            "sense": "route taken while running",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "тираж",
+            "sense": "production quantity",
+            "tags": []
+          },
+          {
+            "word": "партия",
+            "sense": "production quantity",
+            "tags": []
+          },
+          {
+            "word": "поток",
+            "sense": "flow of liquid",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "ток",
+            "sense": "flow of liquid",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "течение",
+            "sense": "flow of liquid",
+            "tags": [
+              "neuter"
+            ]
+          },
+          {
+            "word": "стрелка",
+            "sense": "line of unravelled stitches",
+            "tags": [
+              "feminine"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "runs",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "rin",
+            "tags": [
+              "alternative",
+              "dialectal"
+            ]
+          },
+          {
+            "form": "ren",
+            "tags": [
+              "alternative",
+              "dialectal"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "run",
+        "pos": "adj",
+        "glosses": [
+          "In a liquid state; melted or molten.",
+          "Cast in a mould.",
+          "Exhausted; depleted (especially with \"down\" or \"out\").",
+          "Travelled, migrated; having made a migration or a spawning run.",
+          "Smuggled."
+        ],
+        "ipa": [
+          "/ɹʌn/",
+          "/ɹʊn/",
+          "/ɾʌn/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "rin",
+            "tags": [
+              "alternative",
+              "dialectal"
+            ]
+          },
+          {
+            "form": "ren",
+            "tags": [
+              "alternative",
+              "dialectal"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "run",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [
+          "/ɹʌn/",
+          "/ɹʊn/",
+          "/ɾʌn/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "rin",
+            "tags": [
+              "alternative",
+              "dialectal"
+            ]
+          },
+          {
+            "form": "ren",
+            "tags": [
+              "alternative",
+              "dialectal"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "colour": {
+    "candidates": [
+      "colour"
+    ],
+    "russian_candidates": [
+      "colour"
+    ],
+    "translated_candidates": [],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "colour",
+        "pos": "noun",
+        "glosses": [
+          "брит. то же, что color; цвет"
+        ],
+        "ipa": [
+          "[ˈkʌl.ə(ɹ)]",
+          "[ˈkʌl.ɚ]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "colours",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "colour",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "colours",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "color",
+            "tags": [
+              "alternative",
+              "US"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "colour",
+        "pos": "adj",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "color",
+            "tags": [
+              "alternative",
+              "US"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "colour",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "colours",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "colouring",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "coloured",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "coloured",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "color",
+            "tags": [
+              "alternative",
+              "US"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "color": {
+    "candidates": [
+      "color"
+    ],
+    "russian_candidates": [
+      "color"
+    ],
+    "translated_candidates": [
+      "color"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "color",
+        "pos": "noun",
+        "glosses": [
+          "амер. цвет",
+          "амер. краска",
+          "амер. колорит",
+          "амер. оттенок",
+          "амер. свет",
+          "амер. тон",
+          "амер. румянец",
+          "амер. колер"
+        ],
+        "ipa": [
+          "[ˈkʌlɚ]",
+          "[ˈkʌlɚz]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "colors",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "ru",
+        "word": "color",
+        "pos": "adj",
+        "glosses": [
+          "амер. цветовой",
+          "амер. цветной"
+        ],
+        "ipa": [
+          "[ˈkʌlɚ]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "color",
+        "pos": "verb",
+        "glosses": [
+          "амер. окрашивать",
+          "амер. раскрашивать",
+          "амер. красить",
+          "амер. окрашиваться",
+          "амер. покраснеть",
+          "амер. краснеть",
+          "амер. подкрасить",
+          "амер. принимать окраску"
+        ],
+        "ipa": [
+          "[ˈkʌlɚ]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "colors",
+            "tags": [
+              "third-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "colored",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "colored",
+            "tags": [
+              "past",
+              "participle"
+            ]
+          },
+          {
+            "form": "coloring",
+            "tags": [
+              "gerund"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "color",
+        "pos": "noun",
+        "glosses": [
+          "The spectral composition of visible light.",
+          "A subset thereof:",
+          "A particular set of visible spectral compositions, perceived or named as a class.",
+          "A subset thereof:",
+          "Hue as opposed to achromatic colors (black, white and grays).",
+          "A subset thereof:",
+          "These hues as used in color television or films, color photographs, etc (as opposed to the shades of grey used in black-and-white television).",
+          "A subset thereof:"
+        ],
+        "ipa": [
+          "/ˈkʌl.ə/",
+          "/ˈkʌl.ə(ɹ)/",
+          "[ˈkʰʌl.ə(ɹ)]",
+          "[ˈkʌləɹ]",
+          "[ˈkʰɐɫ.ɐ]",
+          "[ˈkɐl.ɐ(ɾ)]",
+          "/ˈkʌl.ɚ/",
+          "/ˈkʊl.ə(ɹ)/"
+        ],
+        "ru_translations": [
+          {
+            "word": "цвет",
+            "sense": "particular set of the visible spectrum",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "цвет",
+            "sense": "spectral composition of visible light",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "колер",
+            "sense": "spectral composition of visible light",
+            "tags": [
+              "colloquial",
+              "masculine",
+              "special"
+            ]
+          },
+          {
+            "word": "насыщенность",
+            "sense": "hue as opposed to achromatic colors",
+            "tags": []
+          },
+          {
+            "word": "колорит",
+            "sense": "interest, especially in a selective area",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "финифть",
+            "sense": "any of the standard dark tinctures used in a coat of arms",
+            "tags": [
+              "feminine"
+            ]
+          },
+          {
+            "word": "цвет",
+            "sense": "any of the standard dark tinctures used in a coat of arms",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "цвет кожи",
+            "sense": "human skin tone, especially as an indicator of race or ethnicity",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "знамя",
+            "sense": "standard or banner (colors)",
+            "tags": [
+              "neuter"
+            ]
+          },
+          {
+            "word": "флаг",
+            "sense": "standard or banner (colors)",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "штандарт",
+            "sense": "standard or banner (colors)",
+            "tags": [
+              "masculine"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "colors",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "colour",
+            "tags": [
+              "alternative",
+              "Commonwealth",
+              "Ireland"
+            ]
+          },
+          {
+            "form": "usage notes",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "color",
+        "pos": "adj",
+        "glosses": [
+          "Conveying color, as opposed to shades of gray."
+        ],
+        "ipa": [
+          "/ˈkʌl.ə/",
+          "/ˈkʌl.ə(ɹ)/",
+          "[ˈkʰʌl.ə(ɹ)]",
+          "[ˈkʌləɹ]",
+          "[ˈkʰɐɫ.ɐ]",
+          "[ˈkɐl.ɐ(ɾ)]",
+          "/ˈkʌl.ɚ/",
+          "/ˈkʊl.ə(ɹ)/"
+        ],
+        "ru_translations": [
+          {
+            "word": "цветной",
+            "sense": "conveying color",
+            "tags": [
+              "masculine"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "colour",
+            "tags": [
+              "alternative",
+              "Commonwealth",
+              "Ireland"
+            ]
+          },
+          {
+            "form": "usage notes",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "color",
+        "pos": "verb",
+        "glosses": [
+          "To give something color.",
+          "To give something color.",
+          "To cause (a pipe, especially a meerschaum) to take on a brown or black color, by smoking.",
+          "To apply colors to the areas within the boundaries of a line drawing using colored markers or crayons.",
+          "To become red through increased blood flow.",
+          "To affect without completely changing.",
+          "To attribute a quality to; to portray (as).",
+          "To assign colors to the vertices of a graph (or the regions of a map) so that no two vertices connected by an edge (regions sharing a border) have the same color."
+        ],
+        "ipa": [
+          "/ˈkʌl.ə/",
+          "/ˈkʌl.ə(ɹ)/",
+          "[ˈkʰʌl.ə(ɹ)]",
+          "[ˈkʌləɹ]",
+          "[ˈkʰɐɫ.ɐ]",
+          "[ˈkɐl.ɐ(ɾ)]",
+          "/ˈkʌl.ɚ/",
+          "/ˈkʊl.ə(ɹ)/"
+        ],
+        "ru_translations": [
+          {
+            "word": "красить",
+            "sense": "give something color",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "покрасить",
+            "sense": "give something color",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "раскрашивать",
+            "sense": "draw using crayons",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "раскрасить",
+            "sense": "draw using crayons",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "краснеть",
+            "sense": "become red through increased blood flow",
+            "tags": []
+          },
+          {
+            "word": "рдеться",
+            "sense": "become red through increased blood flow",
+            "tags": []
+          }
+        ],
+        "forms": [
+          {
+            "form": "colors",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "coloring",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "colored",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "colored",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "colour",
+            "tags": [
+              "alternative",
+              "Commonwealth",
+              "Ireland"
+            ]
+          },
+          {
+            "form": "usage notes",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "organise": {
+    "candidates": [
+      "organise",
+      "organize"
+    ],
+    "russian_candidates": [],
+    "translated_candidates": [
+      "organize"
+    ],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "organise",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "organises",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "organising",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "organised",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "organised",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "organize",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "organize": {
+    "candidates": [
+      "organize"
+    ],
+    "russian_candidates": [],
+    "translated_candidates": [
+      "organize"
+    ],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "organize",
+        "pos": "verb",
+        "glosses": [
+          "To arrange in working order.",
+          "To constitute in parts, each having a special function, act, office, or relation; to systematize.",
+          "To furnish with organs; to give an organic structure to; to endow with capacity for the functions of life",
+          "To sing in parts.",
+          "To band together into a group or union that can bargain and act collectively; to unionize."
+        ],
+        "ipa": [
+          "/ˈɔːɡənaɪz/",
+          "/ˈɔɹɡənaɪz/"
+        ],
+        "ru_translations": [
+          {
+            "word": "организовывать",
+            "sense": "to arrange in working order",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "организовать",
+            "sense": "to arrange in working order",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "организовывать",
+            "sense": "to constitute in parts, each having a special function; to systematize",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "организовать",
+            "sense": "to constitute in parts, each having a special function; to systematize",
+            "tags": [
+              "perfective"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "organizes",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "organizing",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "organized",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "organized",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "no-table-tags",
+            "tags": [
+              "table-tags"
+            ]
+          },
+          {
+            "form": "glossary",
+            "tags": [
+              "inflection-template"
+            ]
+          },
+          {
+            "form": "organize",
+            "tags": [
+              "infinitive"
+            ]
+          },
+          {
+            "form": "organize",
+            "tags": [
+              "first-person",
+              "present",
+              "singular"
+            ]
+          },
+          {
+            "form": "organized",
+            "tags": [
+              "first-person",
+              "past",
+              "singular"
+            ]
+          },
+          {
+            "form": "organize",
+            "tags": [
+              "present",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "organized",
+            "tags": [
+              "past",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "organizes",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "organized",
+            "tags": [
+              "past",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "organize",
+            "tags": [
+              "plural",
+              "present"
+            ]
+          },
+          {
+            "form": "organized",
+            "tags": [
+              "past",
+              "plural"
+            ]
+          },
+          {
+            "form": "organize",
+            "tags": [
+              "present",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "organized",
+            "tags": [
+              "past",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "organize",
+            "tags": [
+              "imperative",
+              "present"
+            ]
+          },
+          {
+            "form": "-",
+            "tags": [
+              "imperative",
+              "past"
+            ]
+          },
+          {
+            "form": "organizing",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "organized",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "organise",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "read": {
+    "candidates": [
+      "read"
+    ],
+    "russian_candidates": [
+      "read"
+    ],
+    "translated_candidates": [
+      "read"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "read",
+        "pos": "verb",
+        "glosses": [
+          "читать",
+          "прочесть",
+          "считывать",
+          "гласить",
+          "изучать",
+          "толковать",
+          "показывать",
+          "вычитывать"
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "reads",
+            "tags": [
+              "third-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "reading",
+            "tags": [
+              "gerund"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "ru",
+        "word": "read",
+        "pos": "noun",
+        "glosses": [
+          "чтение",
+          "чтиво",
+          "время, проведённое в чтении"
+        ],
+        "ipa": [
+          "[rɪːd]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "reads",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "ru",
+        "word": "read",
+        "pos": "adj",
+        "glosses": [
+          "начитанный",
+          "образованный",
+          "знающий",
+          "сведущий"
+        ],
+        "ipa": [
+          "[rɛd]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "Read",
+        "pos": "noun",
+        "glosses": [
+          "английская фамилия"
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "read",
+        "pos": "verb",
+        "glosses": [
+          "To look at and interpret letters or other information that is written.",
+          "To look at and interpret letters or other information that is written.",
+          "To be understood or physically read in a specific way.",
+          "To look at and interpret letters or other information that is written.",
+          "To read a work or works written by the named author.",
+          "To speak aloud words or other information that is written. (often construed with a to phrase or an indirect object)",
+          "To interpret, or infer a meaning, significance, thought, intention, etc., from.",
+          "To consist of certain text."
+        ],
+        "ipa": [
+          "/ɹiːd/",
+          "/ɹid/",
+          "/rɛːd/",
+          "/riːd/"
+        ],
+        "ru_translations": [
+          {
+            "word": "читать",
+            "sense": "to look at and interpret letters or other information",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "прочитать",
+            "sense": "to look at and interpret letters or other information",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "толковать",
+            "sense": "of text, etc., to be interpreted or read in a particular way",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "читать",
+            "sense": "to speak aloud words or other information that is written",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "прочитать",
+            "sense": "to speak aloud words or other information that is written",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "читать",
+            "sense": "to interpret or infer a meaning, significance, thought, intention, etc. from — see also suss out",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "прочитать",
+            "sense": "to interpret or infer a meaning, significance, thought, intention, etc. from — see also suss out",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "гласить",
+            "sense": "to consist of certain text",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "изучать",
+            "sense": "to make a study of",
+            "tags": []
+          }
+        ],
+        "forms": [
+          {
+            "form": "reads",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "reading",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "no-table-tags",
+            "tags": [
+              "table-tags"
+            ]
+          },
+          {
+            "form": "glossary",
+            "tags": [
+              "inflection-template"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "infinitive"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "first-person",
+              "present",
+              "singular"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "first-person",
+              "past",
+              "singular"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "present",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "past",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "reads",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "past",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "plural",
+              "present"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "past",
+              "plural"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "present",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "past",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "imperative",
+              "present"
+            ]
+          },
+          {
+            "form": "-",
+            "tags": [
+              "imperative",
+              "past"
+            ]
+          },
+          {
+            "form": "reading",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "read",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "read",
+        "pos": "noun",
+        "glosses": [
+          "A reading or an act of reading, especially of an actor's part of a play or a piece of stored data.",
+          "Something to be read; a written work.",
+          "A person's interpretation or impression of something.",
+          "An instance of reading (“calling attention to someone's flaws; a taunt or insult”).",
+          "The identification of a specific sequence of genes in a genome or bases in a nucleic acid string."
+        ],
+        "ipa": [
+          "/ɹiːd/",
+          "/ɹid/",
+          "/rɛːd/",
+          "/riːd/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "reads",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "read",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [
+          "/ɹɛd/",
+          "/ɹed/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "Read",
+        "pos": "name",
+        "glosses": [
+          "A surname from Old English, a less common spelling variant of Reid.",
+          "A male given name transferred from the surname.",
+          "A village and civil parish in Ribble Valley district, Lancashire, England (OS grid ref SD7634).",
+          "A township in Clayton County, Iowa, United States.",
+          "A township in Butler County, Nebraska, United States.",
+          "An unincorporated community in Randolph County, West Virginia, United States."
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "lead": {
+    "candidates": [
+      "lead"
+    ],
+    "russian_candidates": [
+      "lead"
+    ],
+    "translated_candidates": [
+      "lead"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "lead",
+        "pos": "noun",
+        "glosses": [
+          "свинец",
+          "грузило"
+        ],
+        "ipa": [
+          "[lɛd]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "leads",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "ru",
+        "word": "lead",
+        "pos": "verb",
+        "glosses": [
+          "освинцовывать"
+        ],
+        "ipa": [
+          "[lɛd]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "leads",
+            "tags": [
+              "third-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "leaded",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "leaded",
+            "tags": [
+              "past",
+              "participle"
+            ]
+          },
+          {
+            "form": "leading",
+            "tags": [
+              "gerund"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "ru",
+        "word": "lead",
+        "pos": "verb",
+        "glosses": [
+          "возглавить, возглавлять, руководить",
+          "водить, вести",
+          "лидировать, опережать"
+        ],
+        "ipa": [
+          "[li:d]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "leads",
+            "tags": [
+              "third-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "led",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "led",
+            "tags": [
+              "past",
+              "participle"
+            ]
+          },
+          {
+            "form": "leading",
+            "tags": [
+              "gerund"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "ru",
+        "word": "lead",
+        "pos": "noun",
+        "glosses": [
+          "руководство, управление",
+          "отрыв",
+          "лидерство",
+          "ход",
+          "жила",
+          "привязь",
+          "наводка",
+          "лид (в маркетинге - потенциальный клиент)"
+        ],
+        "ipa": [
+          "[liːd]",
+          "[liːdz]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "lead",
+        "pos": "noun",
+        "glosses": [
+          "A heavy, pliable, inelastic metal element, having a bright, bluish color, but easily tarnished; both malleable and ductile, though with little tenacity. It is easily fusible, forms alloys with other metals, and is an ingredient of solder and type metal. Atomic number 82.",
+          "A plummet or mass of lead attached to a line, used in sounding depth at sea or to estimate velocity in knots.",
+          "A thin strip of type metal, used to separate lines of type in printing.",
+          "Vertical space in advance of a row or between rows of text. Also known as leading.",
+          "Sheets or plates of lead used as a covering for roofs.",
+          "A roof covered with lead sheets or terne plates.",
+          "A thin cylinder of graphite used in pencils.",
+          "Bullets; ammunition."
+        ],
+        "ipa": [
+          "/lɛd/",
+          "/led/"
+        ],
+        "ru_translations": [
+          {
+            "word": "свинец",
+            "sense": "chemical element",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "плюмбум",
+            "sense": "chemical element",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "грузило",
+            "sense": "plummet to measure depth of water",
+            "tags": [
+              "neuter"
+            ]
+          },
+          {
+            "word": "свинцовый отвес",
+            "sense": "plummet to measure depth of water",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "шпон",
+            "sense": "separator line in print",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "шпона",
+            "sense": "separator line in print",
+            "tags": [
+              "feminine"
+            ]
+          },
+          {
+            "word": "шпоны",
+            "sense": "separator line in print",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "word": "интерлиньяж",
+            "sense": "typography: vertical space",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "межстрочное расстояние",
+            "sense": "typography: vertical space",
+            "tags": [
+              "neuter"
+            ]
+          },
+          {
+            "word": "свинец",
+            "sense": "bullets",
+            "tags": [
+              "masculine"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "leads",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "♄",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "lead",
+        "pos": "verb",
+        "glosses": [
+          "To cover, fill, or affect with lead.",
+          "To place leads between the lines of."
+        ],
+        "ipa": [
+          "/lɛd/",
+          "/led/"
+        ],
+        "ru_translations": [
+          {
+            "word": "свинцевать",
+            "sense": "to cover, fill, or affect with lead",
+            "tags": []
+          }
+        ],
+        "forms": [
+          {
+            "form": "leads",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "leading",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "leaded",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "leaded",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "♄",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "lead",
+        "pos": "verb",
+        "glosses": [
+          "To guide or conduct.",
+          "To guide or conduct with the hand, or by means of some physical contact connection.",
+          "To guide or conduct.",
+          "To guide or conduct in a certain course, or to a certain place or end, by making the way known; to show the way, especially by going with or going in advance of; to guide somebody somewhere or to bring somebody somewhere by means of instructions.",
+          "To guide or conduct.",
+          "To direct; to counsel; to instruct.",
+          "To guide or conduct.",
+          "To conduct or direct with authority; to have direction or charge of; to command, especially a military or business unit."
+        ],
+        "ipa": [
+          "/ˈliːd/",
+          "[ˈlɪi̯d]"
+        ],
+        "ru_translations": [
+          {
+            "word": "водиться",
+            "sense": "guide or conduct oneself",
+            "tags": []
+          },
+          {
+            "word": "вестись",
+            "sense": "guide or conduct oneself",
+            "tags": []
+          },
+          {
+            "word": "проводить",
+            "sense": "intransitive: to guide or conduct",
+            "tags": []
+          },
+          {
+            "word": "водить",
+            "sense": "guide or conduct with the hand, or by means of some physical contact connection",
+            "tags": [
+              "abstract",
+              "imperfective"
+            ]
+          },
+          {
+            "word": "вести",
+            "sense": "guide or conduct with the hand, or by means of some physical contact connection",
+            "tags": [
+              "concrete",
+              "imperfective"
+            ]
+          },
+          {
+            "word": "приводить",
+            "sense": "guide or conduct with the hand, or by means of some physical contact connection",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "привести",
+            "sense": "guide or conduct with the hand, or by means of some physical contact connection",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "водить",
+            "sense": "guide or conduct in a certain course",
+            "tags": []
+          },
+          {
+            "word": "вести",
+            "sense": "guide or conduct in a certain course",
+            "tags": []
+          },
+          {
+            "word": "руководить",
+            "sense": "conduct or direct with authority",
+            "tags": []
+          },
+          {
+            "word": "склонять",
+            "sense": "draw or direct by influence",
+            "tags": []
+          },
+          {
+            "word": "приводить",
+            "sense": "draw or direct by influence",
+            "tags": []
+          }
+        ],
+        "forms": [
+          {
+            "form": "leads",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "leading",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "led",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "led",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "no-table-tags",
+            "tags": [
+              "table-tags"
+            ]
+          },
+          {
+            "form": "glossary",
+            "tags": [
+              "inflection-template"
+            ]
+          },
+          {
+            "form": "lead",
+            "tags": [
+              "infinitive"
+            ]
+          },
+          {
+            "form": "lead",
+            "tags": [
+              "first-person",
+              "present",
+              "singular"
+            ]
+          },
+          {
+            "form": "led",
+            "tags": [
+              "first-person",
+              "past",
+              "singular"
+            ]
+          },
+          {
+            "form": "lead",
+            "tags": [
+              "present",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "led",
+            "tags": [
+              "past",
+              "second-person",
+              "singular"
+            ]
+          },
+          {
+            "form": "leads",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "led",
+            "tags": [
+              "past",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "lead",
+            "tags": [
+              "plural",
+              "present"
+            ]
+          },
+          {
+            "form": "led",
+            "tags": [
+              "past",
+              "plural"
+            ]
+          },
+          {
+            "form": "lead",
+            "tags": [
+              "present",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "led",
+            "tags": [
+              "past",
+              "subjunctive"
+            ]
+          },
+          {
+            "form": "lead",
+            "tags": [
+              "imperative",
+              "present"
+            ]
+          },
+          {
+            "form": "-",
+            "tags": [
+              "imperative",
+              "past"
+            ]
+          },
+          {
+            "form": "leading",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "led",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "lead",
+        "pos": "noun",
+        "glosses": [
+          "The act of leading or conducting; guidance; direction, course",
+          "Precedence; advance position; also, the measure of precedence; the state of being ahead in a race; the highest score in an incomplete game.",
+          "An insulated metallic wire for electrical devices and equipment.",
+          "The situation where a runner steps away from a base while waiting for the pitch to be thrown.",
+          "The act or right of playing first in a game or round; the card suit, or piece, so played",
+          "The main role in a play or film; the lead role.",
+          "The actor who plays the main role; lead actor.",
+          "The person in charge of a project or a work shift etc."
+        ],
+        "ipa": [
+          "/ˈliːd/",
+          "[ˈlɪi̯d]"
+        ],
+        "ru_translations": [
+          {
+            "word": "лидерство",
+            "sense": "precedence; advance position",
+            "tags": [
+              "neuter"
+            ]
+          },
+          {
+            "word": "ход",
+            "sense": "in cards and dominoes",
+            "tags": [
+              "masculine"
+            ]
+          },
+          {
+            "word": "жила",
+            "sense": "mining: lode",
+            "tags": [
+              "feminine"
+            ]
+          },
+          {
+            "word": "наводка",
+            "sense": "information obtained by a detective or police officer",
+            "tags": [
+              "feminine"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "leads",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "lead",
+        "pos": "adj",
+        "glosses": [
+          "Foremost.",
+          "Main, principal, primary, first, chief, foremost."
+        ],
+        "ipa": [
+          "/ˈliːd/",
+          "[ˈlɪi̯d]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "lead",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "Lead",
+        "pos": "name",
+        "glosses": [
+          "A civil parish in North Yorkshire, England.",
+          "A city in Lawrence County, South Dakota, United States."
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "a": {
+    "candidates": [
+      "a",
+      "a/b test"
+    ],
+    "russian_candidates": [
+      "a"
+    ],
+    "translated_candidates": [
+      "a"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "a",
+        "pos": "article",
+        "glosses": [
+          "неопределённый артикль, может либо переводиться словами один, некий, либо опускаться при переводе на русский язык"
+        ],
+        "ipa": [
+          "[eɪ]",
+          "[ə]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "num",
+        "glosses": [
+          "The first numeral symbol of the English alphabet, called ay and written in the Latin script."
+        ],
+        "ipa": [
+          "/eɪ/",
+          "/æɪ/",
+          "[eː]",
+          "/æ/",
+          "/ɑː/",
+          "/eɪ/",
+          "/ə/"
+        ],
+        "ru_translations": [
+          {
+            "word": "а",
+            "sense": "first ordering symbol",
+            "tags": []
+          }
+        ],
+        "forms": [
+          {
+            "form": "A",
+            "tags": [
+              "uppercase"
+            ]
+          },
+          {
+            "form": "as",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "a's",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "noun",
+        "glosses": [
+          "The name of the Latin script letter A/a."
+        ],
+        "ipa": [
+          "/eɪ/",
+          "/æɪ/",
+          "[eː]",
+          "/æ/",
+          "/ɑː/",
+          "/eɪ/",
+          "/ə/"
+        ],
+        "ru_translations": [
+          {
+            "word": "эй",
+            "sense": "name of the letter A, a",
+            "tags": [
+              "English",
+              "neuter"
+            ]
+          },
+          {
+            "word": "а",
+            "sense": "name of the letter A, a",
+            "tags": [
+              "neuter"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "a's",
+            "tags": [
+              "plural"
+            ]
+          },
+          {
+            "form": "aes",
+            "tags": [
+              "plural",
+              "rare"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "article",
+        "glosses": [
+          "An unspecified example of (something); the indefinite article.",
+          "One; used before score, dozen, hundred, thousand, million, etc.",
+          "Used in some phrases denoting quantity, such as a few, a good many, a couple, a little, a bit, etc.",
+          "Used in some phrases denoting quantity, such as a few, a good many, a couple, a little, a bit, etc.",
+          "Used before a numeral.",
+          "Used in some adverbial phrases denoting the degree or extent of an action, such as a little, a bit, a lot, etc.",
+          "The same; one and the same. Used in phrases such as of a kind, birds of a feather, etc.",
+          "Any; every; used before a noun which has become modified to limit its scope."
+        ],
+        "ipa": [
+          "/eɪ/",
+          "/ə/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "prep",
+        "glosses": [
+          "To do with separation; In, into.",
+          "To do with time; Each, per, in, on, by. Often occurs between two nouns, where the first noun occurs at the end of a verbal phrase.",
+          "To do with status; In."
+        ],
+        "ipa": [
+          "/ə/"
+        ],
+        "ru_translations": [
+          {
+            "word": "в",
+            "sense": "per; each (time unit)",
+            "tags": []
+          },
+          {
+            "word": "по",
+            "sense": "per; each (time unit)",
+            "tags": []
+          }
+        ],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "verb",
+        "glosses": [
+          "Have (auxiliary verb).",
+          "Had (auxiliary verb)."
+        ],
+        "ipa": [
+          "/ə/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "'a",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "'a'",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "ha",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "ha'",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "pron",
+        "glosses": [
+          "He, she, they: the third-person singular or plural nominative.",
+          "He, she, they: the third-person singular or plural nominative.",
+          "He, the third-person singular nominative.",
+          "He, she, they: the third-person singular or plural nominative.",
+          "She, the third-person singular nominative."
+        ],
+        "ipa": [
+          "/ʌ/",
+          "/ɑ/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "'a",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "prep",
+        "glosses": [],
+        "ipa": [
+          "/ə/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "o'",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "o",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "adv",
+        "glosses": [
+          "All."
+        ],
+        "ipa": [
+          "/ɔ/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "a'",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "adj",
+        "glosses": [
+          "All."
+        ],
+        "ipa": [
+          "/ɔ/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "a'",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "particle",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "'a",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "contraction",
+        "glosses": [
+          "Used to express a future action; going to."
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "conj",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "adv",
+        "glosses": [
+          "across"
+        ],
+        "ipa": [],
+        "ru_translations": [
+          {
+            "word": "г",
+            "sense": "across (crossword clue notation; as in 23a)",
+            "tags": []
+          }
+        ],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "particle",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "noun",
+        "glosses": [
+          "The name of the Cyrillic script letter А/а."
+        ],
+        "ipa": [],
+        "ru_translations": [
+          {
+            "word": "а",
+            "sense": "name of the Cyrillic letter А, а",
+            "tags": [
+              "neuter"
+            ]
+          }
+        ],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "intj",
+        "glosses": [
+          "ah; er (sound of hesitation)"
+        ],
+        "ipa": [],
+        "ru_translations": [
+          {
+            "word": "э-э",
+            "sense": "sound of hesitation",
+            "tags": []
+          }
+        ],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "a",
+        "pos": "noun",
+        "glosses": [
+          "The fourth semiquaver (sixteenth note) of a beat."
+        ],
+        "ipa": [
+          "/ˈʌ/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "uh",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "the": {
+    "candidates": [
+      "the"
+    ],
+    "russian_candidates": [
+      "the"
+    ],
+    "translated_candidates": [],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "the",
+        "pos": "article",
+        "glosses": [
+          "указывает на уже упоминавшийся, известный, конкретный либо единственный в своём роде объект; этот, тот",
+          "используется для указания на последующее уточняющее или определяющее придаточное предложение или фразу",
+          "используется для обобщённого обозначения чего-либо, а не для указания на конкретный случай",
+          "достаточно чего-либо конкретного",
+          "(произносится с ударением) используется для обозначения кого-то или чего-то наиболее важного"
+        ],
+        "ipa": [
+          "[ˈðiː]",
+          "[ðɪ]",
+          "[ðə]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "the",
+        "pos": "adv",
+        "glosses": [
+          "the…the вместе со сравнительной степенью (возможно, с дополнительным more) образует сравнительный оборот"
+        ],
+        "ipa": [
+          "[ˈðiː]",
+          "[ðɪ]",
+          "[ðə]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "the",
+        "pos": "article",
+        "glosses": [
+          "Used before a noun phrase, including a simple noun",
+          "The definite grammatical article that shows that the noun phrase that immediately follows it is definitely identifiable...",
+          "...because it has already been mentioned, is to be completely specified in the same sentence, or very shortly thereafter.",
+          "Used before a noun phrase, including a simple noun",
+          "The definite grammatical article that shows that the noun phrase that immediately follows it is definitely identifiable...",
+          "...because it is presumed to be definitely known in context or from shared knowledge.",
+          "Used before a noun designating something considered to be unique, or of which there is only one at a time.",
+          "Used before a noun phrase, including a simple noun"
+        ],
+        "ipa": [
+          "/ðə/",
+          "/ði/ [ðɪj]",
+          "/ðiː/",
+          "/ðə/",
+          "/ði/ [ðɪj]",
+          "/ðə/",
+          "/ði/ [ðɪj]"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "da",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "d'",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "teh",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "de",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "t'",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "th'",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "ye",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "yᵉ",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "yͤ",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "ẏe",
+            "tags": [
+              "alternative"
+            ]
+          },
+          {
+            "form": "ẏᵉ",
+            "tags": [
+              "alternative"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "the",
+        "pos": "adv",
+        "glosses": [
+          "With a comparative or with more and a verb phrase, establishes a correlation with one or more other such comparatives.",
+          "With a comparative, and often with for it, indicates a result more like said comparative. This can be negated with none.",
+          "Beyond all others."
+        ],
+        "ipa": [
+          "/ðə/",
+          "/ði/ [ðɪj]",
+          "/ðiː/",
+          "/ðə/",
+          "/ði/ [ðɪj]",
+          "/ðə/",
+          "/ði/ [ðɪj]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "the",
+        "pos": "prep",
+        "glosses": [
+          "For each; per."
+        ],
+        "ipa": [
+          "/ðə/",
+          "/ði/ [ðɪj]",
+          "/ðiː/",
+          "/ðə/",
+          "/ði/ [ðɪj]",
+          "/ðə/",
+          "/ði/ [ðɪj]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "the",
+        "pos": "pron",
+        "glosses": [],
+        "ipa": [
+          "/ðə/",
+          "/ði/ [ðɪj]",
+          "/ðiː/",
+          "/ðə/",
+          "/ði/ [ðɪj]",
+          "/ðə/",
+          "/ði/ [ðɪj]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "an": {
+    "candidates": [
+      "an"
+    ],
+    "russian_candidates": [
+      "an"
+    ],
+    "translated_candidates": [],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "an",
+        "pos": "article",
+        "glosses": [
+          "вариант неопределённого артикля a перед существительными, начинающимися с гласного звука"
+        ],
+        "ipa": [
+          "[ˈɛən]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "ru",
+        "word": "an",
+        "pos": "conj",
+        "glosses": [
+          "вариант and"
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "an",
+        "pos": "article",
+        "glosses": [
+          "Form of a (all article senses).",
+          "Used before a vowel sound.",
+          "Form of a (all article senses).",
+          "Used before /h/ in a stressed or unstressed syllable.",
+          "Form of a (all article senses).",
+          "Used before one and words with initial ⟨u⟩, ⟨eu⟩ when pronounced /ju/."
+        ],
+        "ipa": [
+          "/ˈæn/",
+          "[ˈæn]",
+          "[ˈan]",
+          "[ˈeən]",
+          "[ˈɛən]",
+          "[ˈɛən]",
+          "[ˈæ(ː)n]",
+          "/ən/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "an",
+        "pos": "num",
+        "glosses": [],
+        "ipa": [
+          "/ˈæn/",
+          "[ˈæn]",
+          "[ˈan]",
+          "[ˈeən]",
+          "[ˈɛən]",
+          "[ˈɛən]",
+          "[ˈæ(ː)n]",
+          "/ən/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "an",
+        "pos": "conj",
+        "glosses": [],
+        "ipa": [
+          "/ˈæn/",
+          "[ˈæn]",
+          "[ˈan]",
+          "[ˈeən]",
+          "[ˈɛən]",
+          "[ˈɛən]",
+          "[ˈæ(ː)n]",
+          "/ən/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "an",
+        "pos": "noun",
+        "glosses": [
+          "The first letter of the Georgian alphabet, ა (Mkhedruli), Ⴀ (Asomtavruli) or ⴀ (Nuskhuri)."
+        ],
+        "ipa": [
+          "/ˈæn/",
+          "[ˈæn]",
+          "[ˈan]",
+          "[ˈeən]",
+          "[ˈɛən]",
+          "[ˈɛən]",
+          "[ˈæ(ː)n]",
+          "/ən/"
+        ],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "ans",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "an",
+        "pos": "prep",
+        "glosses": [
+          "In each; to or for each; per."
+        ],
+        "ipa": [
+          "/ˈæn/",
+          "[ˈæn]",
+          "[ˈan]",
+          "[ˈeən]",
+          "[ˈɛən]",
+          "[ˈɛən]",
+          "[ˈæ(ː)n]",
+          "/ən/"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "An",
+        "pos": "name",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "look up": {
+    "candidates": [
+      "look up"
+    ],
+    "russian_candidates": [
+      "look up"
+    ],
+    "translated_candidates": [
+      "look up"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "look up",
+        "pos": "phrase",
+        "glosses": [
+          "поднимать глаза (поднять глаза), смотреть (посмотреть) вверх",
+          "искать",
+          "улучшаться",
+          "навещать"
+        ],
+        "ipa": [
+          "[lʊk ʌp]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "look up",
+        "pos": "verb",
+        "glosses": [
+          "Used other than figuratively or idiomatically: see look, up.",
+          "To have better prospects.",
+          "To obtain, or seek to obtain, information about something.",
+          "To obtain, or seek to obtain, information about something.",
+          "To obtain information about something from a reference book.",
+          "To obtain, or seek to obtain, information about something.",
+          "To enter a query into a database or search engine.",
+          "To reconnect or meet with someone that one used to know."
+        ],
+        "ipa": [
+          "/ˌlʊk ˈʌp/"
+        ],
+        "ru_translations": [
+          {
+            "word": "смотреть вверх",
+            "sense": "used other than as an idiom",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "улучшаться",
+            "sense": "to have better prospects, to improve",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "искать",
+            "sense": "to obtain information about something from a text source",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "поискать",
+            "sense": "to obtain information about something from a text source",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "смотреть",
+            "sense": "to obtain information about something from a text source",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "посмотреть",
+            "sense": "to obtain information about something from a text source",
+            "tags": [
+              "perfective"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "looks up",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "looking up",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "looked up",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "looked up",
+            "tags": [
+              "past"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "looked up": {
+    "candidates": [
+      "look up",
+      "looked up"
+    ],
+    "russian_candidates": [
+      "look up"
+    ],
+    "translated_candidates": [
+      "look up"
+    ],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "looked up",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "turn off": {
+    "candidates": [
+      "turn off"
+    ],
+    "russian_candidates": [
+      "turn off"
+    ],
+    "translated_candidates": [
+      "turn off"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "turn off",
+        "pos": "phrase",
+        "glosses": [
+          "выключать (выключить)",
+          "сворачивать (свернуть), поворачивать (повернуть)",
+          "разочаровывать (разочаровать)",
+          "вызывать неприязнь"
+        ],
+        "ipa": [
+          "[tɜːn ɒf]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "turn off",
+        "pos": "verb",
+        "glosses": [
+          "Used other than figuratively or idiomatically: see turn, off.",
+          "To power down, to switch off, to put out of operation, to deactivate (an appliance, light, mechanism, functionality etc.).",
+          "To power down, to switch off, to put out of operation, to deactivate (an appliance, light, mechanism, functionality etc.).",
+          "To deactivate a heat source cooking a particular item.",
+          "To power down, to switch off, to put out of operation, to deactivate (an appliance, light, mechanism, functionality etc.).",
+          "To become deactivated; to become powered down.",
+          "To power down, to switch off, to put out of operation, to deactivate (an appliance, light, mechanism, functionality etc.).",
+          "To rotate a tap or valve so as to interrupt the outflow of liquid or gas."
+        ],
+        "ipa": [],
+        "ru_translations": [
+          {
+            "word": "выключать",
+            "sense": "switch off appliance or light",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "выключить",
+            "sense": "switch off appliance or light",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "гасить",
+            "sense": "switch off appliance or light",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "погасить",
+            "sense": "switch off appliance or light",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "тушить",
+            "sense": "switch off appliance or light",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "потушить",
+            "sense": "switch off appliance or light",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "отталкивать",
+            "sense": "repulse",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "сворачивать",
+            "sense": "leave a road",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "съезжать",
+            "sense": "leave a road",
+            "tags": [
+              "imperfective"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "turns off",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "turning off",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "turned off",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          },
+          {
+            "form": "turned off",
+            "tags": [
+              "past"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "turned off": {
+    "candidates": [
+      "turn off",
+      "turned off"
+    ],
+    "russian_candidates": [
+      "turn off"
+    ],
+    "translated_candidates": [
+      "turn off"
+    ],
+    "entries": [
+      {
+        "edition": "en",
+        "word": "turned off",
+        "pos": "verb",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": []
+      }
+    ]
+  },
+  "take off": {
+    "candidates": [
+      "take off"
+    ],
+    "russian_candidates": [
+      "take off"
+    ],
+    "translated_candidates": [
+      "take off"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "take off",
+        "pos": "phrase",
+        "glosses": [
+          "снимать",
+          "подражать",
+          "взлетать",
+          "убавлять, сбавлять",
+          "приобретать популярность",
+          "брать отгул"
+        ],
+        "ipa": [
+          "[teɪk ɒf]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "take off",
+        "pos": "verb",
+        "glosses": [
+          "To remove.",
+          "To leave the ground and ascend into the air or into flight.",
+          "To stand up on a surfboard and begin to surf a breaking wave.",
+          "To become successful, to flourish.",
+          "To depart.",
+          "To imitate (somebody), often in a satirical manner.",
+          "To take (a specified time period) as a vacation or break from work or other activity.",
+          "To absent oneself from work or other responsibility, especially with permission."
+        ],
+        "ipa": [],
+        "ru_translations": [
+          {
+            "word": "снимать",
+            "sense": "to remove",
+            "tags": [
+              "imperfective",
+              "usually"
+            ]
+          },
+          {
+            "word": "снять",
+            "sense": "to remove",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "убирать",
+            "sense": "to remove",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "убрать",
+            "sense": "to remove",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "взлетать",
+            "sense": "to begin flight",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "взлететь",
+            "sense": "to begin flight",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "подняться",
+            "sense": "to become successful",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "подниматься",
+            "sense": "to become successful",
+            "tags": [
+              "imperfective"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "takes off",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "taking off",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "took off",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "taken off",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "take off",
+        "pos": "noun",
+        "glosses": [],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "take offs",
+            "tags": [
+              "plural"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "give up": {
+    "candidates": [
+      "give up"
+    ],
+    "russian_candidates": [
+      "give up"
+    ],
+    "translated_candidates": [
+      "give up"
+    ],
+    "entries": [
+      {
+        "edition": "ru",
+        "word": "give up",
+        "pos": "phrase",
+        "glosses": [
+          "сдаваться, поступаться (поступиться)",
+          "отказывать (отказываться)",
+          "бросать (бросить), отбрасывать (отбросить)",
+          "уступать",
+          "оставлять",
+          "покидать",
+          "признавать безнадежным"
+        ],
+        "ipa": [
+          "[ɡɪˈvʌp]"
+        ],
+        "ru_translations": [],
+        "forms": []
+      },
+      {
+        "edition": "en",
+        "word": "give up",
+        "pos": "verb",
+        "glosses": [
+          "To surrender (someone or something); to inform on (someone).",
+          "To relinquish (something)",
+          "Devote or dedicate (oneself, one's life, etc.) to something.",
+          "To have someone obtain (something) to one's disadvantage; to concede.",
+          "To stop or quit (an activity, etc.).",
+          "To abandon (someone or something)",
+          "To lose hope concerning (someone or something)",
+          "To admit defeat, capitulate; to desist for that reason."
+        ],
+        "ipa": [],
+        "ru_translations": [
+          {
+            "word": "сдаваться",
+            "sense": "surrender",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "сдаться",
+            "sense": "surrender",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "сдавать",
+            "sense": "surrender",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "сдать pf trans.",
+            "sense": "surrender",
+            "tags": []
+          },
+          {
+            "word": "выдавать",
+            "sense": "surrender",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "выдать",
+            "sense": "surrender",
+            "tags": [
+              "perfective",
+              "transitive"
+            ]
+          },
+          {
+            "word": "уступать",
+            "sense": "relinquish",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "уступить",
+            "sense": "relinquish",
+            "tags": [
+              "perfective"
+            ]
+          },
+          {
+            "word": "бросать",
+            "sense": "stop, quit, desist",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "бросить pf the habit",
+            "sense": "stop, quit, desist",
+            "tags": []
+          },
+          {
+            "word": "прекращать",
+            "sense": "stop, quit, desist",
+            "tags": [
+              "imperfective"
+            ]
+          },
+          {
+            "word": "прекратить",
+            "sense": "stop, quit, desist",
+            "tags": [
+              "perfective"
+            ]
+          }
+        ],
+        "forms": [
+          {
+            "form": "gives up",
+            "tags": [
+              "present",
+              "singular",
+              "third-person"
+            ]
+          },
+          {
+            "form": "giving up",
+            "tags": [
+              "participle",
+              "present"
+            ]
+          },
+          {
+            "form": "gave up",
+            "tags": [
+              "past"
+            ]
+          },
+          {
+            "form": "given up",
+            "tags": [
+              "participle",
+              "past"
+            ]
+          }
+        ]
+      },
+      {
+        "edition": "en",
+        "word": "give up",
+        "pos": "adj",
+        "glosses": [
+          "Become fully taken over by a certain quality, activity, trait, etc."
+        ],
+        "ipa": [],
+        "ru_translations": [],
+        "forms": [
+          {
+            "form": "more give up",
+            "tags": [
+              "comparative"
+            ]
+          },
+          {
+            "form": "most give up",
+            "tags": [
+              "superlative"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -38,6 +38,10 @@ object WritingExercise {
     fun occurrences(example: String, word: String, language: String): List<IntRange> {
         if (word.isBlank() || example.isBlank()) return emptyList()
         val exact = headwordRegex(word, language).findAll(example).map { it.range }.toList()
+        if (language.startsWith("en")) {
+            val engine = com.hanreader.app.en.EnEngine.ready() ?: return exact
+            return (exact + engine.occurrences(example, word)).distinct().sortedBy { it.first }
+        }
         if (exact.isNotEmpty() || !language.startsWith("es")) return exact
         val stem = spanishStem(word) ?: return emptyList()
         return Regex("[\\p{L}]+").findAll(example).filter { m ->

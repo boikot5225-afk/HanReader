@@ -41,7 +41,7 @@ object AppearanceStore { val appearance=kotlinx.coroutines.flow.MutableStateFlow
 (gen/'Sentences.kt').write_text('''package com.hanreader.app.reader
 object Sentences { fun ends(text:String,i:Int)=com.hanreader.app.lang.SentenceBoundary.ends(text,i) }
 ''')
-sources=[*gen.glob('*.kt'),*(src/'zh').glob('*.kt'),*(src/'es').glob('*.kt'),*(src/'epub').glob('*.kt'),*(src/'lang').glob('*.kt'),*(src/'reader'/n for n in ['ReaderModel.kt','BookVocabulary.kt','BookSearch.kt']),root/'tools/zh_context_audit/Main.kt']
+sources=[*gen.glob('*.kt'),*(src/'zh').glob('*.kt'),*(src/'es').glob('*.kt'),*(src/'en').glob('*.kt'),*(src/'epub').glob('*.kt'),*(src/'lang').glob('*.kt'),*(src/'reader'/n for n in ['ReaderModel.kt','BookVocabulary.kt','BookSearch.kt']),root/'tools/zh_context_audit/Main.kt']
 # Other lang sources currently require Android Activity/Application; include only pure contracts.
 sources=[p for p in sources if p.parent!=src/'lang' or p.name in ['LanguageModule.kt','Alphabetic.kt','ContextRules.kt','SentenceBoundary.kt']]
 if args.tests:

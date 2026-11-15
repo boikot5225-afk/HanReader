@@ -52,7 +52,11 @@ data class LanguageInfo(
      * Its commonest small words (lower case): a book in a language with an alphabet is recognized
      * by how many of its words are these. Empty for Chinese, recognized by its characters.
      */
-    val markers: Set<String> = emptySet()
+    val markers: Set<String> = emptySet(),
+    /** Text written for the appearance preview, in this language. */
+    val appearanceSample: String = "Aa",
+    /** Words marked as saved in the appearance preview. */
+    val appearanceKnownWords: Set<String> = emptySet()
 ) {
     val locale: Locale get() = Locale.forLanguageTag(tag)
 }
@@ -193,7 +197,9 @@ object Languages {
         isWordChar = { it.isHan() },
         legacyCharset = "GB18030",
         ownsWord = { w -> w.any { it.isHan() } },
-        bookAdjective = "китайскую"
+        bookAdjective = "китайскую",
+        appearanceSample = "那天晚上一直在下雨。街灯很暗，他站在门口，等一个不会来的人。",
+        appearanceKnownWords = setOf("门口")
     )
 
     val SPANISH = LanguageInfo(
@@ -210,11 +216,26 @@ object Languages {
         ownsWord = { w -> w.isNotEmpty() && w.all { !it.isLetter() || Character.UnicodeScript.of(it.code) == Character.UnicodeScript.LATIN } && w.any { it.isLetter() } },
         bookAdjective = "испанскую",
         markers = setOf("de", "la", "que", "el", "en", "y", "los", "se", "del", "las", "un", "por", "con", "no", "una",
-            "su", "para", "es", "al", "lo", "como", "más", "pero", "sus", "le", "ya", "o", "fue", "este", "ha", "sí", "porque")
+            "su", "para", "es", "al", "lo", "como", "más", "pero", "sus", "le", "ya", "o", "fue", "este", "ha", "sí", "porque"),
+        appearanceSample = "Aquella noche no dejó de llover. La farola daba poca luz, y él esperaba en la puerta a alguien que no iba a venir.",
+        appearanceKnownWords = setOf("puerta")
     )
 
-    /** Every language the code knows, in a fixed order (statistics keep their days by the index here). */
-    val ALL = listOf(CHINESE, SPANISH)
+    val ENGLISH = LanguageInfo(
+        tag = "en-US", title = "Английский", readingTitle = null, levelsTitle = "A1–C2",
+        sentenceEnd = ".!?…;\n",
+        voiceMissing = "Нет английского голоса. Установи его: Настройки Android → Синтез речи",
+        noWordsMessage = "В тексте нет английских слов",
+        isWordChar = { it.isLetter() && Character.UnicodeScript.of(it.code) == Character.UnicodeScript.LATIN },
+        legacyCharset = "windows-1252", ownsWord = SPANISH.ownsWord, bookAdjective = "английскую",
+        markers = setOf("the", "and", "of", "to", "in", "is", "was", "it", "that", "he", "for", "with", "as", "on",
+            "his", "at", "by", "be", "this", "had", "not", "are", "but", "from", "they", "you", "she", "we", "have", "were"),
+        appearanceSample = "That night the rain did not stop. He stood by the door, waiting for someone who would never come.",
+        appearanceKnownWords = setOf("door")
+    )
+
+    /** Append languages: statistics keep their days by the index here. */
+    val ALL = listOf(CHINESE, SPANISH, ENGLISH)
 
     /**
      * The languages this app reads, in the order of BuildConfig.LANGUAGES ("es,zh": Spanish and
@@ -244,6 +265,7 @@ object Languages {
     fun init(context: Context) {
         val tag = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null)
         current = AVAILABLE.firstOrNull { it.tag == tag } ?: default
+        if (current == ENGLISH) LanguageEngines.warmUp(context)
     }
 
     /** Saves [language] as the one to read; takes effect after a restart ([restart]). */
@@ -286,6 +308,10 @@ object LanguageEngines {
             Languages.SPANISH to object : EngineLoader {
                 override fun warmUp(context: Context) = com.hanreader.app.es.EsEngine.warmUp(context)
                 override fun release() = com.hanreader.app.es.EsEngine.release()
+            },
+            Languages.ENGLISH to object : EngineLoader {
+                override fun warmUp(context: Context) = com.hanreader.app.en.EnEngine.warmUp(context)
+                override fun release() = com.hanreader.app.en.EnEngine.release()
             }
         )
     }

@@ -20,6 +20,11 @@ class SortedTsv private constructor(private val b: ByteBuffer, private val start
 
     /** The fields after the key of the line with [key], or null. */
     fun get(key: String): List<String>? {
+        val index = indexOf(key)
+        return if (index < 0) null else fields(index)
+    }
+
+    private fun indexOf(key: String): Int {
         val k = key.toByteArray(Charsets.UTF_8)
         var lo = 0
         var hi = size - 1
@@ -29,13 +34,13 @@ class SortedTsv private constructor(private val b: ByteBuffer, private val start
             when {
                 c < 0 -> lo = mid + 1
                 c > 0 -> hi = mid - 1
-                else -> return fields(mid)
+                else -> return mid
             }
         }
-        return null
+        return -1
     }
 
-    fun contains(key: String): Boolean = get(key) != null
+    fun contains(key: String): Boolean = indexOf(key) >= 0
 
     /** Every line as key and fields after it, in order. */
     fun forEach(action: (String, List<String>) -> Unit) {

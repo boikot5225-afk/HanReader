@@ -32,6 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 import java.io.File
 
 /** The language this build reads (cards, speech): see [com.hanreader.app.lang.Languages]. */
@@ -70,6 +71,11 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val engineCore = com.hanreader.app.lang.LanguageEngines.core(app)
     private val booksDir = File(app.filesDir, "books").apply { mkdirs() }
     private val openMutex = Mutex()
+    private var openingJob: kotlinx.coroutines.Job? = null
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val analysisDispatcher = Dispatchers.Default.limitedParallelism(1)
+    private val _openingError = MutableStateFlow<String?>(null)
+    val openingError: StateFlow<String?> = _openingError.asStateFlow()
     private val images = object : LruCache<String, Bitmap>(24 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
@@ -418,20 +424,30 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openBook(id: Long) {
-        viewModelScope.launch {
+        openingJob?.cancel()
+        openingJob = viewModelScope.launch {
             openMutex.withLock {
                 closeBookInternal()
-                val entity = books.get(id) ?: return@withLock
+                _openingError.value = null
+                val entity = books.get(id) ?: run {
+                    _openingError.value = "Книга не найдена в библиотеке"
+                    return@withLock
+                }
+                var openingSource: com.hanreader.app.epub.BookSource? = null
                 val epub = runCatching {
-                    withContext(Dispatchers.IO) { BookFiles.open(File(booksDir, entity.fileName)) }
+                    withContext(Dispatchers.IO) { BookFiles.open(File(booksDir, entity.fileName)).also { openingSource = it } }
                 }.getOrElse {
+                    runCatching { openingSource?.close() }
+                    if (it is kotlinx.coroutines.CancellationException) throw it
                     com.hanreader.app.CrashLog.record("Открытие книги", it)
                     _message.value = "Не удалось открыть книгу: ${it.message}"
+                    _openingError.value = _message.value
                     return@withLock
                 }
                 if (epub.chapters.isEmpty()) {
                     runCatching { epub.close() }
                     _message.value = "В книге не нашлось текста"
+                    _openingError.value = _message.value
                     return@withLock
                 }
                 _open.value = OpenBook(entity, epub)
@@ -464,8 +480,10 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             val engine = engineCore.await()
             val extra = namesToKeepWhole(current.entity.id)
             val blocked = splitDao.words().toHashSet()
-            withContext(Dispatchers.Default) { ChapterBuilder.build(current.epub, index, engine, extra, com.hanreader.app.AppearanceStore.appearance.value.script, blocked) }
+            withContext(Dispatchers.Default) { ChapterBuilder.build(current.epub, index, engine, extra,
+                com.hanreader.app.AppearanceStore.appearance.value.script, blocked, checkCancelled = { coroutineContext.ensureActive() }) }
         }
+        result.exceptionOrNull()?.let { if (it is kotlinx.coroutines.CancellationException) throw it }
         val now = _open.value ?: return
         _open.value = result.fold(
             onSuccess = { now.copy(chapter = it, loading = false) },
@@ -488,6 +506,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun closeBook() {
+        openingJob?.cancel()
         _open.value?.entity?.id?.let { snapshotProgress(it) }
         viewModelScope.launch { openMutex.withLock { closeBookInternal() } }
     }
@@ -741,7 +760,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             runCatching {
                 val entity = books.get(bookId) ?: return@runCatching
                 val engine = engineCore.await()
-                val result = withContext(Dispatchers.Default) {
+                val result = withContext(analysisDispatcher) {
                     BookFiles.open(File(booksDir, entity.fileName)).use { epub ->
                         engine.analyze(bookId, epub) { done, total ->
                             _analysis.value = _analysis.value + (bookId to done.toFloat() / total)
@@ -751,7 +770,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 books.saveAnalysis(bookId, result.words, result.tokens)
                 prefs.edit().putInt("analysis_v_$bookId", BookAnalyzer.VERSION).apply()
                 // Names found now are kept whole: rebuild the open chapter in place.
-                _open.value?.let { o -> if (o.entity.id == bookId) rebuildOpenChapter(o) }
+                _open.value?.let { o -> if (o.entity.id == bookId && engine is ZhEngine) rebuildOpenChapter(o) }
                 _open.value?.let { o -> if (o.entity.id == bookId) _open.value = o.copy(entity = o.entity.copy(analyzedTokens = result.tokens)) }
                 snapshotProgress(bookId)
             }.onFailure {

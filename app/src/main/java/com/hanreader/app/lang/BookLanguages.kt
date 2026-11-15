@@ -91,6 +91,10 @@ object LanguageDays {
 
     private fun index(l: LanguageInfo = Languages.current): Int = Languages.ALL.indexOf(l).coerceAtLeast(0)
 
+    /** Backup validation must allow the language offset, as well as old Chinese dates. */
+    fun isValidKey(day: Int): Boolean = day >= 0 && day / OFFSET in Languages.ALL.indices &&
+        day % OFFSET in 19_000_101..29_991_231
+
     /** The stored key of [day] for the current language. */
     fun key(day: Int): Int = day + index() * OFFSET
 

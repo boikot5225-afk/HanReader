@@ -41,7 +41,8 @@ class NeuralVoice private constructor(context: Context) {
         private set
 
     /** On and pointing somewhere. */
-    val available: Boolean get() = enabled && serverUrl.isNotBlank()
+    val available: Boolean get() = enabled && serverUrl.isNotBlank() &&
+        com.hanreader.app.lang.Languages.current == com.hanreader.app.lang.Languages.CHINESE
 
     fun update(enabled: Boolean, voice: String, serverUrl: String, token: String) {
         this.enabled = enabled

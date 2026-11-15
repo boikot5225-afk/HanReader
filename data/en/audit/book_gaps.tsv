@@ -1,0 +1,101 @@
+book	word	count	english_candidates	status
+alice	i'm	59		lookup_or_normalization_needed
+alice	that's	34	that's	russian_not_resolved
+alice	i'll	31	i'll	russian_not_resolved
+alice	you're	23		lookup_or_normalization_needed
+alice	doesn't	16	doesn't	russian_not_resolved
+alice	didn't	14	didn't	russian_not_resolved
+alice	anxiously	14	anxiously	russian_not_resolved
+alice	alice's	13		lookup_or_normalization_needed
+alice	they're	13		lookup_or_normalization_needed
+alice	i'd	11		lookup_or_normalization_needed
+alice	wasn't	11		lookup_or_normalization_needed
+alice	you'd	10		lookup_or_normalization_needed
+alice	couldn't	9	couldn't	russian_not_resolved
+alice	timidly	9	timidly	russian_not_resolved
+alice	queen's	8		lookup_or_normalization_needed;possible_name
+alice	it'll	8		lookup_or_normalization_needed
+alice	hadn't	8		lookup_or_normalization_needed
+alice	haven't	8	haven't	russian_not_resolved
+alice	she's	7		lookup_or_normalization_needed
+alice	lory	7	lory	russian_not_resolved
+alice	isn't	7		lookup_or_normalization_needed
+alice	you've	7		lookup_or_normalization_needed
+alice	soo	7	soo	russian_not_resolved;possible_name
+alice	oop	7	oop	russian_not_resolved
+alice	shan't	6		lookup_or_normalization_needed
+alice	you'll	6	you'll	russian_not_resolved
+alice	dreadfully	6	dreadfully	russian_not_resolved
+alice	bread-and-butter	6	bread-and-butter	russian_not_resolved
+alice	rabbit-hole	5	rabbit hole	russian_not_resolved
+alice	let's	5	let's	russian_not_resolved
+alice	what's	5	what's	russian_not_resolved
+alice	shouldn't	5	shouldn't	russian_not_resolved
+alice	tis	5	ti	russian_not_resolved
+alice	caucus-race	4		lookup_or_normalization_needed
+alice	croquet-ground	4		lookup_or_normalization_needed
+alice	they'll	4		lookup_or_normalization_needed
+alice	rabbit's	4		lookup_or_normalization_needed
+alice	they'd	4		lookup_or_normalization_needed
+alice	bill's	4		lookup_or_normalization_needed
+alice	rose-tree	4	rose-tree	russian_not_resolved
+alice	ootiful	4		lookup_or_normalization_needed
+alice	jury-box	4		lookup_or_normalization_needed
+alice	tea-party	3		lookup_or_normalization_needed
+alice	turtle's	3		lookup_or_normalization_needed
+alice	she'll	3		lookup_or_normalization_needed
+alice	out-of-the-way	3	out-of-the-way	russian_not_resolved
+alice	he's	3	hes	russian_not_resolved;possible_name
+alice	needn't	3	needn't	russian_not_resolved
+alice	duchess's	3		lookup_or_normalization_needed
+alice	trial's	3		lookup_or_normalization_needed
+sherlock	lestrade	37		lookup_or_normalization_needed
+sherlock	rucastle	34		lookup_or_normalization_needed
+sherlock	coronet	28	coronet	russian_not_resolved
+sherlock	k	21	k	russian_not_resolved
+sherlock	windibank	20		lookup_or_normalization_needed
+sherlock	i'll	19	i'll	russian_not_resolved
+sherlock	hatherley	17	hatherley	russian_not_resolved;possible_name
+sherlock	boscombe	16	boscombe	russian_not_resolved;possible_name
+sherlock	adler	16	adler	russian_not_resolved;possible_name
+sherlock	sitting-room	15	sitting room	russian_not_resolved
+sherlock	didn't	15	didn't	russian_not_resolved
+sherlock	openshaw	15	openshaw	russian_not_resolved;possible_name
+sherlock	toller	15	toller	russian_not_resolved;possible_name
+sherlock	man's	14		lookup_or_normalization_needed
+sherlock	roylott	14		lookup_or_normalization_needed
+sherlock	he's	13	hes	russian_not_resolved;possible_name
+sherlock	ross	13	ross	russian_not_resolved;possible_name
+sherlock	merryweather	12	merryweather	russian_not_resolved;possible_name
+sherlock	lascar	12	lascar	russian_not_resolved
+sherlock	bradstreet	12	bradstreet	russian_not_resolved;possible_name
+sherlock	woman's	11		lookup_or_normalization_needed
+sherlock	friend's	10		lookup_or_normalization_needed
+sherlock	you'll	10	you'll	russian_not_resolved
+sherlock	father's	10		lookup_or_normalization_needed
+sherlock	horsham	10	horsham	russian_not_resolved;possible_name
+sherlock	suggestive	9	suggestive	russian_not_resolved
+sherlock	jabez	9	jabez	russian_not_resolved;possible_name
+sherlock	eyford	9		lookup_or_normalization_needed
+sherlock	good-night	8	good-night	russian_not_resolved
+sherlock	lady's	8		lookup_or_normalization_needed
+sherlock	frock-coat	8	frock coat	russian_not_resolved
+sherlock	that's	8	that's	russian_not_resolved
+sherlock	tut	8	tut	russian_not_resolved;possible_name
+sherlock	th	8		lookup_or_normalization_needed;possible_name
+sherlock	waterloo	8	waterloo	russian_not_resolved;possible_name
+sherlock	swandam	8		lookup_or_normalization_needed
+sherlock	sister's	8		lookup_or_normalization_needed
+sherlock	grimesby	8		lookup_or_normalization_needed
+sherlock	paddington	7	paddington	russian_not_resolved;possible_name
+sherlock	cooee	7	cooee	russian_not_resolved;possible_name
+sherlock	wife's	7		lookup_or_normalization_needed
+sherlock	oakshott	7		lookup_or_normalization_needed
+sherlock	roylott's	7		lookup_or_normalization_needed
+sherlock	lysander	7	lysander	russian_not_resolved;possible_name
+sherlock	fuller's-earth	7		lookup_or_normalization_needed
+sherlock	burnwell	7		lookup_or_normalization_needed
+sherlock	reasoner	6	reasoner	russian_not_resolved;possible_name
+sherlock	hansom	6	hansom	russian_not_resolved;possible_name
+sherlock	dimly	6	dimly	russian_not_resolved
+sherlock	here's	6		lookup_or_normalization_needed

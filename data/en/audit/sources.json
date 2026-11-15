@@ -1,0 +1,34 @@
+{
+  "audited_at_utc": "2026-11-15T11:18:53.318933+00:00",
+  "sources": {
+    "ru-english.jsonl": {
+      "url": "https://kaikki.org/ruwiktionary/Английский/kaikki.org-dictionary-Английский.jsonl",
+      "bytes": 87009307,
+      "sha256": "8cff3c5121393abf82909c5946217cc44fa9b06c640876705edb38d65dfe6894",
+      "extraction_date": "2026-11-02",
+      "dump_date": "2026-11-01"
+    },
+    "en-english.jsonl.gz": {
+      "url": "https://kaikki.org/dictionary/English/kaikki.org-dictionary-English.jsonl.gz",
+      "bytes": 534186395,
+      "sha256": "4d03b6cba283744756c57ff661c2c6cbfe34fcf8ff513a966576cf7d97e91a99",
+      "extraction_date": "2026-10-30",
+      "dump_date": "2026-10-01"
+    },
+    "en_50k.txt": {
+      "url": "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/en/en_50k.txt",
+      "bytes": 622749,
+      "sha256": "5351ff405b1126ef555791dd4d9798a48e3e9a501a9fc481a9da957752cfb458"
+    },
+    "alice.txt": {
+      "url": "https://www.gutenberg.org/cache/epub/11/pg11.txt",
+      "bytes": 174311,
+      "sha256": "01b38ea4c710a84bc18d0bd41271a5a1a92b94e97b2812f4dece97d4a694725e"
+    },
+    "sherlock.txt": {
+      "url": "https://www.gutenberg.org/cache/epub/1661/pg1661.txt",
+      "bytes": 607606,
+      "sha256": "922e2a12ccb43a4c9544c260b2166c6ad2097aeb5957faeee113f173bb857cd0"
+    }
+  }
+}

@@ -276,7 +276,7 @@ object BackupFormat {
                 (0 until arr.length()).map { i ->
                     val d = arr.getJSONObject(i)
                     DailyActivity(d.getInt("day"), d.optLong("readMillis", 0L), d.optInt("readChars", 0), d.optInt("pages", 0), d.optInt("reviews", 0))
-                }.filter { it.day in 19_000_101..29_991_231 }.distinctBy { it.day }
+                }.filter { com.hanreader.app.lang.LanguageDays.isValidKey(it.day) }.distinctBy { it.day }
             }
             val meanings = root.optJSONArray("userMeanings")?.let { arr ->
                 (0 until arr.length()).map { i ->

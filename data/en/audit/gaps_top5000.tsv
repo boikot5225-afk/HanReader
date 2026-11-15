@@ -1,0 +1,96 @@
+rank	word	count	english_candidates	status
+105	didn	1100643		lookup_or_normalization_needed
+188	doesn	471037		lookup_or_normalization_needed
+198	isn	429536		lookup_or_normalization_needed
+215	ok	388338	ok	russian_not_resolved;possible_name
+259	wasn	312240		lookup_or_normalization_needed
+276	wouldn	288422		lookup_or_normalization_needed
+330	um	238853	um	russian_not_resolved;possible_name
+336	couldn	233368		lookup_or_normalization_needed
+405	aren	178286		lookup_or_normalization_needed
+432	ain	166551	ain	russian_not_resolved;possible_name
+536	l	126518	l	russian_not_resolved
+564	shouldn	117029		lookup_or_normalization_needed
+670	weren	88427		lookup_or_normalization_needed
+675	ooh	87683	ooh	russian_not_resolved
+769	t	72881	t	russian_not_resolved
+774	tv	72054		lookup_or_normalization_needed
+795	hasn	70449		lookup_or_normalization_needed
+948	mm	57659	mm	russian_not_resolved
+961	mm-hmm	56720	mhm	russian_not_resolved
+980	mama	55372	mama	russian_not_resolved;possible_name
+991	i-i	54460		lookup_or_normalization_needed
+995	lt	54305		lookup_or_normalization_needed
+1067	mmm	49655	mmm	russian_not_resolved
+1142	ow	45251	ow	russian_not_resolved
+1149	de	44903	de	russian_not_resolved;possible_name
+1158	hadn	44545		lookup_or_normalization_needed
+1379	c	36830	c	russian_not_resolved
+1516	aw	32746	aw	russian_not_resolved;possible_name
+1540	doc	32073	doc | docs	russian_not_resolved;possible_name
+1569	sweetie	31295	sweetie	russian_not_resolved
+1655	h	29291	h	russian_not_resolved
+1720	indistinct	27777	indistinct	russian_not_resolved
+1729	kinda	27662	kinda	russian_not_resolved
+1775	san	26690	san	russian_not_resolved;possible_name
+1797	ohh	26185		lookup_or_normalization_needed
+1822	fbi	25798		lookup_or_normalization_needed
+1852	outta	25290	outta	russian_not_resolved
+1938	da	23954	da	russian_not_resolved;possible_name
+1943	dna	23889		lookup_or_normalization_needed
+1969	madame	23490	madame	russian_not_resolved
+2028	b	22813	b	russian_not_resolved
+2109	hm	21429	hm	russian_not_resolved
+2192	heh	20476	heh	russian_not_resolved
+2348	monsieur	18763	monsieur	russian_not_resolved
+2359	ls	18609	l | ls	russian_not_resolved
+2398	ll	18255	ll	russian_not_resolved
+2435	julie	17794	julie	russian_not_resolved;possible_name
+2510	mustn	17276		lookup_or_normalization_needed
+2547	morgan	16891	morgan	russian_not_resolved;possible_name
+2650	nothin	15992		lookup_or_normalization_needed
+2725	sara	15387	sara	russian_not_resolved;possible_name
+2853	g	14340	g	russian_not_resolved
+2913	sec	13941	sec	russian_not_resolved
+2973	neighbor	13590	neighbor	russian_not_resolved;possible_name
+3021	marcus	13314	marcus	russian_not_resolved;possible_name
+3042	ross	13220	ross	russian_not_resolved;possible_name
+3058	j	13171	j	russian_not_resolved
+3067	heck	13118	heck	russian_not_resolved;possible_name
+3179	chffffff	12527		lookup_or_normalization_needed
+3185	michelle	12482	michelle	russian_not_resolved;possible_name
+3235	somethin	12242		lookup_or_normalization_needed
+3250	someplace	12156	someplace	russian_not_resolved
+3278	r	12054	r	russian_not_resolved
+3337	p	11737	p	russian_not_resolved
+3339	ve	11729	ve	russian_not_resolved
+3357	eva	11633	eva	russian_not_resolved;possible_name
+3459	x	11212	x	russian_not_resolved
+3484	mm-hm	11120	mhm	russian_not_resolved
+3556	cia	10825		lookup_or_normalization_needed
+3557	ii	10823	ii	russian_not_resolved;possible_name
+3575	oi	10736	oi	russian_not_resolved
+3718	sync	10168	sync	russian_not_resolved
+3721	joan	10153	joan	russian_not_resolved;possible_name
+3728	sammy	10138	sammy	russian_not_resolved;possible_name
+3777	serial	9936	serial	russian_not_resolved
+3805	ln	9844		lookup_or_normalization_needed
+3922	dont	9523		lookup_or_normalization_needed
+3924	von	9519		lookup_or_normalization_needed
+3961	herr	9443	herr	russian_not_resolved;possible_name
+3975	karl	9383	karl	russian_not_resolved;possible_name
+3995	aii	9323	ai	russian_not_resolved;possible_name
+4045	w	9179	w	russian_not_resolved
+4180	k	8812	k	russian_not_resolved
+4181	mo	8810	mo	russian_not_resolved;possible_name
+4310	cellphone	8464	cellphone	russian_not_resolved
+4322	iike	8435		lookup_or_normalization_needed
+4333	mitch	8417	mitch	russian_not_resolved;possible_name
+4456	sarge	8091	sarge	russian_not_resolved
+4515	mmm-hmm	7965		lookup_or_normalization_needed
+4558	tara	7886	tara	russian_not_resolved;possible_name
+4723	uh-uh	7501	uh-uh	russian_not_resolved
+4764	ahem	7416	ahem	russian_not_resolved
+4771	hon	7387	hon	russian_not_resolved;possible_name
+4843	un	7239	un	russian_not_resolved;possible_name
+4994	kurt	6953	kurt	russian_not_resolved;possible_name

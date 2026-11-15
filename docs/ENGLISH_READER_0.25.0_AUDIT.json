@@ -1,0 +1,21 @@
+{
+  "books": [
+    {
+      "prepare_and_lookup_ms": 2779,
+      "book": "alice",
+      "phrase_heads": 1429,
+      "tokens": 26630,
+      "tokens_with_visible_hint": 24867,
+      "paragraphs": 2494
+    },
+    {
+      "prepare_and_lookup_ms": 6898,
+      "book": "sherlock",
+      "phrase_heads": 4619,
+      "tokens": 104530,
+      "tokens_with_visible_hint": 98306,
+      "paragraphs": 9312
+    }
+  ],
+  "limitations": "Visible hints may be Russian or English; counts do not measure sense accuracy. Desktop JVM timing, not a phone benchmark."
+}

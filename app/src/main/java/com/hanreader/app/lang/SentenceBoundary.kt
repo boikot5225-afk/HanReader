@@ -6,7 +6,8 @@ object SentenceBoundary {
     /** Abbreviations whose full stop does not end a sentence (Sr. Ortega, EE. UU., pág. 3). */
     private val ABBREVIATIONS = setOf(
         "sr", "sra", "srta", "sres", "dr", "dra", "ud", "uds", "vd", "vds", "d", "dña", "ee", "uu", "etc", "pág", "págs",
-        "núm", "nº", "vol", "cap", "art", "av", "avda", "ed", "eds", "fig", "ibíd", "cf", "aprox", "tel", "st", "mr", "mrs", "ms"
+        "núm", "nº", "vol", "cap", "art", "av", "avda", "ed", "eds", "fig", "ibíd", "cf", "aprox", "tel", "st", "mr", "mrs", "ms",
+        "prof", "rev", "messrs", "jr", "inc", "ltd", "vs"
     )
 
     /**

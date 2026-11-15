@@ -17,10 +17,10 @@ android {
         buildConfigField("String", "APP_NAME", "\"$appName\"")
         minSdk = 26
         targetSdk = 36
-        versionCode = 64
-        versionName = "0.24.11"
-        // The languages this app reads, the first is the default: Spanish and Chinese.
-        buildConfigField("String", "LANGUAGES", "\"es,zh\"")
+        versionCode = 67
+        versionName = "0.25.1"
+        // The first language remains the default; English is the third reader module.
+        buildConfigField("String", "LANGUAGES", "\"es,zh,en\"")
         // Instrumented tests (app/src/androidTest) on emulators in CI.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Default neural voice server (reader can change it in the voice menu): gradle property,

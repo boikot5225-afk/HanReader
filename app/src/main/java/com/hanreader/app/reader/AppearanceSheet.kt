@@ -58,13 +58,15 @@ import com.hanreader.app.ReaderTheme
 import com.hanreader.app.ReadingMode
 import com.hanreader.app.TextAlignMode
 import com.hanreader.app.WordFont
+import com.hanreader.app.lang.LanguageInfo
+import com.hanreader.app.lang.Languages
 import com.hanreader.app.zh.TokenKind
 import java.util.Locale
 import kotlin.math.roundToInt
 
 /** Sample paragraph written for the preview; pinyin over the words a learner may not know. */
 private val SAMPLE = ReaderBlock.Text(
-    "那天晚上一直在下雨。街灯很暗，他站在门口，等一个不会来的人。",
+    Languages.CHINESE.appearanceSample,
     heading = false,
     tokens = listOf(
         t("那天", 0), t("晚上", 2), t("一直", 4), t("在", 6), t("下雨", 7), p("。", 9),
@@ -74,18 +76,18 @@ private val SAMPLE = ReaderBlock.Text(
     )
 )
 
-/** The same evening in Spanish, for a language written with spaces. */
-private val SAMPLE_SPACED: ReaderBlock.Text by lazy {
-    val text = "Aquella noche no dejó de llover. La farola daba poca luz, y él esperaba en la puerta a alguien que no iba a venir."
-    val tokens = Regex("\\p{L}+|\\s+|[^\\p{L}\\s]").findAll(text).map { m ->
+/** A language's own preview, without needing its dictionary. */
+private fun spacedSample(language: LanguageInfo): ReaderBlock.Text {
+    val text = language.appearanceSample
+    val tokens = Regex("[\\p{L}\\p{M}]+(?:['’‐-][\\p{L}\\p{M}]+)*|\\s+|[^\\p{L}\\p{M}\\s]").findAll(text).map { m ->
         val kind = when { m.value[0].isLetter() -> TokenKind.HAN; m.value[0].isWhitespace() -> TokenKind.SPACE; else -> TokenKind.PUNCT }
         RToken(m.value, "", kind, m.range.first, m.range.last + 1, kind == TokenKind.HAN)
     }.toList()
-    ReaderBlock.Text(text, heading = false, tokens = tokens)
+    return ReaderBlock.Text(text, heading = false, tokens = tokens)
 }
 
 /** Chinese settings (pinyin, tones, characters) are shown only when reading Chinese. */
-private val chinese: Boolean get() = com.hanreader.app.lang.Languages.current.readingTitle != null
+private val chinese: Boolean get() = Languages.current == Languages.CHINESE
 
 private fun t(w: String, at: Int, pinyin: String = "") = RToken(w, pinyin, TokenKind.HAN, at, at + w.length, true)
 private fun p(w: String, at: Int) = RToken(w, "", TokenKind.PUNCT, at, at + w.length, false)
@@ -94,6 +96,8 @@ private fun p(w: String, at: Int) = RToken(w, "", TokenKind.PUNCT, at, at + w.le
 @Composable
 fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
     val a by AppearanceStore.appearance.collectAsState()
+    val language = Languages.current
+    val sample = remember(language) { if (language == Languages.CHINESE) SAMPLE else spacedSample(language) }
     val spec = LocalThemeSpec.current
     val scheme = MaterialTheme.colorScheme
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -113,7 +117,7 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
                     .padding(horizontal = a.margin.coerceAtMost(28).dp, vertical = 14.dp)
             ) {
                 RubyParagraph(
-                    if (chinese) SAMPLE else SAMPLE_SPACED, metrics, showPinyin = chinese, hidePinyinFor = null, saved = setOf("门口", "puerta"),
+                    sample, metrics, showPinyin = chinese, hidePinyinFor = null, saved = language.appearanceKnownWords,
                     selection = null, colors = rubyColors(a, spec), onTap = {}
                 )
             }
@@ -163,7 +167,7 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null) {
                 )
             }
 
-            if (!chinese) {
+            if (language == Languages.SPANISH) {
                 Text("Вариант испанского", style = MaterialTheme.typography.bodyLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     com.hanreader.app.es.EsVariant.entries.forEach { v ->
