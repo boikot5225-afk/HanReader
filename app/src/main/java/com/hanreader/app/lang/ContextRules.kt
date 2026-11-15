@@ -60,7 +60,7 @@ class ContextRules private constructor(private val byLemma: Map<String, List<Rul
 
     private fun holds(c: Condition, s: Sentence, i: Int): Boolean = when (c) {
         is Near -> s.words.indices.any { j -> j != i && (s.words[j] in c.words || s.lemmas(j).any { it in c.words }) }
-        is Next -> s.words.getOrNull(i + 1)?.let { it in c.words } == true
+        is Next -> matches(s, i + 1, c.words)
         is Prev -> matches(s, i - 1, c.words)
         is Within -> (maxOf(0, i - c.distance)..minOf(s.words.lastIndex, i + c.distance)).any { it != i && matches(s, it, c.words) }
         is After -> (0..3 - c.words.size).any { off -> c.words.indices.all { k -> s.words.getOrNull(i + 1 + off + k) == c.words[k] } }

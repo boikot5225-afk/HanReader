@@ -36,7 +36,7 @@ fun main(args:Array<String>) {
             if(a<0 || b<a) result.put("error","selection not token-aligned") else {
                 val t=p.tokens[a]; val analyses=engine.cardAnalyses(p.tokens,text,a,b)
                 val e=analyses.firstOrNull()?.entry
-                val reading=if(a==b && '#' in t.pinyin) t.pinyin else e?.key
+                val reading=if('#' in t.pinyin && (a==b || ContextRules.key(t.pinyin)==e?.key)) t.pinyin else e?.key
                 val senses=e?.let { engine.senses(it) }.orEmpty()
                 val r=engine.phraseAt(p.tokens,text,a)
                 result.put("word",text.substring(start,end)).put("reading",t.pinyin).put("lemma",e?.lemma.orEmpty()).put("pos",e?.pos.orEmpty()).put("cardLemma",engine.cardLemma(analyses).orEmpty())

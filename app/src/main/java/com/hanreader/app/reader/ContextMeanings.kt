@@ -24,6 +24,18 @@ object ContextMeanings {
     fun here(book: Long, chapter: Int, block: Int, start: Int) = "@$book|o|$chapter:$block:$start"
     fun inBook(book: Long, key: String) = "@$book|b|$key"
 
+    /** Apply a new value while retaining broader fallbacks. Moving outward removes local overrides
+     * at this occurrence, so they cannot hide the reader's new choice. Blank removes only its scope. */
+    fun edits(keys: Map<MeaningScope,String>, scope: MeaningScope, meaning: String): Map<String,String> {
+        val value = meaning.trim()
+        return buildMap {
+            if (value.isNotEmpty()) MeaningScope.entries.filter { it.ordinal < scope.ordinal }.forEach {
+                put(keys.getValue(it), "")
+            }
+            put(keys.getValue(scope), value)
+        }
+    }
+
     /** The key a word on the page has in its book: what the context chose for it. */
     fun keyOf(t: RToken, engine: LanguageModule): String = when {
         engine is ZhEngine -> t.text

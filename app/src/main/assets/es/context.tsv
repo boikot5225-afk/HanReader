@@ -24,6 +24,7 @@ mordida	near:pagar,dinero,policía,soldado,conductor,mafia,soborno,traficante	в
 célula	near:organismo,biología,tejido,microscopio,sangre	клетка	биология
 célula	near:zeta,zetas,cártel,guerrero,recluta,sicario,hampones,autónomo,organizar	ячейка организации	организационная единица
 cuota	near:cártel,gánster,extorsión,amenaza,incendiario	побор, дань	принудительный платёж
+cuota	next:mensual,anual,semanal,sindical	взнос, регулярный платёж	обычные регулярные взносы; признаки вымогательства выше по приоритету
 cuota	near:pagar,cuartel	взнос, отчисление	платёж без достаточных признаков вымогательства
 cuota	near:conseguir,parte,repartir	доля	часть дохода или рынка
 piso	next:de & after:arriba	этаж	уровень здания

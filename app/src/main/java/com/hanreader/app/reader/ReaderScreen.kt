@@ -123,7 +123,7 @@ import kotlinx.coroutines.launch
  * Selected tokens [first..last] of paragraph [block]. [phrase]: selected by long press and drag
  * (or «всё предложение»): the phrase sheet opens once [done], when the finger is lifted.
  */
-private data class Selection(val block: Int, val first: Int, val last: Int, val phrase: Boolean = false, val done: Boolean = true)
+internal data class Selection(val block: Int, val first: Int, val last: Int, val phrase: Boolean = false, val done: Boolean = true)
 
 
 @OptIn(ExperimentalMaterial3Api::class, FlowPreview::class, ExperimentalLayoutApi::class)
@@ -837,23 +837,25 @@ private fun RunningHeader(text: String, bookmarked: Boolean = false, indicator: 
     }
 }
 
-/** «Сомневаюсь в переводе»: puts the word, its meaning here and its sentence on the list sent from the library. */
+/** Mark a problematic translation locally and open the existing scoped correction editor. */
 @Composable
-private fun DoubtRow(word: String, key: String, shown: String, sentence: String, source: String) {
+private fun DoubtRow(word: String, key: String, shown: String, sentence: String, source: String, onCorrect: () -> Unit) {
     val context = LocalContext.current
     var doubted by remember(word, sentence) { mutableStateOf(Doubts.has(context, word, sentence)) }
-    TextButton(
-        onClick = {
-            if (doubted) Doubts.remove(context, word, sentence)
-            else Doubts.add(context, Doubts.Doubt(word, key, shown, sentence, source))
-            doubted = !doubted
-        },
-        contentPadding = PaddingValues(0.dp)
-    ) {
-        Text(
-            if (doubted) "⚑ Под вопросом — отправить можно из библиотеки · убрать" else "⚑ Сомневаюсь в переводе",
-            style = MaterialTheme.typography.bodySmall
-        )
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        TextButton(onClick = {
+            if (!doubted) {
+                Doubts.add(context, Doubts.Doubt(word, key, shown, sentence, source))
+                ReadingChecks.record(context, ReadingChecks.Event.FLAG)
+                doubted = true
+            }
+            onCorrect()
+        }, contentPadding = PaddingValues(0.dp)) {
+            Text(if (doubted) "Отмечено · исправить" else "Не подходит", style = MaterialTheme.typography.bodyMedium)
+        }
+        if (doubted) TextButton(onClick = {
+            Doubts.remove(context, word, sentence); doubted = false
+        }) { Text("Убрать отметку", style = MaterialTheme.typography.bodySmall) }
     }
 }
 
@@ -1419,7 +1421,7 @@ private fun BookImage(vm: ReaderViewModel, path: String) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun WordSheet(
+internal fun WordSheet(
     selection: Selection,
     block: ReaderBlock.Text,
     engine: com.hanreader.app.lang.LanguageModule,
@@ -1504,7 +1506,7 @@ private fun WordSheet(
         }
     }
     // A language with an alphabet: the reading the sentence chose (with its meaning, «durmiente#шпала»), else the card's first.
-    val alphaReading = first.pinyin.takeIf { selection.first == selection.last && '#' in it } ?: es.firstOrNull()?.entry?.key
+    val alphaReading = first.pinyin.takeIf { '#' in it && (selection.first == selection.last || com.hanreader.app.lang.ContextRules.key(it) == es.firstOrNull()?.entry?.key) } ?: es.firstOrNull()?.entry?.key
     val translation = userMeaning ?: nameInRussian ?: (if (zh == null) engine.cardTranslation(word, alphaReading) else zh.cardTranslation(word, pageReading, selectedMeaning))
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
@@ -1512,10 +1514,27 @@ private fun WordSheet(
     val scope = rememberCoroutineScope()
     val isSaved = cardWord in saved
 
-    // Neighbouring Han tokens for widening the selection.
-    val canGrowLeft = selection.first > 0 && tokens[selection.first - 1].kind == TokenKind.HAN
-    val canGrowRight = selection.last < tokens.lastIndex && tokens[selection.last + 1].kind == TokenKind.HAN
-    val canShrink = selection.last > selection.first
+    val context = LocalContext.current
+    LaunchedEffect(Unit) { ReadingChecks.record(context, ReadingChecks.Event.OPEN) }
+    var correcting by remember(selection, word) { mutableStateOf(false) }
+    var correctingHere by remember(selection, word) { mutableStateOf(false) }
+    var details by remember(selection, word) { mutableStateOf(false) }
+    val growLeft = SelectionBounds.neighbour(tokens, selection.first, -1)
+    val growRight = SelectionBounds.neighbour(tokens, selection.last, 1)
+    val shrinkLeft = SelectionBounds.shrink(tokens, selection.first..selection.last, true)
+    val shrinkRight = SelectionBounds.shrink(tokens, selection.first..selection.last, false)
+    fun changeBounds(range: IntRange) {
+        ReadingChecks.record(context, ReadingChecks.Event.BOUNDARY)
+        onChange(selection.copy(first=range.first,last=range.last))
+    }
+    val phrase = remember(engine, block.text, tokens, selection) {
+        if (selection.first != selection.last) null
+        else alpha?.let { e -> e.phraseAt(tokens,block.text,selection.first)?.let { r ->
+            val key = e.phraseKey(tokens,block.text,r.first,r.last) ?: block.text.substring(tokens[r.first].start,tokens[r.last].end)
+            val meaning = e.cardAnalyses(tokens,block.text,r.first,r.last).firstOrNull()?.entry?.let { e.senses(it).firstOrNull() }
+            Triple(r,key,meaning ?: e.cardTranslation(key))
+        } }
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -1585,165 +1604,147 @@ private fun WordSheet(
             idiomKind(entry?.gloss)?.let {
                 Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
-            OwnMeaning(word, own, suggestions = remember(word, russian, es) {
-                (russian + es.drop(1).flatMap { it.entry.ru.take(2) }).map { it.replace(Regex("^\\([^)]*\\)\\s*"), "") }.distinct().take(8)
-            }) { scope, text, previous ->
-                if (previous != null && previous != scope) onUserMeaning(meaningKeys.getValue(previous), "")
-                onUserMeaning(meaningKeys.getValue(scope), text)
-            }
-            if ((alpha != null || zh != null) && russian.size > 1) {
-                Text(if (selection.first == selection.last && (selectedMeaning != null || '#' in first.pinyin)) "Первое значение — по контекстному правилу"
-                    else "Словарные значения: контекст может требовать другого смысла",
-                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (russian.isNotEmpty()) {
-                russian.forEachIndexed { i, sense ->
-                    Text("${i + 1}. $sense", style = MaterialTheme.typography.bodyLarge)
-                }
-                (if (zh != null && selectedMeaning != null) "локальное контекстное правило" else zh?.russianSource(word)?.label ?: es.firstOrNull()?.let { if (it.entry.machine) "машинный перевод Викисловаря" else "Викисловарь" })?.let { src ->
-                    Text(
-                        "Русский · $src",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            phrase?.let { (range, phraseWord, meaning) ->
+                Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Выражение: $phraseWord", style = MaterialTheme.typography.titleSmall)
+                        meaning?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                        TextButton(onClick = { changeBounds(range) }) { Text("Выделить выражение") }
+                    }
                 }
             }
-            val measureWords = remember(word) { zh?.measureWords(word).orEmpty() }
-            if (measureWords.isNotEmpty()) {
-                Text("Счётное слово: " + measureWords.joinToString(" · "), style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val primaryMeaning = userMeaning ?: nameInRussian ?: russian.firstOrNull() ?: translation
+            MeaningSummary(primaryMeaning, russian,
+                selectedMeaning != null || es.firstOrNull()?.entry?.contextMeaning != null,
+                own?.first, userMeaning != null || nameInRussian != null || russian.isNotEmpty())
+            DoubtRow(word, cardWord, primaryMeaning, sentence, doubtSource) { correctingHere = true; correcting = true }
+            key(selection) { OwnMeaning(word, own, editing = correcting, startHere = correctingHere, onEditingChange = { open -> if (open) correctingHere = false; correcting = open }, suggestions = remember(word, russian, es) {
+                (russian + es.drop(1).flatMap { it.entry.ru.take(2) }).distinct().take(8)
+            }) { scope, text, _ ->
+                val value = text.trim()
+                ContextMeanings.edits(meaningKeys,scope,value).forEach { (key, meaning) -> onUserMeaning(key,meaning) }
+                Doubts.correct(context,word,sentence,value,scope)
+                if (value.isNotEmpty()) ReadingChecks.record(context,ReadingChecks.Event.CORRECT)
+            } }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(onClick = { growLeft?.let { changeBounds(it..selection.last) } }, enabled = growLeft != null) { Text("← слово") }
+                OutlinedButton(onClick = { growRight?.let { changeBounds(selection.first..it) } }, enabled = growRight != null) { Text("слово →") }
+                if (shrinkLeft != null) OutlinedButton(onClick = { changeBounds(shrinkLeft) }) { Text("Убрать слева") }
+                if (shrinkRight != null) OutlinedButton(onClick = { changeBounds(shrinkRight) }) { Text("Убрать справа") }
             }
-            DoubtRow(word, cardWord, translation, sentence, doubtSource)
-            if (otherReadings.isNotEmpty()) {
-                Text("Другие чтения", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                otherReadings.take(3).forEach { (p, ru) ->
-                    Text("$p — $ru", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+            TextButton(onClick = { details = !details }, contentPadding = PaddingValues(0.dp)) {
+                Text(if (details) "Скрыть разбор и словарь" else "Разбор и словарь")
             }
-            grammar.forEach { GrammarNote(it.point) }
-            if (entry != null) {
-                if (russian.isNotEmpty()) {
-                    Text("English", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (details) {
+                (if (zh != null && selectedMeaning != null) "локальное контекстное правило" else zh?.russianSource(word)?.label
+                    ?: es.firstOrNull()?.let { if (it.entry.machine) "машинный перевод Викисловаря" else "Викисловарь" })?.let {
+                    Text("Русский · $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                entry.gloss.split("; ", "/").map { it.trim() }.filter { it.isNotEmpty() }
-                    .take(if (russian.isEmpty()) 6 else 3).forEachIndexed { i, sense ->
-                    Text(
-                        "${i + 1}. $sense",
-                        style = if (russian.isEmpty()) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
-                        color = if (russian.isEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                recommendations[word]?.let { r ->
-                    Text(
-                        "Рекомендовано для твоего уровня: в книге ${r.bookCount} раз" +
-                            (if (r.level in 1..7) " · HSK ${HskSystem.HSK3.levelTitle(r.level)}" else ""),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = LocalThemeSpec.current.recommendedLine
-                    )
-                }
-                if (entry.rank > 0) {
-                    Text("Частотность: №${entry.rank}", style = MaterialTheme.typography.bodySmall,
+                val measureWords = remember(word) { zh?.measureWords(word).orEmpty() }
+                if (measureWords.isNotEmpty()) {
+                    Text("Счётное слово: " + measureWords.joinToString(" · "), style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            } else if (zh != null) {
-                Text(
-                    if (composed != null) "Сочетание слов:" else "Слова нет в словаре. По иероглифам:",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                chars.forEach { c ->
-                    Text("${c.word}  ${c.pinyin} — ${engine.cardTranslation(c.word) ?: c.shortGloss(2)}", style = MaterialTheme.typography.bodyLarge)
-                }
-            } else if (es.isEmpty()) {
-                Text("Слова нет в словаре", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            // A word inside a set phrase (sin embargo): the phrase and its meaning, one tap to take it.
-            val phrase = remember(word, selection) {
-                if (selection.first != selection.last) null
-                else alpha?.let { e ->
-                    e.phraseAt(tokens, block.text, selection.first)?.let { r ->
-                        val p = e.phraseKey(tokens, block.text, r.first, r.last) ?: block.text.substring(tokens[r.first].start, tokens[r.last].end)
-                        Triple(r, p, e.cardTranslation(p))
+                if (otherReadings.isNotEmpty()) {
+                    Text("Другие чтения", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    otherReadings.take(3).forEach { (p, ru) ->
+                        Text("$p — $ru", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            }
-            phrase?.let { (r, p, meaning) ->
-                Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                    Row(Modifier.padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Выражение: $p", style = MaterialTheme.typography.titleSmall)
-                            meaning?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                grammar.forEach { GrammarNote(it.point) }
+                if (entry != null) {
+                    if (russian.isNotEmpty()) {
+                        Text("English", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    entry.gloss.split("; ", "/").map { it.trim() }.filter { it.isNotEmpty() }
+                        .take(if (russian.isEmpty()) 6 else 3).forEachIndexed { i, sense ->
+                        Text(
+                            "${i + 1}. $sense",
+                            style = if (russian.isEmpty()) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                            color = if (russian.isEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    recommendations[word]?.let { r ->
+                        Text(
+                            "Рекомендовано для твоего уровня: в книге ${r.bookCount} раз" +
+                                (if (r.level in 1..7) " · HSK ${HskSystem.HSK3.levelTitle(r.level)}" else ""),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = LocalThemeSpec.current.recommendedLine
+                        )
+                    }
+                    if (entry.rank > 0) {
+                        Text("Частотность: №${entry.rank}", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else if (zh != null) {
+                    Text(
+                        if (composed != null) "Сочетание слов:" else "Слова нет в словаре. По иероглифам:",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    chars.forEach { c ->
+                        Text("${c.word}  ${c.pinyin} — ${engine.cardTranslation(c.word) ?: c.shortGloss(2)}", style = MaterialTheme.typography.bodyLarge)
+                    }
+                } else if (es.isEmpty()) {
+                    Text("Слова нет в словаре", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (zh == null && es.isNotEmpty()) {
+                    // Spanish: what the form is (hablar, гл. · 3 л. ед. ч., претерит), other readings, English.
+                    es.forEachIndexed { i, a ->
+                        val about = listOf(a.entry.posLabel, a.grammar).filter { it.isNotEmpty() }.joinToString(" · ")
+                        if (i > 0) {
+                            Text("${a.entry.lemma} — ${(a.entry.ru.ifEmpty { a.entry.en }).take(2).joinToString("; ")}",
+                                style = MaterialTheme.typography.bodyMedium)
                         }
-                        TextButton(onClick = { onChange(selection.copy(first = r.first, last = r.last)) }) { Text("Выделить") }
-                    }
-                }
-            }
-            if (zh == null && es.isNotEmpty()) {
-                // Spanish: what the form is (hablar, гл. · 3 л. ед. ч., претерит), other readings, English.
-                es.forEachIndexed { i, a ->
-                    val about = listOf(a.entry.posLabel, a.grammar).filter { it.isNotEmpty() }.joinToString(" · ")
-                    if (i > 0) {
-                        Text("${a.entry.lemma} — ${(a.entry.ru.ifEmpty { a.entry.en }).take(2).joinToString("; ")}",
-                            style = MaterialTheme.typography.bodyMedium)
-                    }
-                    if (about.isNotEmpty()) {
-                        Text((if (i > 0 || a.entry.lemma != word.lowercase()) a.entry.lemma + ": " else "") + about,
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                // Grammar of a verb form: tense or mood, person, compound forms with the neighbours, when it is used.
-                val note = remember(word, selection) {
-                    alpha?.takeIf { selection.first == selection.last }?.formNote(tokens, selection.first, es)
-                }
-                note?.let { n ->
-                    Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Разбор", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            n.construction?.let { Text(it, style = MaterialTheme.typography.titleSmall, fontFamily = WordFont) }
-                            Text(n.tense, style = MaterialTheme.typography.bodyLarge)
-                            n.person?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                            n.pronouns?.let { Text("с местоимениями: $it", style = MaterialTheme.typography.bodyMedium) }
-                            Text(n.explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (about.isNotEmpty()) {
+                            Text((if (i > 0 || a.entry.lemma != word.lowercase()) a.entry.lemma + ": " else "") + about,
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                }
-                // The whole conjugation of the verb, on demand (built from the forms table in the background).
-                if (es.first().entry.isVerb) {
-                    val lemma = esLemma ?: es.first().entry.lemma
-                    var showConj by remember(lemma) { mutableStateOf(false) }
-                    TextButton(onClick = { showConj = !showConj }, contentPadding = PaddingValues(0.dp)) {
-                        Text(if (showConj) "Скрыть спряжение" else "Спряжение $lemma")
+                    // Grammar of a verb form: tense or mood, person, compound forms with the neighbours, when it is used.
+                    val note = remember(word, selection) {
+                        alpha?.takeIf { selection.first == selection.last }?.formNote(tokens, selection.first, es)
                     }
-                    if (showConj) {
-                        // Null while it is being built; then the table, or nothing when the language has none.
-                        val conj by produceState<Result<com.hanreader.app.lang.Conjugation?>?>(null, lemma) {
-                            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                                runCatching { alpha?.conjugationTable(lemma) }
+                    note?.let { n ->
+                        Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Разбор", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                n.construction?.let { Text(it, style = MaterialTheme.typography.titleSmall, fontFamily = WordFont) }
+                                Text(n.tense, style = MaterialTheme.typography.bodyLarge)
+                                n.person?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                                n.pronouns?.let { Text("с местоимениями: $it", style = MaterialTheme.typography.bodyMedium) }
+                                Text(n.explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        val c = conj
-                        if (c == null) Text("Собираю формы…", style = MaterialTheme.typography.bodySmall)
-                        else c.getOrNull()?.let { ConjugationTable(it) } ?: Text("Форм нет в словаре", style = MaterialTheme.typography.bodySmall)
+                    }
+                    // The whole conjugation of the verb, on demand (built from the forms table in the background).
+                    if (es.first().entry.isVerb) {
+                        val lemma = esLemma ?: es.first().entry.lemma
+                        var showConj by remember(lemma) { mutableStateOf(false) }
+                        TextButton(onClick = { showConj = !showConj }, contentPadding = PaddingValues(0.dp)) {
+                            Text(if (showConj) "Скрыть спряжение" else "Спряжение $lemma")
+                        }
+                        if (showConj) {
+                            // Null while it is being built; then the table, or nothing when the language has none.
+                            val conj by produceState<Result<com.hanreader.app.lang.Conjugation?>?>(null, lemma) {
+                                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                    runCatching { alpha?.conjugationTable(lemma) }
+                                }
+                            }
+                            val c = conj
+                            if (c == null) Text("Собираю формы…", style = MaterialTheme.typography.bodySmall)
+                            else c.getOrNull()?.let { ConjugationTable(it) } ?: Text("Форм нет в словаре", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    val en = es.first().entry.en
+                    if (en.isNotEmpty()) {
+                        Text("English", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        en.take(if (russian.isEmpty()) 4 else 2).forEachIndexed { i, sense ->
+                            Text("${i + 1}. $sense", style = if (russian.isEmpty()) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                                color = if (russian.isEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
-                val en = es.first().entry.en
-                if (en.isNotEmpty()) {
-                    Text("English", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    en.take(if (russian.isEmpty()) 4 else 2).forEachIndexed { i, sense ->
-                        Text("${i + 1}. $sense", style = if (russian.isEmpty()) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
-                            color = if (russian.isEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { onChange(selection.copy(first = selection.first - 1)) }, enabled = canGrowLeft) { Text("← +") }
-                OutlinedButton(onClick = { onChange(selection.copy(last = selection.last - 1)) }, enabled = canShrink) { Text("−") }
-                OutlinedButton(onClick = { onChange(selection.copy(last = selection.last + 1)) }, enabled = canGrowRight) { Text("+ →") }
-            }
-            if (zh != null) Text(
-                "Границы слова: расширь выделение, если словарь разрезал сочетание.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            } // Optional dictionary and grammar details.
             // The dictionary glued two words together (把头 «подрядчик» where the text means 把 + 头): split it.
             val oneMultiChar = selection.first == selection.last && word.length >= 2 && word.all { it.isHan() }
             if (oneMultiChar) {
@@ -1769,7 +1770,7 @@ private fun WordSheet(
             Surface(
                 onClick = {
                     // Spanish: the card's second line is the part of speech and gender («сущ., ж. р.»).
-                    onSave(cardWord, if (zh == null) es.firstOrNull()?.entry?.posLabel.orEmpty() else reading, translation, sentence) { r ->
+                    onSave(cardWord, if (zh == null) es.firstOrNull()?.entry?.posLabel.orEmpty() else reading, primaryMeaning, sentence) { r ->
                         scope.launch {
                             status = r.fold(
                                 onSuccess = { created -> if (created) "Добавлено в карточки" else "Уже в карточках: добавлен новый пример" },
@@ -1926,19 +1927,21 @@ private fun ReadAloudBar(r: ReadAloud, modifier: Modifier = Modifier) {
 /** The reader's own meaning: shown first; added, edited or removed in place, for this place, this book or every book. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OwnMeaning(
+internal fun OwnMeaning(
     word: String,
     /** The meaning set now and where it applies; null: none. */
     own: Pair<MeaningScope, String>?,
+    editing: Boolean,
+    startHere: Boolean = false,
+    onEditingChange: (Boolean) -> Unit,
     /** Dictionary senses to pick with one tap. */
     suggestions: List<String>,
     /** (where, meaning — blank removes it, where it applied before) */
     onChange: (MeaningScope, String, MeaningScope?) -> Unit
 ) {
-    var editing by remember(word) { mutableStateOf(false) }
     var text by remember(word, own) { mutableStateOf(own?.second.orEmpty()) }
-    // A new meaning is for the whole book unless the reader says otherwise: a wrong sense usually is wrong everywhere in it.
-    var scope by remember(word, own) { mutableStateOf(own?.first ?: MeaningScope.BOOK) }
+    // A correction of one occurrence must not silently replace other senses in the book.
+    var scope by remember(word, own, editing, startHere) { mutableStateOf(if (startHere) MeaningScope.HERE else own?.first ?: MeaningScope.HERE) }
     if (editing) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             androidx.compose.material3.OutlinedTextField(
@@ -1961,21 +1964,15 @@ private fun OwnMeaning(
                 }
             }
             Row {
-                TextButton(onClick = { onChange(scope, text, own?.first); editing = false }, enabled = text.isNotBlank()) { Text("Сохранить") }
-                if (own != null) TextButton(onClick = { onChange(own.first, "", null); editing = false }) { Text("Удалить") }
-                TextButton(onClick = { text = own?.second.orEmpty(); scope = own?.first ?: MeaningScope.BOOK; editing = false }) { Text("Отмена") }
+                TextButton(onClick = { onChange(scope, text.trim(), own?.first); onEditingChange(false) }, enabled = text.isNotBlank()) { Text("Сохранить") }
+                if (own != null) TextButton(onClick = { onChange(own.first, "", null); onEditingChange(false) }) { Text("Удалить") }
+                TextButton(onClick = { text = own?.second.orEmpty(); scope = own?.first ?: MeaningScope.HERE; onEditingChange(false) }) { Text("Отмена") }
             }
-        }
-    } else if (own != null) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Моё значение · ${own.first.about}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                Text(own.second, style = MaterialTheme.typography.bodyLarge)
-            }
-            TextButton(onClick = { editing = true }) { Text("Изменить") }
         }
     } else {
-        TextButton(onClick = { editing = true }, contentPadding = PaddingValues(0.dp)) { Text("+ Своё значение") }
+        TextButton(onClick = { onEditingChange(true) }, contentPadding = PaddingValues(0.dp)) {
+            Text(if (own != null) "Изменить моё значение" else "+ Своё значение")
+        }
     }
 }
 

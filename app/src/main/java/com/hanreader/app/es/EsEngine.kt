@@ -430,7 +430,10 @@ class EsEngine(
         val word = text.substring(tokens[a].start, tokens[b].end)
         // Several words: a dictionary phrase, also inflected («me di cuenta» -> darse cuenta).
         val all = (if (a != b) phraseKey(tokens, text, a, b)?.let { analyses(it) } else null) ?: analyses(word)
-        val inContext = if (a == b) com.hanreader.app.lang.ContextRules.key(tokens[a].pinyin) else ""
+        val contextKey = com.hanreader.app.lang.ContextRules.key(tokens[a].pinyin)
+        // The head of a selected phrase already carries its occurrence-specific sense.
+        // Keep it only when it names this exact phrase, never a neighbouring word or a subphrase.
+        val inContext = contextKey.takeIf { a == b || all.any { analysis -> analysis.entry.key == it } }.orEmpty()
         // A pronominal verb the context named (se limita: limitarse) goes before the plain verb.
         val pronominal = if (inContext.endsWith("se") && ' ' !in inContext && all.none { it.entry.key == inContext })
             all.firstOrNull { it.entry.lemma + "se" == inContext }?.let { v -> entry(inContext)?.let { EsAnalysis(v.form, it, v.grammar) } }
@@ -440,7 +443,7 @@ class EsEngine(
             analyses(inContext).firstOrNull()?.entry?.let { EsAnalysis(inContext, it, "") }
         else null
         val ordered = listOfNotNull(pronominal, phrase) + if (inContext.isEmpty()) all else all.sortedBy { if (it.entry.key == inContext) 0 else 1 }
-        val chosen = if (a == b) com.hanreader.app.lang.ContextRules.chosen(tokens[a].pinyin) else null
+        val chosen = if (inContext.isNotEmpty()) com.hanreader.app.lang.ContextRules.chosen(tokens[a].pinyin) else null
         return ordered.mapIndexed { i, analysis ->
             if (i != 0 || chosen == null) analysis
             else analysis.copy(entry = analysis.entry.copy(contextMeaning = chosen))

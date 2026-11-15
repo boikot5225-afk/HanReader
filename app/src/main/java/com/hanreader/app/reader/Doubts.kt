@@ -22,7 +22,9 @@ object Doubts {
         val sentence: String,
         /** «El narco · 5. Magnates». */
         val source: String,
-        val at: Long = System.currentTimeMillis()
+        val at: Long = System.currentTimeMillis(),
+        val correction: String = "",
+        val correctionScope: String = ""
     )
 
     private const val PREFS = "doubts"
@@ -36,7 +38,7 @@ object Doubts {
         val arr = runCatching { JSONArray(raw) }.getOrElse { JSONArray() }
         val out = (0 until arr.length()).mapNotNull { i ->
             val o = arr.optJSONObject(i) ?: return@mapNotNull null
-            Doubt(o.optString("word"), o.optString("key"), o.optString("shown"), o.optString("sentence"), o.optString("source"), o.optLong("at"))
+            Doubt(o.optString("word"), o.optString("key"), o.optString("shown"), o.optString("sentence"), o.optString("source"), o.optLong("at"), o.optString("correction"), o.optString("correctionScope"))
         }
         count.value = out.size
         return out
@@ -46,7 +48,7 @@ object Doubts {
         val arr = JSONArray()
         list.forEach { d ->
             arr.put(JSONObject().put("word", d.word).put("key", d.key).put("shown", d.shown).put("sentence", d.sentence)
-                .put("source", d.source).put("at", d.at))
+                .put("source", d.source).put("at", d.at).put("correction",d.correction).put("correctionScope",d.correctionScope))
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, arr.toString()).apply()
         count.value = list.size
@@ -62,6 +64,13 @@ object Doubts {
 
     fun remove(context: Context, word: String, sentence: String) = save(context, all(context).filterNot { it.word == word && it.sentence == sentence })
 
+    /** Attach a correction to an existing flag, retaining the original wrong answer. */
+    fun correct(context: Context, word: String, sentence: String, meaning: String, scope: MeaningScope) {
+        save(context, all(context).map { d ->
+            if (d.word == word && d.sentence == sentence) d.copy(correction=meaning.trim(), correctionScope=scope.title) else d
+        })
+    }
+
     fun clear(context: Context) = save(context, emptyList())
 
     /** One message with every doubt: what stood in the book, what the app showed, where. */
@@ -71,6 +80,7 @@ object Doubts {
             append('\n').append(i + 1).append(". ").append(d.word)
             if (!d.key.equals(d.word, ignoreCase = true)) append(" → ").append(d.key)
             append(" — «").append(d.shown.ifBlank { "нет значения" }).append("»\n")
+            if (d.correction.isNotBlank()) append("   Исправлено: «").append(d.correction).append("» · ").append(d.correctionScope).append('\n')
             if (d.sentence.isNotBlank()) append("   ").append(d.sentence.trim()).append('\n')
             if (d.source.isNotBlank()) append("   ").append(d.source).append('\n')
         }

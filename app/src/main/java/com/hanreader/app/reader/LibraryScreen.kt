@@ -559,27 +559,40 @@ private fun DoubtsPanel() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val count by Doubts.count.collectAsState()
     androidx.compose.runtime.LaunchedEffect(Unit) { if (count < 0) Doubts.all(context) }
-    if (count <= 0) return
+    val checks by ReadingChecks.counts.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(Unit) { ReadingChecks.load(context) }
+    if (count <= 0 && checks.opened == 0) return
     var copied by remember { mutableStateOf(false) }
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
-    fun text() = Doubts.message(com.hanreader.app.BuildConfig.APP_NAME, Doubts.all(context))
+    fun text() = Doubts.message(com.hanreader.app.BuildConfig.APP_NAME, Doubts.all(context)) + "\nПроверка чтения · " + com.hanreader.app.BuildConfig.VERSION_NAME + "\n" + checks.line()
     Panel(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(start = 20.dp, end = 12.dp, top = 10.dp, bottom = 6.dp)) {
-            Text("Переводы под вопросом: $count", style = MaterialTheme.typography.titleMedium)
-            Text("Отправь их разработчику одним сообщением — значения проверят и поправят в словаре.",
+            Text("Проверка чтения · ${com.hanreader.app.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium)
+            Text(checks.line(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            checks.flagsPer100?.let { rate ->
+                Text("Отметок на 100 карточек: " + String.format(java.util.Locale.forLanguageTag("ru"),"%.1f",rate),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text("Счётчики только на этом устройстве. Это отметки читателя, а не измеренная точность переводов.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row {
-                TextButton(onClick = {
-                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(android.content.Intent.EXTRA_TEXT, text())
+            TextButton(onClick = { ReadingChecks.reset(context) }) { Text("Начать проверку заново") }
+            if (count > 0) {
+                Text("Переводы под вопросом: $count", style = MaterialTheme.typography.titleMedium)
+                Text("Отправь их разработчику одним сообщением — значения проверят и поправят в словаре.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row {
+                    TextButton(onClick = {
+                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_TEXT, text())
+                        }
+                        runCatching { context.startActivity(android.content.Intent.createChooser(send, "Отправить переводы под вопросом")) }
+                    }) { Text("Отправить") }
+                    TextButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(text())); copied = true }) {
+                        Text(if (copied) "Скопировано" else "Копировать")
                     }
-                    runCatching { context.startActivity(android.content.Intent.createChooser(send, "Отправить переводы под вопросом")) }
-                }) { Text("Отправить") }
-                TextButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(text())); copied = true }) {
-                    Text(if (copied) "Скопировано" else "Копировать")
+                    TextButton(onClick = { Doubts.clear(context) }) { Text("Очистить отметки") }
                 }
-                TextButton(onClick = { Doubts.clear(context) }) { Text("Очистить") }
             }
         }
     }
