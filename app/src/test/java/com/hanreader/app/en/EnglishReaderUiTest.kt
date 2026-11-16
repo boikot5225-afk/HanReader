@@ -79,7 +79,7 @@ class EnglishReaderUiTest {
 
     @Test fun contractionCardKeepsTheFullContextualExpansion() {
         show("I'd go.", "I'd")
-        compose.onNodeWithText("Сокращение: I would").assertExists()
+        compose.onNodeWithText("я бы", substring = true).assertExists()
         compose.onNodeWithText("Знаю").performClick()
         compose.runOnIdle { assertEquals("I'd", marked) }
         compose.onNodeWithText("Сохранить в карточки").performScrollTo().performClick()

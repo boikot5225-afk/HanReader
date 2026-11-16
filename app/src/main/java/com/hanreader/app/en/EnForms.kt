@@ -62,8 +62,9 @@ object EnForms {
         for ((suffix, auxiliary) in listOf("'m" to "am", "'re" to "are", "'ll" to "will", "'d" to "would")) {
             if (!lower.endsWith(suffix)) continue
             val base = lower.dropLast(suffix.length)
-            if (base !in subjects || (suffix == "'m" && base != "i")) continue
-            val subject = if (base == "i") "I" else base
+            val nounFuture = suffix=="'ll" && base.isNotEmpty() && base.all { it.isLetter() || it=='-' }
+            if ((!nounFuture && base !in subjects) || (suffix == "'m" && base != "i")) continue
+            val subject = if (base == "i") "I" else if (nounFuture && base !in subjects) raw.dropLast(suffix.length) else base
             return if (suffix == "'d") result(listOf(subject, "had"), listOf(subject, "would"))
             else result(listOf(subject, auxiliary))
         }

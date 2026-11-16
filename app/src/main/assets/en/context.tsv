@@ -1,0 +1,25 @@
+# Local sense evidence; explicit POS keys select the attested analysis too.
+# First matching rule wins. No author/book identifiers, no network.
+mean/verb	next:to	намереваться; собираться
+still/adv	next:i,you,he,she,it,we,they,in,at,on,to,have,be	всё ещё; по-прежнему
+right/adj	next:one & within:8:wrong	правильный; верный
+line/noun	within:8:officer,command,army,regiment,infantry	строй; шеренга
+close/adv	next:home,by,behind,beside,together	близко; рядом
+bear/verb	within:8:fruit,tree	приносить плоды
+party/noun	before:go over to & prev:another	партия; сторона
+charge/noun	within:6:order & within:8:commander,brigade,cavalry	атака
+train/noun	within:8:dress,gown,bridal,coat-skirt,skirt,wedding	шлейф (одежды)
+pass away	within:8:look,expression,shadow,cloud,sound,hush	исчезать; проходить
+wear on	near:night,time,hour,day	тянуться; проходить (о времени)
+wear/verb	next:on & near:night,time,hour,day	тянуться; проходить (о времени)
+draw/verb	within:6:silk,cloth,tight,closely	натягивать; стягивать
+officer/noun	prev:dead & near:weapon	офицер
+officer/noun	within:8:army,regiment,infantry,colonel,general,uniform	офицер
+general/noun	within:8:adjutant-general,colonel,brigade,division,regiment,army	генерал
+rank/verb	next:among,with	занимать место; относиться
+turn/noun	prev:in	очередь; поочерёдно
+lead/noun	prev:as & within:8:leg,heavy,weight,foot	свинец
+lie/verb	next:on,along,beside,near,under,at & within:8:ground,floor,bed,table,corpse,dead,side,rest	лежать; покоиться
+spring/verb	next:at,toward,towards,forward	прыгнуть; броситься
+charge/noun	within:4:order & near:commander,brigade,cavalry,general	атака
+look up	within:8:word,dictionary,reference,relative	разыскивать; искать
