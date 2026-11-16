@@ -3,12 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>汉读 HanReader — читалка китайских книг с пиньинем</title>
-<meta name="description" content="Android-приложение для чтения книг на китайском: пиньинь над словами, перевод по нажатию, карточки для запоминания слов. Без интернета, рекламы и регистрации.">
-<meta property="og:title" content="汉读 HanReader — читай китайские книги с пиньинем">
-<meta property="og:description" content="Пиньинь над словами, перевод по нажатию, слова в карточки вместе с предложением из книги.">
-<meta property="og:image" content="https://boikot5225-afk.github.io/HanReader/img/1-page.jpg">
-<link rel="icon" href="img/favicon.png">
+<title>Amauta Reader — читай на испанском, английском и китайском</title>
+<meta name="description" content="Android-читалка для испанских, английских и китайских книг: переводы над словами, пиньинь, карточки и контекстная проверка DeepSeek по желанию. Чтение и словари работают офлайн.">
+<meta property="og:title" content="Amauta Reader — книги на трёх языках">
+<meta property="og:description" content="Читай, уточняй значения в контексте и запоминай слова. Испанский, английский и китайский; локальные словари и необязательный DeepSeek.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://boikot5225-afk.github.io/HanReader/">
+<meta property="og:image" content="https://boikot5225-afk.github.io/HanReader/img/amauta-icon.png">
+<meta property="og:locale" content="ru_RU">
+<link rel="canonical" href="https://boikot5225-afk.github.io/HanReader/">
+<link rel="icon" type="image/png" href="img/amauta-icon.png">
 <style>
   :root {
     --bg: #0e0e0e; --surface: #181818; --border: #2a2a2a;
@@ -66,99 +70,150 @@
     .shots { grid-template-columns: repeat(2, 1fr); }
     header.top nav { display: none; }
   }
+
+  .name strong { font-family: Georgia, serif; font-size: 23px; font-weight: 600; }
+  .eyebrow { color: var(--gold); font-size: 14px; letter-spacing: .06em; margin-bottom: 12px; }
+  .langs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+  .langs span { border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; font-size: 14px; }
+  .section-lead { color: var(--muted); max-width: 48em; margin: -10px 0 24px; }
+  .card p { color: var(--muted); margin: 0; }
+  .card .example { color: var(--gold); font-size: 22px; margin: 0 0 12px; font-family: Georgia, var(--han); }
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--gold); border-radius: 16px; padding: 20px 24px; margin-top: 24px; }
+  .callout p { margin: 0 0 10px; } .callout p:last-child { margin-bottom: 0; }
+  .shots { grid-template-columns: repeat(3, 1fr); }
+  .phone figcaption { padding: 10px; font-size: 13px; color: var(--muted); background: var(--surface); }
+  .phone { margin: 0; }
+  details { border-bottom: 1px solid var(--border); padding: 18px 0; }
+  summary { cursor: pointer; font-size: 18px; font-weight: 600; }
+  details p { color: var(--muted); max-width: 50em; margin: 12px 0 0; }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 5px; }
+  @media (max-width: 600px) { .shots { grid-template-columns: 1fr; max-width: 330px; margin: auto; } }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <img src="img/icon-192.png" alt="">
-    <div class="name">汉读<span>HanReader</span></div>
-    <nav>
+    <img src="img/amauta-icon.png" alt="" width="40" height="40">
+    <div class="name"><strong>Amauta Reader</strong></div>
+    <nav aria-label="Разделы сайта">
+      <a href="#languages">Языки</a>
       <a href="#features">Возможности</a>
+      <a href="#ai">DeepSeek</a>
       <a href="#install">Установка</a>
       <a href="#contacts">Связь</a>
     </nav>
   </header>
 
+  <main>
   <div class="hero">
     <div>
-      <div class="ruby">dú zhōngwén shū</div>
-      <h1>Читай китайские книги — <u>понимая</u> каждое слово</h1>
-      <p class="lead">Над словами — пиньинь, перевод — по одному нажатию, незнакомые слова — в карточки вместе с предложением из книги. Без интернета, рекламы и регистрации.</p>
+      <div class="eyebrow">Книги в оригинале · Android</div>
+      <div class="langs" aria-label="Поддерживаемые языки"><span>Español</span><span>English</span><span>中文</span></div>
+      <h1>Читай в оригинале.<br><u>Понимай</u> в контексте.</h1>
+      <p class="lead">Испанские, английские и китайские книги — с короткими переводами над словами, словарём по нажатию и карточками из твоего чтения. Для китайского — пиньинь и подсказки чтений.</p>
       <div class="buttons">
-        <span class="btn disabled" title="Приложение на модерации">Скоро в RuStore</span>
-        <a class="btn primary" href="https://github.com/boikot5225-afk/HanReader/releases/download/beta/HanReader-beta.apk">Скачать бету (APK)</a>
+        <a class="btn primary" href="#install">Получить APK</a>
+        <a class="btn ghost" href="#ai">Контекстный ИИ</a>
       </div>
-      <p class="note">Android 8 и новее · бесплатно · <a href="https://github.com/boikot5225-afk/HanReader/releases/tag/beta">что нового в бете</a></p>
+      <p class="note">Тестовая версия 0.26.3 · Android 8 и новее · без рекламы и регистрации</p>
+      <p class="note">Чтение и словари работают без интернета. DeepSeek и сетевой голос подключаются по желанию.</p>
     </div>
-    <div class="phone"><img src="img/1-page.jpg" alt="Страница книги с пиньинем над словами и подчёркнутыми незнакомыми словами" width="540" height="960"></div>
+    <figure class="phone"><img src="img/es-reader.png" alt="Испанская книга: короткие русские переводы над незнакомыми словами" width="1080" height="1920"><figcaption>Испанский режим · переводы над словами</figcaption></figure>
   </div>
 
-  <section id="features">
-    <h2>Что умеет</h2>
+  <section id="languages">
+    <h2>Три языка в одной читалке</h2>
+    <p class="section-lead">Выбирай язык в библиотеке. У книг свой язык, а знакомые слова, карточки и прогресс учитываются отдельно.</p>
     <div class="features">
-      <div class="card">
-        <h3>Читать</h3>
-        <ul>
-          <li>EPUB, FB2, TXT, DOCX, DOC; открытие книг из Telegram и файлового менеджера</li>
-          <li>Страницы или прокрутка, тёмные и светлые темы, китайские шрифты</li>
-          <li>Упрощённые и традиционные иероглифы</li>
-          <li>Закладки, поиск по иероглифам и пиньиню, выделения и заметки</li>
-          <li>Чтение вслух с подсветкой предложения</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>Понимать</h3>
-        <ul>
-          <li>Текст делится на слова, а не на отдельные иероглифы</li>
-          <li>Пиньинь над всеми словами, только над незнакомыми или выключен; цвета тонов</li>
-          <li>Перевод на русский и английский по нажатию, с учётом чтения иероглифа</li>
-          <li>Отметь свой уровень HSK — незнакомые слова подчеркнутся, а нужные сейчас подскажутся</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>Запоминать</h3>
-        <ul>
-          <li>Слово попадает в карточки вместе с предложением из книги</li>
-          <li>Интервальные повторения и тренировка письма</li>
-          <li>Статистика: минуты чтения, серия дней, как растёт понимание книги</li>
-          <li>Полная резервная копия в один файл</li>
-        </ul>
-      </div>
+      <article class="card"><h3>Испанский</h3><p class="example" lang="es">hablaban → hablar</p><p>Формы слов, выражения и словарные значения. Можно выбрать Испанию или Латинскую Америку для региональных значений. Уровни A1–C2 — приблизительная оценка по частотности.</p></article>
+      <article class="card"><h3>Английский</h3><p class="example" lang="en">went → go</p><p>Исходные формы, сокращения, выражения и произношение IPA в карточке. Приблизительные уровни A1–C2 помогают выбирать слова для изучения.</p></article>
+      <article class="card"><h3>Китайский</h3><p class="example" lang="zh">银行 · yín háng</p><p>Разбивка на слова, пиньинь и цвета тонов, упрощённые и традиционные иероглифы. Уровни HSK 2.0 и 3.0, словарные идиомы и грамматические подсказки.</p></article>
     </div>
   </section>
 
-  <section>
-    <h2>Как это выглядит</h2>
-    <div class="shots">
-      <figure><img src="img/1-page.jpg" alt="Страница с пиньинем" loading="lazy" width="540" height="960"><figcaption>Пиньинь над словами</figcaption></figure>
-      <figure><img src="img/2-menu.jpg" alt="Меню читалки" loading="lazy" width="540" height="960"><figcaption>Меню: разделы, чтение вслух, доля знакомых слов</figcaption></figure>
-      <figure><img src="img/3-library.jpg" alt="Библиотека" loading="lazy" width="540" height="960"><figcaption>Библиотека и знакомые слова</figcaption></figure>
-      <figure><img src="img/4-today.jpg" alt="Повторение карточек" loading="lazy" width="540" height="960"><figcaption>Карточки на сегодня</figcaption></figure>
+  <section id="features">
+    <h2>От чтения — к пониманию и запоминанию</h2>
+    <div class="features">
+      <article class="card"><h3>Удобно читать</h3><ul>
+        <li>EPUB, FB2 и FB2.ZIP, TXT, DOCX и DOC; открытие из файлового менеджера и Telegram</li>
+        <li>Страницы или прокрутка, темы, шрифты, размер текста, поля и интервалы</li>
+        <li>Паузы между сценами, пустые разделители, оформление цитат и сноски EPUB</li>
+        <li>Закладки, поиск, выделения и заметки; для китайского — поиск по пиньиню</li>
+        <li>Озвучка Android с подсветкой предложения; для китайского есть дополнительный сетевой голос</li>
+      </ul></article>
+      <article class="card"><h3>Уточнять значения</h3><ul>
+        <li>Краткие переводы над незнакомыми или рекомендуемыми словами</li>
+        <li>Карточка по нажатию: значение, форма слова и предложение из книги</li>
+        <li>Своё значение «здесь», «в этой книге» или «везде»</li>
+        <li>Ручная и автоматическая проверка контекста через DeepSeek для всех трёх языков</li>
+        <li>Сохранённые ИИ-исправления, пояснения и отмена неудачного результата</li>
+      </ul></article>
+      <article class="card"><h3>Запоминать в контексте</h3><ul>
+        <li>Слово или выражение сохраняется вместе с исходным предложением</li>
+        <li>Интервальные повторения, узнавание и упражнения на письмо</li>
+        <li>Отметки «Знаю / Не знаю», рекомендации и итог главы</li>
+        <li>Статистика чтения и доля знакомых слов в книге</li>
+        <li>Резервная копия книг, мест чтения, карточек и ручных исправлений</li>
+      </ul></article>
     </div>
+  </section>
+
+  <section id="ai">
+    <h2>DeepSeek: проверка значения по контексту</h2>
+    <p class="section-lead">Локальный словарь остаётся основой. По желанию ИИ проверяет его подсказки в читаемом фрагменте и предлагает более подходящий русский смысл.</p>
+    <ol class="steps">
+      <li>Открой «Контекстный ИИ» в библиотеке или настройках, введи личный API-ключ DeepSeek и включи проверку.</li>
+      <li>Выбери режим: «Уточнить с DeepSeek» в карточке слова или автоматическая проверка подсказок текущего абзаца во время чтения.</li>
+      <li>В автоматическом режиме уверенные исправления применяются к конкретному месту. Неоднозначные результаты остаются предложениями. Любое исправление можно отменить.</li>
+    </ol>
+    <div class="callout">
+      <p><strong>Контекст сохраняет значение.</strong> Например, испанское <span lang="es">pista</span> может означать дорожку или улику. Исправление одного употребления не меняет значение во всех книгах. Твои ручные значения всегда имеют приоритет.</p>
+      <p><strong>Повторное чтение использует локальный кеш.</strong> Проверенные значения и исправления сохраняются на телефоне. Неизменённый уже проверенный фрагмент повторно оплачивать не нужно. Есть лимит запросов и счётчик возвращённых API токенов.</p>
+      <p><strong>ИИ выключен по умолчанию.</strong> После включения фрагменты книги передаются DeepSeek напрямую с телефона, а запросы оплачиваются с твоего личного API-баланса. Ключ хранится зашифрованным на устройстве. Подробности — в <a href="privacy.html">политике конфиденциальности</a>.</p>
+      <p class="note">ИИ может ошибаться. Его уверенность не гарантирует правильный перевод. Ключ и лимит общие для трёх языков; отдельные сохранённые контексты не смешиваются. Весь текст книги заранее не отправляется.</p>
+    </div>
+  </section>
+
+  <section id="screens">
+    <h2>Примеры экранов</h2>
+    <div class="shots">
+      <figure><img src="img/es-reader.png" alt="Испанский текст с русскими подсказками над словами" loading="lazy" width="1080" height="1920"><figcaption>Испанский: перевод над словами</figcaption></figure>
+      <figure><img src="img/1-page.jpg" alt="Китайский текст с пиньинем над словами" loading="lazy" width="540" height="960"><figcaption>Китайский: пиньинь и знакомые слова</figcaption></figure>
+      <figure><img src="img/4-today.jpg" alt="Карточки слов для повторения" loading="lazy" width="540" height="960"><figcaption>Карточки и интервальные повторения</figcaption></figure>
+    </div>
+    <p class="note">Китайские экраны сняты в прежних сборках HanReader; оформление отдельных панелей в Amauta Reader изменилось. Панель DeepSeek на этих снимках не показана.</p>
   </section>
 
   <section id="install">
-    <h2>Как установить бету</h2>
-    <ol class="steps">
-      <li>Скачай <a href="https://github.com/boikot5225-afk/HanReader/releases/download/beta/HanReader-beta.apk">HanReader-beta.apk</a> на телефон.</li>
-      <li>Открой файл. Android попросит разрешить установку из этого источника (браузера или Telegram) — разреши.</li>
-      <li>Добавь книгу: EPUB, FB2, TXT или документ Word. Новые бета-версии ставятся поверх, данные сохраняются.</li>
+    <h2>Как установить Amauta Reader</h2>
+    <p class="section-lead">Актуальная тестовая сборка — <strong>0.26.3</strong>. APK можно получить у разработчика:</p>
+    <div class="buttons"><a class="btn primary" href="https://t.me/SainJust">Запросить актуальный APK</a><a class="btn ghost" href="mailto:boikot5225@gmail.com?subject=Amauta%20Reader%20APK">Написать по почте</a></div>
+    <ol class="steps" style="margin-top:24px">
+      <li>Сохрани полученный APK на телефон и открой его. Если Android попросит разрешить установку из браузера или мессенджера, разреши её для этого источника.</li>
+      <li>Запусти приложение, выбери язык в библиотеке и добавь книгу. При желании включи русские переводы над словами в оформлении.</li>
+      <li>Новые сборки Amauta Reader с совместимой подписью устанавливаются поверх предыдущих. Перед обновлением полезно сохранить резервную копию.</li>
     </ol>
+    <div class="callout"><p><strong>Если у тебя прежний HanReader:</strong> Amauta Reader устанавливается отдельным приложением. Для переноса книг и прогресса сохрани резервную копию в старой читалке и восстанови её в новой. Старый публичный <a href="https://github.com/boikot5225-afk/HanReader/releases/tag/beta">HanReader beta</a> — отдельная китайская версия.</p></div>
+  </section>
+
+  <section id="questions">
+    <h2>Частые вопросы</h2>
+    <details><summary>Можно читать без интернета и без ключа?</summary><p>Да. Чтение, локальные словари, карточки и ручные значения работают без DeepSeek. Интернет нужен для ИИ и дополнительного сетевого голоса, если ты их включишь. Синтезатор Android может использовать сеть по собственным настройкам.</p></details>
+    <details><summary>Меняются ли все значения словаря после проверки ИИ?</summary><p>Исправление относится к конкретному слову или выражению в конкретном контексте. Базовый словарь сохраняется. Ручное значение важнее ИИ; ошибочное исправление можно отменить.</p></details>
+    <details><summary>Что попадает в резервную копию?</summary><p>Книги, места чтения, карточки, прогресс, выделения и ручные значения. Сохранённые ИИ-проверки пока не входят в ручной архив. API-ключ не экспортируется. На своём устройстве ИИ-результаты сохраняются после перезапуска приложения.</p></details>
+    <details><summary>Что изменилось в последних версиях?</summary><p>Добавлены английский словарь и чтение на трёх языках, ручная и автоматическая контекстная проверка DeepSeek, локальный кеш результатов. Исправлены скачки страниц при обновлении подсказок; в 0.26.3 сохраняются большие интервалы и разделение сцен внутри EPUB.</p></details>
   </section>
 
   <section id="contacts">
     <h2>Связь</h2>
-    <p class="lead">Нашёл ошибку, есть идея или вопрос — напиши. Если приложение закрылось с ошибкой, при следующем запуске оно предложит отправить отчёт.</p>
-    <div class="contacts">
-      <a class="btn ghost" href="mailto:boikot5225@gmail.com?subject=HanReader">boikot5225@gmail.com</a>
-      <a class="btn ghost" href="https://t.me/SainJust">Telegram @SainJust</a>
-    </div>
+    <p class="lead">Нашёл ошибку, хочешь получить сборку или обсудить перевод — напиши. Для ошибки укажи версию приложения, язык книги и действия, после которых она появилась.</p>
+    <div class="contacts"><a class="btn ghost" href="mailto:boikot5225@gmail.com?subject=Amauta%20Reader">boikot5225@gmail.com</a><a class="btn ghost" href="https://t.me/SainJust">Telegram @SainJust</a></div>
   </section>
+  </main>
 
   <footer>
-    <p>HanReader не собирает личные данные — <a href="privacy.html">политика конфиденциальности</a>. Исходный код и источники данных: <a href="https://github.com/boikot5225-afk/HanReader">GitHub</a>.</p>
-    <p>Словари: CC-CEDICT и русский Викисловарь (CC BY-SA 4.0), Jieba, pypinyin, списки HSK, OpenCC. На скриншотах — «阿Q正传» Лу Синя (общественное достояние).</p>
+    <p>Amauta Reader · проект HanReader · обновлено 16 ноября 2026. <a href="privacy.html">Конфиденциальность</a> · <a href="https://github.com/boikot5225-afk/HanReader/tree/amauta">Репозиторий проекта</a>.</p>
+    <p>Данные: CC-CEDICT, русский и английский Викисловарь через Kaikki, FrequencyWords, Jieba, pypinyin, HSK и OpenCC. Лицензии и источники указаны в приложении. Испанский пример написан для тестов; китайские снимки — «阿Q正传» Лу Синя (общественное достояние).</p>
   </footer>
 </div>
 </body>
