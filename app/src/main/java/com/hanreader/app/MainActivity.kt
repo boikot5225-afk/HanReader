@@ -13,6 +13,9 @@ class MainActivity : ComponentActivity() {
     }
 
     /** In page mode, volume down/up turn the page forward/back instead of changing the volume. */
+    // This overrides Android's public Activity method. AndroidX annotates its inherited
+    // dispatch bridge as library-only; keep the existing platform event routing intact.
+    @android.annotation.SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
         val code = event.keyCode
         if (ReaderKeys.active && (code == android.view.KeyEvent.KEYCODE_VOLUME_DOWN || code == android.view.KeyEvent.KEYCODE_VOLUME_UP)) {

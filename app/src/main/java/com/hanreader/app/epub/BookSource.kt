@@ -141,7 +141,7 @@ class TxtBook(bytes: ByteArray, name: String) : BookSource {
 
     init {
         val text = decode(bytes).replace("\r\n", "\n").replace('\r', '\n')
-        val lines = text.lines().map { it.trim(' ', '\t', '　', ' ', '﻿') }.filter { it.isNotEmpty() }
+        val lines = text.lines().map { it.trim(' ', '\t', '　', ' ', '\uFEFF') }.filter { it.isNotEmpty() }
         val found = ArrayList<Pair<String, MutableList<String>>>()
         var current: Pair<String, MutableList<String>>? = null
         for (l in lines) {

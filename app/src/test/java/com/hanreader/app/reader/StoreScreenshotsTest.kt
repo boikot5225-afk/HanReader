@@ -76,7 +76,7 @@ class StoreScreenshotsTest {
     @Composable
     private fun Page(a: Appearance, index: Int, gloss: Map<String, String>? = null, para: @Composable (ReaderBlock.Text, Int, IntRange?, RubyMetrics, RubyColors) -> Unit) {
         val chapter = ChapterBuilder.build(book, index, engine)
-        val vm = ReaderViewModel(app)
+        val vm = androidx.lifecycle.viewmodel.compose.viewModel<ReaderViewModel>()
         val spec = LocalThemeSpec.current
         val metrics = rememberRubyMetrics(rememberTextMeasurer(cacheSize = 0), a, spec, a.hanFontFor(spec).family)
         val colors = rubyColors(a, spec)
