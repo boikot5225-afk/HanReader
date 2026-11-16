@@ -111,6 +111,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
         if (com.hanreader.app.lang.Languages.AVAILABLE.size > 1) item { LanguagePanel() }
         // Translations marked «Сомневаюсь в переводе»: shown only while there are some.
         item { DoubtsPanel() }
+        item { com.hanreader.app.ai.AiSettingsSection() }
         item {
             // Word levels (HSK) exist for Chinese only for now.
             KnownWordsPanel(known.size, levelMark, onChoose = { showLevel = true },

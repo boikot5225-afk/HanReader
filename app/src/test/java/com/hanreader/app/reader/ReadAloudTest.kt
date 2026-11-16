@@ -41,6 +41,9 @@ class ReadAloudTest {
 
     @Test
     fun readsOnAndMovesToTheNextChapter() {
+        // Old enabled server settings must not bypass Android after updating the app.
+        app.getSharedPreferences("neural_voice", 0).edit().putBoolean("enabled", true)
+            .putString("url", "https://old-voice.invalid").commit()
         ShadowTextToSpeech.addLanguageAvailability(Locale.SIMPLIFIED_CHINESE)
         val r = ReadAloud(app)
         val tts = shadowOf(ShadowTextToSpeech.getLastTextToSpeechInstance())
@@ -78,5 +81,6 @@ class ReadAloudTest {
         assertFalse(r.active)
         assertEquals(null, r.current)
         r.close()
+        app.getSharedPreferences("neural_voice", 0).edit().clear().commit()
     }
 }

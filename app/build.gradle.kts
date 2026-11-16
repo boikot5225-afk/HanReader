@@ -8,8 +8,7 @@ android {
     namespace = "com.hanreader.app"
     compileSdk = 36
     defaultConfig {
-        // Experimental branch (another language): a separate app id, so this test build installs
-        // next to the regular HanReader and never touches its books and words.
+        // Keep the established package identity for Amauta installations and future store updates.
         applicationId = "com.hanreader.app.es"
         // The name people see: under the icon, in «О приложении», in mails and messages.
         val appName = "Amauta Reader"
@@ -17,18 +16,13 @@ android {
         buildConfigField("String", "APP_NAME", "\"$appName\"")
         minSdk = 26
         targetSdk = 36
-        versionCode = 67
-        versionName = "0.25.1"
+        versionCode = 72
+        versionName = "0.26.4"
         // The first language remains the default; English is the third reader module.
         buildConfigField("String", "LANGUAGES", "\"es,zh,en\"")
         // Instrumented tests (app/src/androidTest) on emulators in CI.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // Default neural voice server (reader can change it in the voice menu): gradle property,
-        // else environment variable, else none. HANREADER_VOICE_TOKEN is a CI secret.
-        fun setting(name: String) = (providers.gradleProperty(name).orNull ?: providers.environmentVariable(name).orNull ?: "")
-            .replace("\\", "").replace("\"", "")
-        buildConfigField("String", "VOICE_URL", "\"${setting("HANREADER_VOICE_URL")}\"")
-        buildConfigField("String", "VOICE_TOKEN", "\"${setting("HANREADER_VOICE_TOKEN")}\"")
+
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -84,6 +78,7 @@ android {
     }
     buildTypes {
         getByName("release") {
+            isDebuggable = false
             isMinifyEnabled = false
             if (!System.getenv("HANREADER_KEYSTORE_FILE").isNullOrBlank()) {
                 signingConfig = signingConfigs.getByName("release")

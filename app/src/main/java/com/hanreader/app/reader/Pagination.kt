@@ -8,10 +8,12 @@ sealed interface PageItem {
     val block: Int
 
     /** Lines [lines] of paragraph [block]. */
-    data class Lines(override val block: Int, val lines: IntRange, val spacingBefore: Boolean) : PageItem
+    data class Lines(override val block: Int, val lines: IntRange, val spacingBefore: Boolean,
+        val spacingBeforePx: Float = 0f) : PageItem
 
     /** Image [block], drawn [heightPx] tall. */
-    data class Image(override val block: Int, val heightPx: Float, val spacingBefore: Boolean) : PageItem
+    data class Image(override val block: Int, val heightPx: Float, val spacingBefore: Boolean,
+        val spacingBeforePx: Float = 0f) : PageItem
 
     /** «Знакомо N% · Подготовиться» at the top of the chapter. */
     data object Banner : PageItem {
@@ -66,15 +68,20 @@ object Paginator {
         }
         for ((i, block) in chapter.blocks.withIndex()) {
             if (i % 12 == 0) yield()
+            val previous = (chapter.blocks.getOrNull(i - 1) as? ReaderBlock.Text)?.style
             when (block) {
                 is ReaderBlock.Image -> {
                     val aspect = imageAspect(block.path) ?: 0.66f
                     val h = minOf(spec.widthPx * aspect, spec.heightPx * 0.9f).coerceAtLeast(48f)
-                    val gap = if (items.isEmpty()) 0f else spec.paragraphSpacingPx
+                    var gap = blockSpacingPx(com.hanreader.app.epub.EpubTextStyle(), previous,
+                        spec.paragraphSpacingPx, metrics.emWidth.toFloat(), items.isEmpty())
                     if (y + gap + h > spec.heightPx && items.isNotEmpty()) flush()
+                    if (items.isEmpty()) gap = blockSpacingPx(com.hanreader.app.epub.EpubTextStyle(), previous,
+                        spec.paragraphSpacingPx, metrics.emWidth.toFloat(), true)
+                        .coerceAtMost((spec.heightPx - h).coerceAtLeast(0f))
                     if (items.isEmpty()) first = i
-                    items += PageItem.Image(i, h, spacingBefore = items.isNotEmpty())
-                    y += (if (items.size > 1) gap else 0f) + h
+                    items += PageItem.Image(i, h, spacingBefore = gap > 0f, spacingBeforePx = gap)
+                    y += gap + h
                 }
                 is ReaderBlock.Text -> {
                     val laid = layout(
@@ -94,7 +101,9 @@ object Paginator {
                     }
                     var line = 0
                     while (line < laid.lineCount) {
-                        val gap = if (items.isEmpty() || line > 0 || block.style.compactBefore) 0f else spec.paragraphSpacingPx
+                        var gap = if (line > 0) 0f else blockSpacingPx(block.style, previous,
+                            spec.paragraphSpacingPx, metrics.emWidth.toFloat(), items.isEmpty())
+                        if (items.isEmpty()) gap = gap.coerceAtMost((spec.heightPx - laid.lineHeight).coerceAtLeast(0f))
                         var room = ((spec.heightPx - y - gap) / laid.lineHeight).toInt()
                         if (room <= 0) {
                             if (items.isNotEmpty()) {
@@ -107,7 +116,7 @@ object Paginator {
                         }
                         val take = minOf(room, laid.lineCount - line)
                         if (items.isEmpty()) { first = i; firstChar = if (line == 0) 0 else lineStart[line].takeIf { it != Int.MAX_VALUE } ?: 0 }
-                        items += PageItem.Lines(i, line until line + take, spacingBefore = gap > 0f)
+                        items += PageItem.Lines(i, line until line + take, spacingBefore = gap > 0f, spacingBeforePx = gap)
                         y += gap + take * laid.lineHeight
                         for (k in line until line + take) chars += lineChars[k]
                         line += take

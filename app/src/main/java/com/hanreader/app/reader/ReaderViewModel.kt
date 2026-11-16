@@ -58,7 +58,8 @@ data class OpenBook(
     val error: String? = null
 )
 
-class ReaderViewModel(app: Application) : AndroidViewModel(app) {
+class ReaderViewModel @JvmOverloads constructor(app: Application,
+    private val aiOverride: com.hanreader.app.ai.ContextAi? = null) : AndroidViewModel(app) {
     private val db = LexiconDatabase.get(app)
     private val books = db.bookDao()
     private val cards = db.cardDao()
@@ -70,6 +71,29 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     /** The dictionary alone: chapters, analysis and search need nothing more and start at once. */
     private val engineCore = com.hanreader.app.lang.LanguageEngines.core(app)
     private val booksDir = File(app.filesDir, "books").apply { mkdirs() }
+    val contextAi by lazy { aiOverride ?: com.hanreader.app.ai.ContextAi.get(app) }
+
+    suspend fun checkAi(fragment: com.hanreader.app.ai.AiFragment, automatic: Boolean) {
+        try { contextAi.repository.check(fragment, automatic) {
+            val open = _open.value
+            val chapter = open?.chapter
+            if (open == null || chapter == null || open.loading || open.entity.id != fragment.book || chapter.index != fragment.chapter) false
+            else {
+                val engine = engineDeferred.await()
+                val meanings = db.userMeaningDao().all().filter { it.language.isEmpty() || it.language == lang }.associate { it.word to it.meaning }
+                withContext(Dispatchers.Default) {
+                    val fresh = com.hanreader.app.ai.AiContext.build(fragment.book, chapter, fragment.block,
+                        open.epub.chapters[chapter.index].path, engine, meanings, com.hanreader.app.AppearanceStore.appearance.value.esVariant.name)
+                    fresh != null && fresh.contextHash == fragment.contextHash && fragment.terms.all { old ->
+                        fresh.terms.any { it.start == old.start && it.base == old.base && it.lemma == old.lemma &&
+                            (it.reading == old.reading || old.end > it.end) }
+                    }
+                }
+            }
+        } } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (_: Exception) { contextAi.repository.notice("Не удалось прочитать или сохранить данные проверки. Обычный словарь доступен.") }
+    }
+
     private val openMutex = Mutex()
     private var openingJob: kotlinx.coroutines.Job? = null
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -201,6 +225,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val _open = MutableStateFlow<OpenBook?>(null)
     val open: StateFlow<OpenBook?> = _open.asStateFlow()
 
+    private val _aiReady = MutableStateFlow(false)
+    val aiReady: StateFlow<Boolean> = _aiReady.asStateFlow()
     private val _engine = MutableStateFlow<com.hanreader.app.lang.LanguageModule?>(null)
     val engine: StateFlow<com.hanreader.app.lang.LanguageModule?> = _engine.asStateFlow()
 
@@ -211,7 +237,10 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         // First the dictionary (milliseconds), then the full engine with Russian, HSK and names.
         viewModelScope.launch {
             runCatching { engineCore.await() }.getOrNull()?.let { if (_engine.value == null) _engine.value = it }
-            _engine.value = runCatching { engineDeferred.await() }.getOrNull() ?: _engine.value
+            val full = runCatching { engineDeferred.await() }.getOrNull()
+            _engine.value = full ?: _engine.value
+            // Do not pay to check the Chinese core's temporary English fallbacks before Russian loads.
+            _aiReady.value = full != null
         }
         // HSK lists were corrected after the level was chosen: mark the same level again with the new data.
         val mark = _levelMark.value

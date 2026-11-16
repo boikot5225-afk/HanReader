@@ -222,6 +222,7 @@ class EpubBook(file: File) : BookSource {
         private var bufferStyle = EpubTextStyle()
         private val buffer = StringBuilder()
         private var bufferHeading = false
+        private var pendingSpaceEm = 0f
 
         fun walk(el: Element, heading: Boolean) {
             for (node in el.childNodes()) visit(node, heading)
@@ -251,9 +252,36 @@ class EpubBook(file: File) : BookSource {
                             flush()
                             val isHeading = heading || tag in HEADINGS
                             val parentStyle = bufferStyle
-                            bufferStyle = styles.textStyle(node)
+                            val ownStyle = styles.textStyle(node)
+                            val whole = node.wholeText()
+                            // Fold spacers into geometry, not new blocks: existing book/block/char IDs survive.
+                            val emptyLeaf = whole.isBlank() && node.select("img, image").isEmpty() &&
+                                node.getAllElements().drop(1).none { it.normalName() in BLOCKS }
+                            if (emptyLeaf) {
+                                val breaks = node.select("br").size
+                                val lines = if (breaks > 0) breaks else if ('\u00a0' in whole || tag == "hr") 1 else 0
+                                val extra = maxOf(lines * EpubStyles.BLANK_LINE_EM, styles.emptyHeightEm(node)) +
+                                    ownStyle.spaceBeforeEm + ownStyle.spaceAfterEm
+                                pendingSpaceEm = (pendingSpaceEm + extra).coerceAtMost(EpubStyles.MAX_SPACE_EM)
+                                return
+                            }
+                            val from = out.size
+                            // A container's margins belong at its outer boundaries, never between all its children.
+                            bufferStyle = ownStyle.copy(spaceBeforeEm = 0f, spaceAfterEm = 0f)
                             for (child in node.childNodes()) visit(child, isHeading)
                             flush()
+                            val first = (from until out.size).firstOrNull { out[it] is EpubBlock.Text }
+                            val last = (from until out.size).lastOrNull { out[it] is EpubBlock.Text }
+                            if (first != null) {
+                                val b = out[first] as EpubBlock.Text
+                                out[first] = b.copy(style = b.style.copy(spaceBeforeEm =
+                                    (b.style.spaceBeforeEm + ownStyle.spaceBeforeEm).coerceAtMost(EpubStyles.MAX_SPACE_EM)))
+                            }
+                            if (last != null) {
+                                val b = out[last] as EpubBlock.Text
+                                out[last] = b.copy(style = b.style.copy(spaceAfterEm =
+                                    (b.style.spaceAfterEm + ownStyle.spaceAfterEm).coerceAtMost(EpubStyles.MAX_SPACE_EM)))
+                            }
                             bufferStyle = parentStyle
                         }
                         else -> for (child in node.childNodes()) visit(child, heading)
@@ -289,11 +317,17 @@ class EpubBook(file: File) : BookSource {
         }
 
         fun flush() {
-            val raw = buffer.toString()
+            val untrimmed = buffer.toString()
                 .lines()
                 .joinToString("\n") { it.replace(SPACES, " ").trim(' ', '　', ' ') }
-                .trim()
+            val raw = untrimmed.trim()
+            val leading = untrimmed.takeWhile { it.isWhitespace() }.count { it == '\n' }
+            val trailing = untrimmed.takeLastWhile { it.isWhitespace() }.count { it == '\n' }
             buffer.setLength(0)
+            if (raw.isEmpty()) {
+                pendingSpaceEm = (pendingSpaceEm + leading * EpubStyles.BLANK_LINE_EM).coerceAtMost(EpubStyles.MAX_SPACE_EM)
+                return
+            }
             // Footnote marks travel through the text as MARK_START ref MARK_TEXT shown MARK_END.
             val notes = ArrayList<EpubNote>()
             val text = StringBuilder(raw.length)
@@ -316,7 +350,12 @@ class EpubBook(file: File) : BookSource {
                 i++
             }
             val clean = text.toString()
-            if (clean.isNotBlank()) out += EpubBlock.Text(clean, bufferHeading, notes, bufferStyle)
+            if (clean.isNotBlank()) {
+                out += EpubBlock.Text(clean, bufferHeading, notes, bufferStyle.copy(
+                    spaceBeforeEm = (bufferStyle.spaceBeforeEm + pendingSpaceEm + leading * EpubStyles.BLANK_LINE_EM).coerceAtMost(EpubStyles.MAX_SPACE_EM),
+                    spaceAfterEm = (bufferStyle.spaceAfterEm + (trailing - 1).coerceAtLeast(0) * EpubStyles.BLANK_LINE_EM).coerceAtMost(EpubStyles.MAX_SPACE_EM)))
+                pendingSpaceEm = 0f
+            }
         }
     }
 

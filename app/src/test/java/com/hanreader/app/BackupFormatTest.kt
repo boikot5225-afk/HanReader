@@ -6,6 +6,37 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BackupFormatTest {
+    private val aiBook = BookEntity(id = 7, title = "Test", author = "", fileName = "test.epub", chapterCount = 1)
+    private val aiLibrary = LibraryBackup(listOf(aiBook), emptyList(), emptyList(), emptyList())
+    private val aiCheck = com.hanreader.app.ai.AiCheck("a".repeat(64), 7, 0, 0, "b".repeat(64),
+        2, 7, 2, 7, "pista", "дорожка", "улика", "Контекст расследования", "high", "accepted", 42)
+
+    @Test fun allAiStatesAndCacheIdentitiesSurviveBackup() {
+        val rows = listOf("accepted", "proposed", "rejected", "checked").mapIndexed { i, state ->
+            aiCheck.copy(cacheKey = i.toString().repeat(64), state = state,
+                translation = if (state == "checked") null else "улика")
+        }
+        val json = BackupFormat.encode(Backup(1, emptyList(), emptyList(), emptyList(), library = aiLibrary, aiChecks = rows))
+        assertEquals(rows, BackupFormat.decode(json).aiChecks)
+        assertTrue(!json.contains("apiKey") && !json.contains("mock-key"))
+    }
+
+    @Test fun oldBackupsHaveNoAiSectionAndInvalidChecksAreRejected() {
+        assertEquals(null, BackupFormat.decode(BackupFormat.encode(Backup(1, emptyList(), emptyList(), emptyList()))).aiChecks)
+        val valid = BackupFormat.encode(Backup(1, emptyList(), emptyList(), emptyList(), library = aiLibrary, aiChecks = listOf(aiCheck)))
+        for (field in listOf("state", "bookId", "termEnd", "cacheKey")) {
+            val root = org.json.JSONObject(valid)
+            root.getJSONArray("aiChecks").getJSONObject(0).put(field, when (field) {
+                "bookId" -> 999; "termEnd" -> 1; else -> "invalid"
+            })
+            assertThrows(BackupFormatException::class.java) { BackupFormat.decode(root.toString()) }
+        }
+        val root = org.json.JSONObject(valid)
+        root.getJSONArray("aiChecks").put(root.getJSONArray("aiChecks").getJSONObject(0))
+        assertThrows(BackupFormatException::class.java) { BackupFormat.decode(root.toString()) }
+        root.remove("library")
+        assertThrows(BackupFormatException::class.java) { BackupFormat.decode(root.toString()) }
+    }
     private val card = WordCard(
         id = 7,
         language = "zh-CN",

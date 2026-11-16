@@ -755,9 +755,9 @@ interface CardDao {
 @Database(
     entities = [
         WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
-        Bookmark::class, UserName::class, Highlight::class, DailyActivity::class, BookProgress::class, UserMeaning::class, UserSplit::class
+        Bookmark::class, UserName::class, Highlight::class, DailyActivity::class, BookProgress::class, UserMeaning::class, UserSplit::class, com.hanreader.app.ai.AiCheck::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
@@ -769,6 +769,7 @@ abstract class LexiconDatabase : RoomDatabase() {
     abstract fun highlightDao(): HighlightDao
     abstract fun statsDao(): StatsDao
     abstract fun userMeaningDao(): UserMeaningDao
+    abstract fun aiCheckDao(): com.hanreader.app.ai.AiCheckDao
     abstract fun userSplitDao(): UserSplitDao
 
     companion object {
@@ -947,7 +948,19 @@ abstract class LexiconDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `ai_checks` (`cacheKey` TEXT NOT NULL, `bookId` INTEGER NOT NULL, " +
+                    "`chapter` INTEGER NOT NULL, `block` INTEGER NOT NULL, `contextHash` TEXT NOT NULL, " +
+                    "`termStart` INTEGER NOT NULL, `termEnd` INTEGER NOT NULL, `start` INTEGER NOT NULL, `end` INTEGER NOT NULL, " +
+                    "`original` TEXT NOT NULL, `base` TEXT NOT NULL, `translation` TEXT, `explanation` TEXT, " +
+                    "`confidence` TEXT NOT NULL, `state` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`cacheKey`), " +
+                    "FOREIGN KEY(`bookId`) REFERENCES `books`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_ai_checks_bookId` ON `ai_checks` (`bookId`)")
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {

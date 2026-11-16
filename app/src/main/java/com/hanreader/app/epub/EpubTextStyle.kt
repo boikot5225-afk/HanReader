@@ -8,7 +8,10 @@ data class EpubTextStyle(
     val inset: Boolean = false,
     val indent: Boolean? = null,
     val alignment: String? = null,
-    val compactBefore: Boolean = false
+    val compactBefore: Boolean = false,
+    /** Authored structural whitespace, in reader font em, separate from source text offsets. */
+    val spaceBeforeEm: Float = 0f,
+    val spaceAfterEm: Float = 0f
 )
 
 /** A deliberately small CSS reader: only paragraph geometry, never publisher fonts or colours. */
@@ -51,21 +54,46 @@ internal class EpubStyles(doc: Document, sheets: List<String>) {
 
     fun textStyle(el: Element): EpubTextStyle {
         val inset = inset(el)
-        if (!inset) return EpubTextStyle()
-        val indent = get(el, "text-indent")?.let { !zero(it) }
+        val indent = get(el, "text-indent")?.let { if (inset) !zero(it) else if (zero(it)) false else null }
         val align = (listOf(el) + el.parents()).firstNotNullOfOrNull { get(it, "text-align") }
         // Only consecutive, explicitly compact paragraphs in the same quotation lose their gap.
         // An empty paragraph remains a stanza separator even though it is not rendered itself.
         val previous = el.previousElementSibling()
         val compact = inset && previous != null && previous.text().replace('\u00a0', ' ').isNotBlank() &&
             inset(previous) && zero(get(el, "margin-top")) && zero(get(previous, "margin-bottom"))
-        return EpubTextStyle(inset, indent, align, compact)
+        return EpubTextStyle(inset, indent, align?.takeIf { inset || it in setOf("center", "right") }, compact,
+            (lengthEm(get(el, "margin-top")) + lengthEm(get(el, "padding-top"))).coerceAtMost(MAX_SPACE_EM),
+            (lengthEm(get(el, "margin-bottom")) + lengthEm(get(el, "padding-bottom"))).coerceAtMost(MAX_SPACE_EM))
     }
 
-    private fun declarations(css: String): Map<String, String> = css.split(';').mapNotNull {
-        val pair = it.split(':', limit = 2)
-        if (pair.size != 2) null else pair[0].trim().lowercase() to pair[1].trim().lowercase().removeSuffix("!important").trim()
-    }.filter { it.first in setOf("margin-left", "margin-right", "margin-top", "margin-bottom", "text-indent", "text-align") }.toMap()
+    /** Only used for empty structural blocks, never a fixed height for running text. */
+    fun emptyHeightEm(el: Element): Float = maxOf(lengthEm(get(el, "height")), lengthEm(get(el, "min-height")))
+
+    private fun declarations(css: String): Map<String, String> = buildMap {
+        for (item in css.split(';')) {
+            val pair = item.split(':', limit = 2)
+            if (pair.size != 2) continue
+            val key = pair[0].trim().lowercase()
+            val value = pair[1].trim().lowercase().removeSuffix("!important").trim()
+            if (key in setOf("margin", "padding")) {
+                val parts = value.split(Regex("\\s+"))
+                if (parts.size !in 1..4) continue
+                put("$key-top", parts[0]); put("$key-right", parts.getOrElse(1) { parts[0] })
+                put("$key-bottom", parts.getOrElse(2) { parts[0] }); put("$key-left", parts.getOrElse(3) { parts.getOrElse(1) { parts[0] } })
+            } else if (key in setOf("margin-left", "margin-right", "margin-top", "margin-bottom", "padding-top", "padding-bottom",
+                    "text-indent", "text-align", "height", "min-height")) put(key, value)
+        }
+    }
+
+    companion object {
+        const val MAX_SPACE_EM = 8f
+        const val BLANK_LINE_EM = 1.2f
+        private fun lengthEm(value: String?): Float {
+            val m = value?.let { Regex("^([+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))(em|rem|px|pt)?$").matchEntire(it) } ?: return 0f
+            val n = m.groupValues[1].toFloatOrNull()?.takeIf { it.isFinite() } ?: return 0f
+            return (when (m.groupValues[2]) { "em", "rem" -> n; "px" -> n / 16f; "pt" -> n / 12f; else -> 0f }).coerceIn(0f, MAX_SPACE_EM)
+        }
+    }
 
     private fun zero(value: String?): Boolean = value != null && Regex("[+-]?0+(?:\\.0+)?(?:[a-z%]+)?").matches(value)
     private fun positive(value: String?): Boolean = value?.let { Regex("^[+]?(\\d*\\.?\\d+)").find(it)?.value?.toFloatOrNull() }?.let { it > 0f } == true

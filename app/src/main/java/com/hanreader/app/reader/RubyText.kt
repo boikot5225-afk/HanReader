@@ -292,10 +292,14 @@ internal fun layout(
  * line, the space is split half-way between the centres of translated words; what does not fit is
  * cut with an ellipsis. Word widths never change, so lines break exactly as without translations.
  */
+/** A pending background calculation is not the user's decision to hide the translation row. */
+internal fun glossesForMode(mode: com.hanreader.app.GlossMode, ready: Map<String, String>?): Map<String, String>? =
+    if (mode == com.hanreader.app.GlossMode.OFF) null else ready ?: emptyMap()
+
 /** The translation of a token: "text|reading" first (a character read as on the page), then the word. */
 internal fun glossOf(glossFor: Map<String, String>, t: RToken, block: Int = -1): String? {
     // The reader's meaning for this very place (ContextMeanings) wins.
-    if (block >= 0) glossFor["@$block:${t.start}"]?.let { return it }
+    if (block >= 0) glossFor["@$block:${t.start}"]?.let { return it.ifEmpty { null } }
     // An empty hint for a reading: no hint at all (a word inside a phrase whose first word carries it).
     if (t.pinyin.isNotEmpty()) {
         glossFor[t.glossKey]?.let { return it.ifEmpty { null } }

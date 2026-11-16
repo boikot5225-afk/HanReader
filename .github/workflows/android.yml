@@ -23,10 +23,6 @@ jobs:
   build:
     if: inputs.publish_run_id == ''
     runs-on: ubuntu-latest
-    # Neural voice server built into the app (the reader can change it in «Голос»); the key is a secret.
-    env:
-      HANREADER_VOICE_URL: https://tts.saintjust.space
-      HANREADER_VOICE_TOKEN: ${{ secrets.HANREADER_VOICE_KEY }}
     permissions:
       # write: to publish the beta APK as a release asset.
       contents: write
@@ -107,9 +103,9 @@ jobs:
           else
             echo "No release secrets: only the debug APK will be produced."
           fi
-      - name: Build signed release APK
+      - name: Test and build signed release APK
         if: env.HANREADER_HAS_RELEASE_KEY == 'true'
-        run: gradle :app:assembleRelease --stacktrace
+        run: gradle :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --stacktrace
       # The release key's certificate fingerprint, to compare with hanreader-signing-setup.txt.
       - name: Show release signature
         if: env.HANREADER_HAS_RELEASE_KEY == 'true'

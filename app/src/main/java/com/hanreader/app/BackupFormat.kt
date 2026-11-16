@@ -1,5 +1,6 @@
 package com.hanreader.app
 
+import com.hanreader.app.ai.AiCheck
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -25,7 +26,9 @@ data class Backup(
     /** HanReader: reading time and reviews by day. Null in older files: restoring keeps the current ones. */
     val activity: List<DailyActivity>? = null,
     /** Book files unpacked from the archive (file name -> temporary file); not part of the JSON. */
-    val bookFiles: Map<String, java.io.File> = emptyMap()
+    val bookFiles: Map<String, java.io.File> = emptyMap(),
+    /** Context checks accompany the library with its original book ids. Never contains the API key. */
+    val aiChecks: List<AiCheck>? = null
 )
 
 /** Books with their reading positions, bookmarks, highlights and «Не учить» marks. */
@@ -50,9 +53,11 @@ object BackupFormat {
     private const val FORMAT = "lexicon-backup"
     /** 2: HanReader library, word sources. Version 1 files still restore. */
     /** 3 (0.24.2): known words, names and meanings carry their language. */
-    const val VERSION = 3
+    /** 4: context corrections, paid checks and rejections (book ids and hashes stay unchanged). */
+    const val VERSION = 4
 
     fun encode(backup: Backup): String {
+        validateAi(backup.aiChecks, backup.library)
         val root = JSONObject()
         root.put("format", FORMAT)
         root.put("version", VERSION)
@@ -180,6 +185,19 @@ object BackupFormat {
                 }
             })
         }
+        backup.aiChecks?.let { checks ->
+            root.put("aiChecks", JSONArray().apply {
+                checks.forEach { c -> put(JSONObject().apply {
+                    put("cacheKey", c.cacheKey); put("bookId", c.bookId)
+                    put("chapter", c.chapter); put("block", c.block); put("contextHash", c.contextHash)
+                    put("termStart", c.termStart); put("termEnd", c.termEnd)
+                    put("start", c.start); put("end", c.end); put("original", c.original); put("base", c.base)
+                    put("translation", c.translation ?: JSONObject.NULL)
+                    put("explanation", c.explanation ?: JSONObject.NULL)
+                    put("confidence", c.confidence); put("state", c.state); put("createdAt", c.createdAt)
+                }) }
+            })
+        }
         return root.toString(2)
     }
 
@@ -291,9 +309,42 @@ object BackupFormat {
                 (0 until arr.length()).map { arr.getString(it).trim() }.filter { it.length >= 2 }.distinct()
             }
             validate(cards, examples)
-            return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known, names, sources, library, meanings, splits, activity)
+            val checks = if (root.has("aiChecks")) root.getJSONArray("aiChecks").let { arr ->
+                (0 until arr.length()).map { i ->
+                    val c = arr.getJSONObject(i)
+                    AiCheck(c.getString("cacheKey"), c.getLong("bookId"), c.getInt("chapter"), c.getInt("block"),
+                        c.getString("contextHash"), c.getInt("termStart"), c.getInt("termEnd"),
+                        c.getInt("start"), c.getInt("end"), c.getString("original"), c.getString("base"),
+                        if (c.isNull("translation")) null else c.getString("translation"),
+                        if (c.isNull("explanation")) null else c.getString("explanation"),
+                        c.getString("confidence"), c.getString("state"), c.getLong("createdAt"))
+                }
+            } else null
+            validateAi(checks, library)
+            return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known, names, sources, library, meanings, splits, activity,
+                aiChecks = checks)
         } catch (e: JSONException) {
             throw BackupFormatException("Файл копии повреждён: " + (e.message ?: "неверная структура"))
+        }
+    }
+
+    private fun validateAi(checks: List<AiCheck>?, library: LibraryBackup?) {
+        if (checks == null) return
+        val books = library?.books?.mapTo(HashSet()) { it.id }
+            ?: throw BackupFormatException("Файл копии повреждён: проверки ИИ без библиотеки")
+        val keys = HashSet<String>()
+        val hash = Regex("[a-f0-9]{64}")
+        for (c in checks) {
+            if (c.bookId !in books || !keys.add(c.cacheKey) || !hash.matches(c.cacheKey) || !hash.matches(c.contextHash) ||
+                c.chapter < 0 || c.block < 0 || c.termStart < 0 || c.termEnd <= c.termStart ||
+                c.start < 0 || c.end <= c.start || c.start > c.termStart || c.end < c.termEnd ||
+                c.original.isBlank() || c.base.isBlank() || c.createdAt < 0 ||
+                c.confidence !in setOf("high", "medium", "low") ||
+                c.state !in setOf("checked", "accepted", "proposed", "rejected") ||
+                (c.translation != null && c.translation.isBlank()) ||
+                (c.state in setOf("accepted", "proposed", "rejected") && c.translation == null)) {
+                throw BackupFormatException("Файл копии повреждён: некорректная проверка ИИ")
+            }
         }
     }
 

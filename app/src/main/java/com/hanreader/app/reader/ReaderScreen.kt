@@ -1,5 +1,7 @@
 package com.hanreader.app.reader
 
+import com.hanreader.app.ai.*
+
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -213,6 +215,25 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val bookWords by bookWordsFlow.collectAsState(initial = emptyList())
     val userNames by vm.userNames.collectAsState()
     val userMeanings by vm.userMeanings.collectAsState()
+    val ai = vm.contextAi
+    val aiConfig by ai.settings.config.collectAsState()
+    val aiFlow = remember(book.entity.id, chapter?.index) { ai.repository.observeChapter(book.entity.id, chapter?.index ?: -1) }
+    val aiRows by aiFlow.collectAsState(initial = emptyList())
+    val aiBusy by ai.repository.busy.collectAsState()
+    val aiMessage by ai.repository.message.collectAsState()
+    val supportedAi = AiContext.supports(com.hanreader.app.lang.Languages.current.tag)
+    val aiReady by vm.aiReady.collectAsState()
+    val aiEngine = engine
+    val aiResource = book.epub.chapters.getOrNull(chapter?.index ?: -1)?.path.orEmpty()
+    val validAiRows = readerWork(emptyList<AiCheck>(), aiRows, chapter, engine, userMeanings, aiConfig, appearance.esVariant, aiResource) {
+        if (!supportedAi || !aiConfig.enabled || chapter == null || aiEngine == null) emptyList()
+        else aiRows.filter { it.chapter == chapter.index }.groupBy { it.block }.flatMap { (bi, rows) ->
+            val fragment = AiContext.build(book.entity.id, chapter, bi, aiResource, aiEngine, userMeanings, appearance.esVariant.name)
+            if (fragment == null) emptyList() else AiContext.applicable(fragment, rows, aiConfig.model).filter { row ->
+                fragment.protected.none { it.first < row.end && it.last >= row.start }
+            }
+        }
+    }
     val userSplits by vm.userSplits.collectAsState()
     // Names of this book (found or «Не учить») and the reader's own «Это имя».
     // Names of this chapter: a word written with a capital inside a sentence and never in lower case here
@@ -265,7 +286,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
     // Short translations above the pinyin: over unknown words or over recommended ones.
-    val glossFor: Map<String, String>? = readerWork(null, appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, bookWide, known) {
+    val baseGlossFor: Map<String, String>? = readerWork(null, appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, bookWide, known) {
         val eng = engine
         // A language with an alphabet: phrases carry one hint, words their reading in context.
         val zhless = eng is com.hanreader.app.lang.AlphabeticModule
@@ -309,6 +330,18 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 ContextMeanings.ofBook(userMeanings, book.entity.id), eng, words)
         }
     }
+    val readyGlosses: Map<String, String>? = readerWork(baseGlossFor, baseGlossFor, validAiRows, chapter, aiConfig.indicators) {
+        val base = baseGlossFor
+        if (base == null || chapter == null || validAiRows.isEmpty()) base
+        else HashMap(base).apply {
+            validAiRows.groupBy { it.block }.forEach { (bi, rows) ->
+                (chapter.blocks.getOrNull(bi) as? ReaderBlock.Text)?.let { AiContext.overlay(this, it, bi, rows, aiConfig.indicators) }
+            }
+        }
+    }
+    // Reserve the row throughout asynchronous updates (known words, manual meanings, AI).
+    // null means that the user turned translations off, never that a calculation is pending.
+    val glossFor = glossesForMode(appearance.gloss, readyGlosses)
     // Fading translations: a word's first few appearances carry it, the later ones only the underline.
     // Counted from where reading started in this chapter (the place the book opened at), not from its start.
     val fadeFrom = remember(chapter?.index) { if (chapter != null && book.entity.chapterIndex == chapter.index) book.entity.blockIndex else 0 }
@@ -327,6 +360,51 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val bars = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout).asPaddingValues()
     var progress by remember { mutableStateOf(ReadingProgress()) }
     val scope = rememberCoroutineScope()
+    val aiLifecycle by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    var automaticAiJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    DisposableEffect(book.entity.id, chapter, aiConfig.enabled, aiConfig.automatic, aiConfig.hasKey,
+        aiConfig.consent, aiConfig.model, appearance.esVariant, aiLifecycle) {
+        onDispose { automaticAiJob?.cancel(); automaticAiJob = null }
+    }
+    LaunchedEffect(book.entity.id, chapter, progress.firstBlock, progress.lastBlock, baseGlossFor, aiConfig,
+        userMeanings, appearance.esVariant, aiLifecycle, sheetOpen, aiReady) {
+        if (!supportedAi || !aiConfig.enabled || !aiConfig.automatic || !aiConfig.hasKey || !aiReady ||
+            chapter == null || aiEngine == null || baseGlossFor == null || sheetOpen ||
+            !aiLifecycle.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return@LaunchedEffect
+        kotlinx.coroutines.delay(1200)
+        // Bound the queue to at most three visible source paragraphs; no prefetch of the book.
+        for (bi in progress.firstBlock..minOf(progress.lastBlock, progress.firstBlock + 2)) {
+            // Scrolling cancels this waiter, not a paid request already running in the same chapter.
+            automaticAiJob?.join()
+            val fragment = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                AiContext.build(book.entity.id, chapter, bi, aiResource, aiEngine, userMeanings,
+                    appearance.esVariant.name, baseGlossFor)
+            } ?: continue
+            val request = scope.launch { vm.checkAi(fragment, automatic = true) }
+            automaticAiJob = request
+            request.join()
+        }
+    }
+    var manualAiJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    DisposableEffect(book.entity.id, chapter, aiConfig, userMeanings, appearance.esVariant, aiLifecycle) {
+        onDispose { manualAiJob?.cancel(); manualAiJob = null }
+    }
+    fun checkManualAi(target: Selection) {
+        if (chapter == null || aiEngine == null || !supportedAi || !aiConfig.enabled || !aiReady || manualAiJob?.isActive == true) return
+        manualAiJob = scope.launch {
+            try {
+                val paragraph = chapter.blocks.getOrNull(target.block) as? ReaderBlock.Text ?: return@launch
+                val start = paragraph.tokens.getOrNull(target.first)?.start ?: return@launch
+                val end = paragraph.tokens.getOrNull(target.last)?.end ?: return@launch
+                val fragment = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    AiContext.build(book.entity.id, chapter, target.block, aiResource, aiEngine, userMeanings,
+                        appearance.esVariant.name, range = start until end)
+                }
+                if (fragment != null) vm.checkAi(fragment, automatic = false)
+                else ai.repository.notice("Для этого выделения нет доступной словарной подсказки, оно защищено ручным значением или абзац слишком длинный.")
+            } finally { manualAiJob = null }
+        }
+    }
     // Page mode exposes its controls to the bottom panel through these.
     var jumpToPage by remember { mutableStateOf<((Int) -> Unit)?>(null) }
 
@@ -355,7 +433,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             block = block,
             metrics = metrics,
             showPinyin = showPinyin,
-            hidePinyinFor = hidePinyinFor,
+            hidePinyinFor = if (showPinyin) hidePinyinFor else null,
             saved = studying,
             selection = selection?.takeIf { it.block == i }?.let { it.first..it.last },
             colors = colors,
@@ -479,6 +557,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 book = book,
                 chapter = chapter,
                 appearance = appearance,
+                emPx = metrics.emWidth.toFloat(),
                 paragraph = paragraph,
                 bars = bars,
                 speed = speed,
@@ -741,6 +820,14 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onHighlightWholeBook = { h, on -> moveHighlight(vm, h, on, chapter, sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end) },
             onNote = { h, note -> vm.updateHighlight(h.copy(note = note)) },
             onRemoveHighlight = { vm.removeHighlight(it.id) },
+            aiCheck = validAiRows.firstOrNull { it.block == sel.block && it.start <= block.tokens[sel.first].start && it.end >= block.tokens[sel.last].end && it.state != "checked" }
+                ?: validAiRows.firstOrNull { it.block == sel.block && it.termStart == block.tokens[sel.first].start },
+            aiAvailable = supportedAi,
+            aiEnabled = aiConfig.enabled && aiConfig.hasKey,
+            aiBusy = aiBusy || manualAiJob != null || !aiReady,
+            aiMessage = aiMessage,
+            onAiCheck = { checkManualAi(sel) },
+            onAiState = { row, state -> scope.launch { ai.repository.setState(row.cacheKey, state) } },
             userMeanings = userMeanings,
             meaningKey = { scope, key ->
                 when (scope) {
@@ -975,10 +1062,12 @@ internal fun PagedChapter(
             gapPx = with(density) { colors.wordGap.toPx() },
             lineGapPx = with(density) { colors.lineGap.toPx() },
             showPinyin = showPinyin,
-            hidePinyinFor = hidePinyinFor,
+            hidePinyinFor = if (showPinyin) hidePinyinFor else null,
             justify = colors.justify,
             indent = colors.indent,
-            glossFor = glossFor
+            // Hint text never changes word widths. Pagination only needs the row's presence;
+            // passing the changing map here restarted pagination on every dictionary/AI update.
+            glossFor = if (appearance.gloss != GlossMode.OFF || glossFor != null) emptyMap() else null
         )
         // The pages remember which chapter they were made for: produceState keeps its last value
         // while the next one is computed, and pages of another chapter must never be drawn with
@@ -1094,14 +1183,14 @@ internal fun PagedChapter(
                                     is PageItem.Lines -> {
                                         val b = chapter.blocks.getOrNull(item.block) as? ReaderBlock.Text
                                         if (b != null) {
-                                            if (item.spacingBefore) Spacer(Modifier.height(appearance.paragraphSpacing.dp))
+                                            if (item.spacingBefore) Spacer(Modifier.height(with(density) { item.spacingBeforePx.toDp() }))
                                             paragraph(b, item.block, item.lines)
                                         }
                                     }
                                     is PageItem.Image -> {
                                         val img = chapter.blocks.getOrNull(item.block) as? ReaderBlock.Image
                                         if (img != null) {
-                                            if (item.spacingBefore) Spacer(Modifier.height(appearance.paragraphSpacing.dp))
+                                            if (item.spacingBefore) Spacer(Modifier.height(with(density) { item.spacingBeforePx.toDp() }))
                                             Box(Modifier.fillMaxWidth().height(with(density) { item.heightPx.toDp() })) { BookImage(vm, img.path) }
                                         }
                                     }
@@ -1129,6 +1218,7 @@ private fun ScrollChapter(
     book: OpenBook,
     chapter: ChapterContent,
     appearance: Appearance,
+    emPx: Float,
     paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit,
     bars: PaddingValues,
     speed: Float,
@@ -1139,6 +1229,8 @@ private fun ScrollChapter(
     registerJump: (((Int) -> Unit)?) -> Unit,
     registerBlockJump: (((Int, Int) -> Unit)?) -> Unit
 ) {
+    val density = LocalDensity.current
+    val paragraphPx = with(density) { appearance.paragraphSpacing.dp.toPx() }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val blockChars = remember(chapter) {
@@ -1195,13 +1287,16 @@ private fun ScrollChapter(
     ) {
         item(key = "prepare:${chapter.index}") { banner() }
         itemsIndexed(chapter.blocks, key = { i, _ -> "${chapter.index}:$i" }) { i, block ->
+            val current = (block as? ReaderBlock.Text)?.style ?: com.hanreader.app.epub.EpubTextStyle()
+            val previous = (chapter.blocks.getOrNull(i - 1) as? ReaderBlock.Text)?.style
+            val gap = with(density) { blockSpacingPx(current, previous, paragraphPx, emPx).toDp() }
             when (block) {
                 is ReaderBlock.Text -> Column {
-                    if (!block.style.compactBefore) Spacer(Modifier.height(appearance.paragraphSpacing.dp))
+                    if (gap.value > 0f) Spacer(Modifier.height(gap))
                     paragraph(block, i, null)
                 }
                 is ReaderBlock.Image -> Column {
-                    Spacer(Modifier.height(appearance.paragraphSpacing.dp))
+                    if (gap.value > 0f) Spacer(Modifier.height(gap))
                     BookImage(vm, block.path)
                 }
             }
@@ -1460,6 +1555,13 @@ internal fun WordSheet(
     onNote: (com.hanreader.app.Highlight, String) -> Unit,
     onRemoveHighlight: (com.hanreader.app.Highlight) -> Unit,
     /** The reader's own meanings (see [ContextMeanings]), the key of this word for each scope, and how to change one (blank removes it). */
+    aiCheck: AiCheck? = null,
+    aiAvailable: Boolean = false,
+    aiEnabled: Boolean = false,
+    aiBusy: Boolean = false,
+    aiMessage: String? = null,
+    onAiCheck: () -> Unit = {},
+    onAiState: (AiCheck, String) -> Unit = { _, _ -> },
     userMeanings: Map<String, String> = emptyMap(),
     meaningKey: (MeaningScope, String) -> String = { _, key -> key },
     onUserMeaning: (String, String) -> Unit = { _, _ -> },
@@ -1526,12 +1628,21 @@ internal fun WordSheet(
     }
     // A language with an alphabet: the reading the sentence chose (with its meaning, «durmiente#шпала»), else the card's first.
     val alphaReading = first.pinyin.takeIf { '#' in it && (selection.first == selection.last || com.hanreader.app.lang.ContextRules.key(it) == es.firstOrNull()?.entry?.key) } ?: es.firstOrNull()?.entry?.key
-    val translation = userMeaning ?: nameInRussian ?: (if (zh == null) engine.cardTranslation(word, alphaReading) else zh.cardTranslation(word, pageReading, selectedMeaning))
+    val aiTranslation = aiCheck?.takeIf { it.state == "accepted" }?.translation
+    val aiExpression = aiCheck?.takeIf { row -> userMeaning == null && aiTranslation != null &&
+        (row.original.any(Char::isWhitespace) || tokens.count {
+            it.kind == TokenKind.HAN && it.start >= row.start && it.end <= row.end
+        } > 1) }?.let { row -> if (zh != null) engine.searchForm(row.original) else row.original }
+    val aiExpressionReading = if (zh != null && aiExpression != null && aiCheck != null)
+        tokens.filter { it.kind == TokenKind.HAN && it.start >= aiCheck.start && it.end <= aiCheck.end }
+            .map { it.pinyin }.filter { it.isNotBlank() }.joinToString(" ") else ""
+    val saveWord = aiExpression ?: cardWord
+    val translation = userMeaning ?: aiTranslation ?: nameInRussian ?: (if (zh == null) engine.cardTranslation(word, alphaReading) else zh.cardTranslation(word, pageReading, selectedMeaning))
         ?: chars.joinToString(" + ") { engine.cardTranslation(it.word) ?: it.shortGloss(1) }.ifEmpty { "нет в словаре" }
     val sentence = remember(word, selection) { ChapterBuilder.sentence(block.text, first.start, last.end) }
     var status by remember(word) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val isSaved = cardWord in saved
+    val isSaved = saveWord in saved
 
     val context = LocalContext.current
     LaunchedEffect(Unit) { ReadingChecks.record(context, ReadingChecks.Event.OPEN) }
@@ -1635,10 +1746,13 @@ internal fun WordSheet(
                     }
                 }
             }
-            val primaryMeaning = userMeaning ?: nameInRussian ?: russian.firstOrNull() ?: translation
+            val primaryMeaning = userMeaning ?: aiTranslation ?: nameInRussian ?: russian.firstOrNull() ?: translation
+            if (aiAvailable) {
+                AiWordControls(aiCheck, aiEnabled, aiBusy, aiMessage, userMeaning != null, onAiCheck, onAiState)
+            }
             MeaningSummary(primaryMeaning, russian,
                 selectedMeaning != null || es.firstOrNull()?.entry?.contextMeaning != null,
-                own?.first, userMeaning != null || nameInRussian != null || russian.isNotEmpty())
+                own?.first, userMeaning != null || aiTranslation != null || nameInRussian != null || russian.isNotEmpty())
             DoubtRow(word, cardWord, primaryMeaning, sentence, doubtSource) { correctingHere = true; correcting = true }
             key(selection) { OwnMeaning(word, own, editing = correcting, startHere = correctingHere, onEditingChange = { open -> if (open) correctingHere = false; correcting = open }, suggestions = remember(word, russian, es) {
                 (russian + es.drop(1).flatMap { it.entry.ru.take(2) }).distinct().take(8)
@@ -1792,7 +1906,7 @@ internal fun WordSheet(
             Surface(
                 onClick = {
                     // Spanish: the card's second line is the part of speech and gender («сущ., ж. р.»).
-                    onSave(cardWord, if (zh == null) es.firstOrNull()?.entry?.let { e ->
+                    onSave(saveWord, if (aiExpression != null) aiExpressionReading else if (zh == null) es.firstOrNull()?.entry?.let { e ->
                         listOf(e.pronunciation, e.posLabel).filter { it.isNotEmpty() }.joinToString(" · ")
                     }.orEmpty() else reading, primaryMeaning, sentence) { r ->
                         scope.launch {
@@ -1809,7 +1923,7 @@ internal fun WordSheet(
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(if (isSaved) "Добавить пример к карточке" else "Сохранить в карточки", style = MaterialTheme.typography.titleMedium)
+                    Text(if (isSaved) "Добавить пример к карточке" else if (aiExpression != null) "Сохранить выражение в карточки" else "Сохранить в карточки", style = MaterialTheme.typography.titleMedium)
                 }
             }
             val lexiconName = zh?.nameKind(word)

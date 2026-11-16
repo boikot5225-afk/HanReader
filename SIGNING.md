@@ -1,4 +1,4 @@
-# HanReader: signing Android releases
+# Amauta Reader: signing Android releases
 
 The private signing key is NEVER committed to this public repository.
 
@@ -20,45 +20,54 @@ Keep the .p12 file and both passwords in two safe places (e.g. a password manage
 offline copy). Losing them means no more updates for the published app. Never send them in
 a chat, an e-mail or a commit. Delete keystore.base64.txt after adding the secret.
 
-## One-time setup
+## Existing production identity
 
-Keep the following two private files provided with this release:
-- hanreader-release-keystore.p12
-- hanreader-signing-setup.txt
+Amauta Reader keeps package `com.hanreader.app.es`. The established private release
+key is stored in GitHub Actions secrets; do not create a replacement for this release.
+The committed `app/debug.keystore` is public and must never sign a store release.
+A separate older app uses `com.hanreader.app`: its RuStore listing cannot be updated
+with the Amauta package. Use the Amauta listing or create one for this package.
 
-GitHub repository Settings → Secrets and variables → Actions → New repository secret.
-Add the four named secrets and copy their values from hanreader-signing-setup.txt:
+Required Actions secrets (already used by Android CI):
 
-1. HANREADER_KEYSTORE_BASE64
-2. HANREADER_KEYSTORE_PASSWORD
-3. HANREADER_KEY_ALIAS
-4. HANREADER_KEY_PASSWORD
+- `HANREADER_KEYSTORE_BASE64`
+- `HANREADER_KEYSTORE_PASSWORD`
+- `HANREADER_KEY_ALIAS`
+- `HANREADER_KEY_PASSWORD`
 
-After that, run Android CI on main using "Run workflow".
-It produces both hanreader-debug-apk and hanreader-signed-release-apk artifacts.
-The release APK is signed using the stable release key. Debug APKs are signed with
-the shared test key committed as app/debug.keystore, so every debug build (CI or local)
-installs over the previous one. That key is public: it identifies test builds only.
+A push to existing `amauta` runs tests and creates `hanreader-debug-apk` and,
+when these secrets are configured, `hanreader-signed-release-apk` artifacts.
+Release tests and Android Lint run before the signed APK is uploaded.
+`amauta` does not replace the public Chinese beta. An artifact is not a RuStore
+submission or an approval by its moderators. Keep signing passwords out of logs.
 
-## Beta link for testers
+For a local signed build, set `HANREADER_KEYSTORE_FILE` and the three password /
+alias environment variables above, then run `:app:assembleRelease`. Without them,
+the local release output is unsigned and must not be distributed as ready for a store.
+Verify the final APK with `apksigner verify --verbose --print-certs`, inspect its
+manifest and compare the certificate with the previous signed release.
 
-Every successful CI build on main or a working branch replaces the APK of the
-GitHub release `beta`. The link stays the same:
-https://github.com/boikot5225-afk/HanReader/releases/download/beta/HanReader-beta.apk
+## Switching from a test build to the production signature
 
-## Switching from the debug build to the signed release
+Android cannot install a production APK over a debug APK of the same package.
+Before uninstalling anything:
 
-Android refuses to update an installed app with an APK signed by a different
-certificate, even if both APKs have the same package name. Moving from the
-debug APK to the release APK therefore needs a reinstall:
+1. Install the **debug 0.26.4** (versionCode 72) over the previous debug app.
+2. Save the manual backup to a file outside the app and check it exists. From
+   0.26.4 / backup format 4 it includes books, reading progress, cards, manual
+   meanings, AI corrections, rejected suggestions and cached paid checks.
+3. Only then uninstall the debug app and install the signed release 0.26.4.
+4. Restore the archive. Enter the DeepSeek key again and enable AI if wanted.
 
-1. In the installed debug HanReader (0.7.0 or newer): Settings → «Резервная копия» →
-   «Сохранить копию в файл». Check that the file exists.
-2. Uninstall the debug HanReader.
-3. Install `hanreader-signed-release-apk` from the latest Android CI run.
-4. Settings → «Резервная копия» → «Восстановить из файла».
+Archives from 0.26.3 and earlier do not contain AI results. Exporting from an old
+version before uninstalling would lose those results. Never promise to recover
+results which were not included in the archive. AI mode and API key are never
+exported; the encrypted API key is also excluded from Android's system backups.
+Book ids and context/cache hashes remain unchanged during restore, allowing the
+same checks to be reused without API calls. All later production updates must
+keep the package and certificate and increase versionCode.
 
-All later release APKs install as normal updates over the release build.
+Store listing text and release notes: `store/amauta/`.
 
 ## Keep the key safe
 

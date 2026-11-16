@@ -115,7 +115,7 @@ class MigrationTest {
             assertEquals(listOf("雷蒙德"), db.userNameDao().all().map { it.word })
             assertEquals(emptyList<String>(), db.bookDao().ignoredWords(7)) // cascade
         }
-        assertEquals(14, db.openHelper.readableDatabase.version)
+        assertEquals(15, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -166,7 +166,7 @@ class MigrationTest {
             assertEquals(setOf("red", "@7|b|limitarse"), db.userMeaningDao().observeAll("es-ES").first().map { it.word }.toSet())
             assertEquals(setOf("端", "@7|b|limitarse"), db.userMeaningDao().observeAll("zh-CN").first().map { it.word }.toSet())
         }
-        assertEquals(14, db.openHelper.readableDatabase.version)
+        assertEquals(15, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

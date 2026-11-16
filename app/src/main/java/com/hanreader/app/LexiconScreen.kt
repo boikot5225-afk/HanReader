@@ -453,6 +453,8 @@ private fun LearningSettingsDialog(
                     style = MaterialTheme.typography.bodySmall
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                com.hanreader.app.ai.AiSettingsSection()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 BackupSection(vm)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 CrashReportsSection()

@@ -122,11 +122,10 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
         val app = getApplication<Application>()
         viewModelScope.launch {
             onDone(runCatching {
-                val cards = dao.allCards()
                 val db = LexiconDatabase.get(app)
-                val backup = Backup(
+                val backup = db.withTransaction { Backup(
                     exportedAt = System.currentTimeMillis(),
-                    cards = cards,
+                    cards = dao.allCards(),
                     examples = dao.allExamples(),
                     settings = com.hanreader.app.lang.Languages.ALL.map { settingsStore.load(it.tag) },
                     knownWords = knownDao.all(),
@@ -143,14 +142,15 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                     ),
                     userMeanings = db.userMeaningDao().all(),
                     userSplits = db.userSplitDao().all().map { it.word },
-                    activity = db.statsDao().allDays()
-                )
+                    activity = db.statsDao().allDays(),
+                    aiChecks = db.aiCheckDao().all()
+                ) }
                 withContext(Dispatchers.IO) {
                     val stream = app.contentResolver.openOutputStream(uri, "wt")
                         ?: error("Не удалось открыть файл для записи")
                     stream.use { BackupArchive.write(it, backup, booksDir) }
                 }
-                cards.size
+                backup.cards.size
             })
         }
     }
@@ -208,6 +208,9 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         db.highlightDao().insertAllStrict(lib.highlights)
                         lib.ignored.chunked(2_000).forEach { books.insertWords(it) }
                         db.statsDao().putProgressAll(lib.progress)
+                        // Deleting books cascades old checks. Restore every state and the exact
+                        // ids/hashes so reopening the same context never spends tokens again.
+                        backup.aiChecks?.let { db.aiCheckDao().restore(it) }
                     }
                     backup.userSplits?.let { list ->
                         db.userSplitDao().removeAll()
