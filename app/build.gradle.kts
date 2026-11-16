@@ -37,6 +37,11 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.all { test ->
+            // Robolectric sandboxes retain mapped dictionaries and native graphics between
+            // classes. Bound each worker's lifetime rather than exhausting CI direct memory.
+            test.maxHeapSize = "1g"
+            test.maxParallelForks = 1
+            test.setForkEvery(15)
             // Optional mirror for Robolectric's Android jars (set in ~/.gradle/gradle.properties).
             providers.gradleProperty("robolectricRepoUrl").orNull?.let {
                 test.systemProperty("robolectric.dependency.repo.url", it)

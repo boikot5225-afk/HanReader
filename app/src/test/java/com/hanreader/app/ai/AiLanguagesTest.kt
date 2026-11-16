@@ -107,7 +107,8 @@ class AiLanguagesTest {
 
     @Test fun englishSeparatedPhrasalVerbIsValidatedAsOneContextualUnit() {
         val f = fragment("She turned it off.", en)
-        assertEquals("turn", f.terms.first { it.original == "turned" }.lemma)
+        // The English module now recognises the separated expression before the AI check.
+        assertEquals("turn off", f.terms.first { it.original == "turned" }.lemma)
         val rows = AiContext.validate(response(f, "turned", "выключила", "turned it off"), f, "model")
         val b = chapter(f.text, en).blocks[0] as ReaderBlock.Text
         val glosses = hashMapOf<String, String>()

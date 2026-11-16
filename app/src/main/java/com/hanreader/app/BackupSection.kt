@@ -82,7 +82,7 @@ fun BackupSection(vm: LexiconViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Overline("Резервная копия")
         Text(
-            "Всё в одном файле: слова и прогресс, известные слова, книги с местом чтения, закладки, выделения и заметки. Сохраняй копию перед переустановкой или сменой телефона.",
+            "Всё в одном файле: книги и место чтения, слова и прогресс, закладки, заметки, свои переводы, ИИ-исправления и выполненные проверки. Ключ DeepSeek в копию не входит. Сохраняй копию перед переустановкой или сменой телефона.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall
         )

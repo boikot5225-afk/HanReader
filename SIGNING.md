@@ -24,6 +24,7 @@ a chat, an e-mail or a commit. Delete keystore.base64.txt after adding the secre
 
 Amauta Reader keeps package `com.hanreader.app.es`. The established private release
 key is stored in GitHub Actions secrets; do not create a replacement for this release.
+Certificate SHA-256: `59345a3b2a7007d83b95832fe30e120fb71686c413680ed86fb078f813d97859`.
 The committed `app/debug.keystore` is public and must never sign a store release.
 A separate older app uses `com.hanreader.app`: its RuStore listing cannot be updated
 with the Amauta package. Use the Amauta listing or create one for this package.

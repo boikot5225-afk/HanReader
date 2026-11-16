@@ -106,13 +106,18 @@ jobs:
       - name: Test and build signed release APK
         if: env.HANREADER_HAS_RELEASE_KEY == 'true'
         run: gradle :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --stacktrace
-      # The release key's certificate fingerprint, to compare with hanreader-signing-setup.txt.
-      - name: Show release signature
+      # Keep the existing production identity. A different key would break Android updates.
+      - name: Verify release signature and manifest
         if: env.HANREADER_HAS_RELEASE_KEY == 'true'
         shell: bash
         run: |
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
           DIGEST=$("$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1)
+          test "$DIGEST" = '59345a3b2a7007d83b95832fe30e120fb71686c413680ed86fb078f813d97859'
+          AAPT="$(dirname "$APKSIGNER")/aapt2"
+          BADGING=$("$AAPT" dump badging app/build/outputs/apk/release/app-release.apk)
+          [[ "$BADGING" != *application-debuggable* ]]
+          "$(dirname "$APKSIGNER")/zipalign" -c -P 16 4 app/build/outputs/apk/release/app-release.apk
           echo "Release signing certificate SHA-256: $DIGEST"
           echo "Подпись релиза (SHA-256): \`$DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload signed release APK
