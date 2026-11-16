@@ -54,7 +54,8 @@ object BackupFormat {
     /** 2: HanReader library, word sources. Version 1 files still restore. */
     /** 3 (0.24.2): known words, names and meanings carry their language. */
     /** 4: context corrections, paid checks and rejections (book ids and hashes stay unchanged). */
-    const val VERSION = 4
+    /** 5: an empty base explicitly means the requested word has no dictionary hint. */
+    const val VERSION = 5
 
     fun encode(backup: Backup): String {
         validateAi(backup.aiChecks, backup.library)
@@ -338,7 +339,7 @@ object BackupFormat {
             if (c.bookId !in books || !keys.add(c.cacheKey) || !hash.matches(c.cacheKey) || !hash.matches(c.contextHash) ||
                 c.chapter < 0 || c.block < 0 || c.termStart < 0 || c.termEnd <= c.termStart ||
                 c.start < 0 || c.end <= c.start || c.start > c.termStart || c.end < c.termEnd ||
-                c.original.isBlank() || c.base.isBlank() || c.createdAt < 0 ||
+                c.original.isBlank() || c.createdAt < 0 ||
                 c.confidence !in setOf("high", "medium", "low") ||
                 c.state !in setOf("checked", "accepted", "proposed", "rejected") ||
                 (c.translation != null && c.translation.isBlank()) ||

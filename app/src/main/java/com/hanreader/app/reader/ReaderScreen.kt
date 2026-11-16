@@ -228,7 +228,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val validAiRows = readerWork(emptyList<AiCheck>(), aiRows, chapter, engine, userMeanings, aiConfig, appearance.esVariant, aiResource) {
         if (!supportedAi || !aiConfig.enabled || chapter == null || aiEngine == null) emptyList()
         else aiRows.filter { it.chapter == chapter.index }.groupBy { it.block }.flatMap { (bi, rows) ->
-            val fragment = AiContext.build(book.entity.id, chapter, bi, aiResource, aiEngine, userMeanings, appearance.esVariant.name)
+            val fragment = AiContext.build(book.entity.id, chapter, bi, aiResource, aiEngine, userMeanings, appearance.esVariant.name,
+                includeMissing = true)
             if (fragment == null) emptyList() else AiContext.applicable(fragment, rows, aiConfig.model).filter { row ->
                 fragment.protected.none { it.first < row.end && it.last >= row.start }
             }
@@ -401,7 +402,11 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                         appearance.esVariant.name, range = start until end)
                 }
                 if (fragment != null) vm.checkAi(fragment, automatic = false)
-                else ai.repository.notice("Для этого выделения нет доступной словарной подсказки, оно защищено ручным значением или абзац слишком длинный.")
+                else ai.repository.notice(when {
+                    paragraph.text.length > AiContext.MAX_PARAGRAPH -> "Абзац слишком длинный для контекстной проверки (более ${AiContext.MAX_PARAGRAPH} символов)."
+                    paragraph.heading -> "Проверка доступна для слов в тексте главы, кроме заголовков."
+                    else -> "Не удалось подготовить выделение для проверки. Выбери слово или выражение без своего перевода."
+                })
             } finally { manualAiJob = null }
         }
     }
@@ -1751,7 +1756,7 @@ internal fun WordSheet(
                 AiWordControls(aiCheck, aiEnabled, aiBusy, aiMessage, userMeaning != null, onAiCheck, onAiState)
             }
             MeaningSummary(primaryMeaning, russian,
-                selectedMeaning != null || es.firstOrNull()?.entry?.contextMeaning != null,
+                aiTranslation != null || selectedMeaning != null || es.firstOrNull()?.entry?.contextMeaning != null,
                 own?.first, userMeaning != null || aiTranslation != null || nameInRussian != null || russian.isNotEmpty())
             DoubtRow(word, cardWord, primaryMeaning, sentence, doubtSource) { correctingHere = true; correcting = true }
             key(selection) { OwnMeaning(word, own, editing = correcting, startHere = correctingHere, onEditingChange = { open -> if (open) correctingHere = false; correcting = open }, suggestions = remember(word, russian, es) {

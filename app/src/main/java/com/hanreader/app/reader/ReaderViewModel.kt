@@ -83,7 +83,8 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
                 val meanings = db.userMeaningDao().all().filter { it.language.isEmpty() || it.language == lang }.associate { it.word to it.meaning }
                 withContext(Dispatchers.Default) {
                     val fresh = com.hanreader.app.ai.AiContext.build(fragment.book, chapter, fragment.block,
-                        open.epub.chapters[chapter.index].path, engine, meanings, com.hanreader.app.AppearanceStore.appearance.value.esVariant.name)
+                        open.epub.chapters[chapter.index].path, engine, meanings, com.hanreader.app.AppearanceStore.appearance.value.esVariant.name,
+                        includeMissing = true)
                     fresh != null && fresh.contextHash == fragment.contextHash && fragment.terms.all { old ->
                         fresh.terms.any { it.start == old.start && it.base == old.base && it.lemma == old.lemma &&
                             (it.reading == old.reading || old.end > it.end) }

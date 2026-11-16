@@ -31,7 +31,10 @@ data class AiFragment(val book: Long, val chapter: Int, val block: Int, val reso
         .put("terms", JSONArray().apply { terms.forEach { t -> put(JSONObject()
             .put("term_id", t.id).put("original", t.original).put("lemma", t.lemma)
             .put("current_translation", t.base).put("start", t.start).put("end", t.end)
-            .put("sentence", t.sentence).apply { t.reading?.let { put("reading", it) } }) } })
+            .put("sentence", t.sentence).apply {
+                if (t.base.isBlank()) put("translation_missing", true)
+                t.reading?.let { put("reading", it) }
+            }) } })
 }
 
 /** Source positions, never page coordinates. Existing ContextMeanings keys retain their semantics. */
@@ -53,7 +56,8 @@ object AiContext {
 
     fun build(book: Long, chapter: ChapterContent, blockIndex: Int, resource: String, engine: LanguageModule,
               meanings: Map<String, String>, variant: String,
-              glosses: Map<String, String>? = null, range: IntRange? = null): AiFragment? {
+              glosses: Map<String, String>? = null, range: IntRange? = null,
+              includeMissing: Boolean = false): AiFragment? {
         val block = chapter.blocks.getOrNull(blockIndex) as? ReaderBlock.Text ?: return null
         if (!supports(engine.info.tag)) return null
         if (block.heading || block.text.length > MAX_PARAGRAPH) return null
@@ -98,7 +102,10 @@ object AiContext {
             if (range != null && (end <= range.first || token.start > range.last)) continue
             if (range != null) end = maxOf(end, range.last + 1)
             if (protected.any { it.first < end && it.last >= token.start }) continue
-            val base = engine.glossShort(token)?.takeIf { it.isNotBlank() } ?: continue
+            // Unknown entries can be requested explicitly. Normal automatic candidate
+            // selection still requires a dictionary hint; includeMissing is for saved overlays.
+            val base = engine.glossShort(token)?.takeIf { it.isNotBlank() }
+                ?: if (range != null || includeMissing) "" else continue
             if (glosses != null && glossOf(glosses, token, blockIndex).isNullOrBlank()) continue
             val original = text.substring(token.start, end)
             val key = ContextMeanings.keyOf(token, engine)

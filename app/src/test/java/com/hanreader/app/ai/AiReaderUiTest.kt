@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import com.hanreader.app.*
 import com.hanreader.app.lang.Languages
@@ -14,6 +15,7 @@ import com.hanreader.app.reader.ReaderScreen
 import com.hanreader.app.reader.ReaderViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.*
@@ -42,23 +44,24 @@ class AiReaderUiTest {
     private lateinit var vm: ReaderViewModel
     private lateinit var ai: ContextAi
     private val calls = AtomicInteger()
+    private val missingEntry get() = testName.methodName.startsWith("englishMissing")
     private val language get() = when {
         testName.methodName.startsWith("english") -> Languages.ENGLISH
         testName.methodName.startsWith("chinese") -> Languages.CHINESE
         else -> Languages.SPANISH
     }
     private val sourceText get() = when (language) {
-        Languages.ENGLISH -> "She sat on the bank by the river."
+        Languages.ENGLISH -> if (missingEntry) "The globally-admired writer arrived." else "She sat on the bank by the river."
         Languages.CHINESE -> "他在银行门口等朋友。"
         else -> "Buscaba una pista en los periódicos."
     }
     private val target get() = when (language) {
-        Languages.ENGLISH -> "bank"
+        Languages.ENGLISH -> if (missingEntry) "globally-admired" else "bank"
         Languages.CHINESE -> "银行"
         else -> "pista"
     }
     private val expected get() = when (language) {
-        Languages.ENGLISH -> "берег"
+        Languages.ENGLISH -> if (missingEntry) "всемирно признанный" else "берег"
         Languages.CHINESE -> "банк"
         else -> "улика"
     }
@@ -74,7 +77,7 @@ class AiReaderUiTest {
         val settings = AiSettings(app, AiKeyVault(app) { aes })
         settings.vault.save("mock-key-not-a-real-account")
         settings.refresh()
-        settings.update(settings.config.value.copy(enabled = true, consent = true, automatic = true))
+        settings.update(settings.config.value.copy(enabled = true, consent = true, automatic = !missingEntry))
         ai = ContextAi(app, settings, AiClient { _, _, payload ->
             calls.incrementAndGet()
             assertEquals(language.tag, payload.getString("language"))
@@ -115,6 +118,41 @@ class AiReaderUiTest {
     @Test fun readingAutomaticallyChecksTheVisibleParagraphAndReopenWithLargerFontUsesCache() = readingAndReopeningUseCache()
     @Test fun englishReadingAutomaticallyChecksAndReusesCache() = readingAndReopeningUseCache()
     @Test fun chineseReadingAutomaticallyChecksAndReusesCache() = readingAndReopeningUseCache()
+
+    @Test fun englishMissingDictionaryEntryPassesReaderValidationAndSurvivesReopening() {
+        var imported: Result<Long>? = null
+        compose.runOnIdle { vm.importBook(Uri.fromFile(epub())) { imported = it } }
+        await { imported != null }
+        val id = imported!!.getOrThrow()
+        compose.runOnIdle { vm.openBook(id) }
+        await { vm.open.value?.loading == false && vm.aiReady.value }
+        fun fragment(): AiFragment {
+            val open = vm.open.value!!
+            val ch = open.chapter!!
+            val block = ch.blocks.single() as com.hanreader.app.reader.ReaderBlock.Text
+            val token = block.tokens.single { it.text == target }
+            return AiContext.build(id, ch, 0, open.epub.chapters[ch.index].path, vm.engine.value!!,
+                emptyMap(), "ANY", range = token.start until token.end)!!
+        }
+        val f = fragment()
+        assertEquals("", f.terms.single().base)
+        compose.runOnIdle { vm.viewModelScope.launch { vm.checkAi(f, false) } }
+        await { ai.repository.message.value != null }
+        val rows = runBlocking { ai.repository.observe(id).first() }
+        assertEquals(expected, rows.single().translation)
+        assertEquals(1, calls.get())
+        compose.runOnIdle { vm.closeBook() }
+        await { vm.open.value == null }
+        compose.runOnIdle { vm.openBook(id) }
+        await { vm.open.value?.loading == false && vm.aiReady.value }
+        val reopened = fragment()
+        compose.runOnIdle { vm.viewModelScope.launch { vm.checkAi(reopened, false) } }
+        compose.waitForIdle()
+        assertEquals(1, calls.get())
+        val whole = AiContext.build(id, vm.open.value!!.chapter!!, 0, reopened.resource, vm.engine.value!!,
+            emptyMap(), "ANY", includeMissing = true)!!
+        assertEquals(rows, AiContext.applicable(whole, rows, ai.settings.config.value.model))
+    }
 
     private fun readingAndReopeningUseCache() {
         var imported: Result<Long>? = null

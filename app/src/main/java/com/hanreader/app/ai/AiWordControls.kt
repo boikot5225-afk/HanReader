@@ -13,10 +13,10 @@ fun AiWordControls(row: AiCheck?, enabled: Boolean, busy: Boolean, message: Stri
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (row != null) {
             Text("DeepSeek · ${row.original}", style = MaterialTheme.typography.labelMedium)
-            Text("Исходная подсказка: ${row.base}", style = MaterialTheme.typography.bodySmall)
+            Text(if (row.base.isBlank()) "Исходное значение: в словаре отсутствует" else "Исходная подсказка: ${row.base}", style = MaterialTheme.typography.bodySmall)
             row.translation?.let { Text((if (row.state == "accepted" && !manual) "В этом контексте: " else "Предложение: ") + it) }
             row.explanation?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            if (row.state == "checked") Text("Проверено: исходное значение сохранено.", style = MaterialTheme.typography.bodySmall)
+            if (row.state == "checked") Text(if (row.base.isBlank()) "Надёжное значение не найдено." else "Проверено: исходное значение сохранено.", style = MaterialTheme.typography.bodySmall)
             if (row.state == "rejected") Text("Исправление отклонено; повторно автоматически не применяется.", style = MaterialTheme.typography.bodySmall)
             if (row.state == "proposed" && !manual) TextButton(onClick = { onState(row, "accepted") }) { Text("Применить здесь") }
             if (row.state in setOf("accepted", "proposed")) TextButton(onClick = { onState(row, "rejected") }) { Text("Отменить исправление ИИ") }

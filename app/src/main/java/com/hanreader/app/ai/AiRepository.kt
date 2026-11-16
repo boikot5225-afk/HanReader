@@ -57,7 +57,7 @@ class AiRepository(
         if (!c.enabled || !c.consent || !c.hasKey || automatic && !c.automatic) return@withLock emptyList()
         val existing = fragment.terms.mapNotNull { dao.get(fragment.key(it, c.model)) }
         val cached = existing.mapTo(HashSet()) { it.cacheKey }
-        val pending = fragment.terms.filter { fragment.key(it, c.model) !in cached &&
+        val pending = fragment.terms.filter { (!automatic || it.base.isNotBlank()) && fragment.key(it, c.model) !in cached &&
             (!automatic || fragment.key(it, c.model) !in attempts) }
         if (pending.isEmpty() && existing.isNotEmpty() && !automatic) _message.value = "Показан сохранённый результат. Новый запрос не нужен."
         val out = existing.toMutableList()

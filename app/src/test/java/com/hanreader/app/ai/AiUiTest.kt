@@ -37,8 +37,8 @@ class AiUiTest {
     }
     @Before fun setup() { Languages.current = Languages.SPANISH; speaker = Speaker(app) }
     @After fun cleanup() { speaker.close(); Languages.current = previous }
-    private fun show(expression: Boolean = false, manual: Boolean = false, chinese: Boolean = false, english: Boolean = false) {
-        val text = when { chinese -> "他终于回来了。"; english -> "She sat on the bank by the river."
+    private fun show(expression: Boolean = false, manual: Boolean = false, chinese: Boolean = false, english: Boolean = false, missing: Boolean = false) {
+        val text = when { missing -> "The globally-admired writer arrived."; chinese -> "他终于回来了。"; english -> "She sat on the bank by the river."
             expression -> "Se van identificando."; else -> "Buscaba una pista en los periódicos." }
         val engine = when {
             chinese -> ZhEngine(com.hanreader.app.zh.ZhSegmenterTest.dict, 0)
@@ -50,12 +50,12 @@ class AiUiTest {
         val tokens = if (chinese || english) engine.chapter(listOf(text), TextOptions())(text).tokens
         else Regex("\\p{L}+|\\s+|[^\\p{L}\\s]").findAll(text).map { RToken(it.value, "",
             if (it.value.first().isLetter()) TokenKind.HAN else TokenKind.PUNCT, it.range.first, it.range.last + 1, true) }.toList()
-        val target = when { chinese -> "回来"; english -> "bank"; expression -> "van"; else -> "pista" }
+        val target = when { missing -> "globally-admired"; chinese -> "回来"; english -> "bank"; expression -> "van"; else -> "pista" }
         val index = tokens.indexOfFirst { it.text == target }
         assertTrue(index >= 0)
         val start = if (expression) 0 else tokens[index].start
         val end = if (expression || chinese) text.length - 1 else tokens[index].end
-        val translation = when { chinese -> "вернулся"; english -> "берег"; expression -> "постепенно отождествляются"; else -> "улика" }
+        val translation = when { missing -> "всемирно признанный"; chinese -> "вернулся"; english -> "берег"; expression -> "постепенно отождествляются"; else -> "улика" }
         val row = AiCheck("ui", 1, 0, 0, "hash", tokens[index].start, tokens[index].end, start, end,
             text.substring(start, end), engine.glossShort(tokens[index]).orEmpty(), translation, "По контексту.", "high", "accepted")
         compose.setContent {
@@ -101,6 +101,14 @@ class AiUiTest {
         show(english = true)
         compose.onNodeWithText("Сохранить в карточки").performScrollTo().performClick()
         compose.runOnIdle { assertEquals("bank" to "берег", saved); assertTrue(!savedReading.isNullOrBlank()) }
+    }
+
+    @Test fun missingDictionaryWordShowsContextualMeaningAndSavesItToCards() {
+        show(english = true, missing = true)
+        compose.onNodeWithText("Исходное значение: в словаре отсутствует").performScrollTo().assertExists()
+        compose.onNodeWithText("По контексту").performScrollTo().assertExists()
+        compose.onNodeWithText("Сохранить в карточки").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals("globally-admired" to "всемирно признанный", saved) }
     }
 
     @Test fun chineseConstructionWithoutSpacesSavesTheWholeSpanAndPreservesPinyin() {

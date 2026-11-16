@@ -145,6 +145,42 @@ class AiLanguagesTest {
             term.original, term.lemma, term.base)).toString()), spanish.key(term, "model"))
     }
 
+    @Test fun unknownHyphenatedWordCanBeRequestedManuallyAndReusedWithoutAutomaticRequests() = runBlocking {
+        val text = "The globally-admired writer arrived."
+        val ch = chapter(text, en)
+        val block = ch.blocks[0] as ReaderBlock.Text
+        val token = block.tokens.single { it.text == "globally-admired" }
+        assertNull(en.glossShort(token))
+        val f = AiContext.build(1, ch, 0, "chapter.xhtml", en, emptyMap(), "ANY",
+            range = token.start until token.end)!!
+        assertEquals("globally-admired", f.terms.single().original)
+        assertEquals("", f.terms.single().base)
+        assertTrue(f.json().getJSONArray("terms").getJSONObject(0).getBoolean("translation_missing"))
+        var calls = 0
+        val config = AiConfig(enabled = true, automatic = true, consent = true, hasKey = true)
+        fun repository() = AiRepository(db, AiClient { _, _, _ ->
+            calls++; AiReply(response(f, "globally-admired", "всемирно признанный"), 10, true)
+        }, { config }, { "mock-key" })
+        var repo = repository()
+        // Defence in depth: even a manually constructed missing term cannot trigger automatic billing.
+        assertTrue(repo.check(f, true) { true }.isEmpty())
+        assertEquals(0, calls)
+        val rows = repo.check(f, false) { true }
+        assertEquals("всемирно признанный", rows.single().translation)
+        repo = repository()
+        assertEquals(rows, repo.check(f, false) { true }); assertEquals(1, calls)
+        val whole = AiContext.build(1, ch, 0, "chapter.xhtml", en, emptyMap(), "ANY", includeMissing = true)!!
+        assertEquals(rows, AiContext.applicable(whole, rows, config.model))
+        val glosses = hashMapOf<String, String>()
+        AiContext.overlay(glosses, block, 0, rows, false)
+        assertEquals("всемирно признанный", glossOf(glosses, token, 0))
+        val backup = Backup(1, emptyList(), emptyList(), emptyList(), library = LibraryBackup(
+            db.bookDao().all(), emptyList(), emptyList(), emptyList()), aiChecks = rows)
+        assertEquals(rows, BackupFormat.decode(BackupFormat.encode(backup)).aiChecks)
+        assertNull(AiContext.build(1, ch, 0, "chapter.xhtml", en,
+            mapOf("globally-admired" to "моё значение"), "ANY", range = token.start until token.end))
+    }
+
     @Test fun manualValuesProtectBothEnglishAndChineseAndChineseTokenCannotBeSplit() {
         for ((engine, text, key) in listOf(Triple(en, "bank", "bank"), Triple(zh, "銀行", "银行"))) {
             val ch = chapter(text, engine)
