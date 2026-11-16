@@ -105,7 +105,13 @@ jobs:
           fi
       - name: Test and build signed release APK
         if: env.HANREADER_HAS_RELEASE_KEY == 'true'
-        run: gradle :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease --stacktrace
+        # Compose UI fixtures belong to debugImplementation; exercise the production
+        # database/API/voice logic here, after the complete debug UI regression above.
+        run: >-
+          gradle :app:testReleaseUnitTest
+          --tests '*Backup*Test' --tests '*ContextAiTest' --tests '*AiKeyVaultTest'
+          --tests '*AiLanguagesTest' --tests '*ReadAloudTest'
+          :app:lintRelease :app:assembleRelease --stacktrace
       # Keep the existing production identity. A different key would break Android updates.
       - name: Verify release signature and manifest
         if: env.HANREADER_HAS_RELEASE_KEY == 'true'

@@ -18,6 +18,11 @@
   URL/токена в BuildConfig и CI. Чтение и карточки используют только Android TTS.
 - CI проверяет release unit tests / lint перед выдачей подписанного APK.
   Локальный release без закрытого ключа остаётся неподписанным.
+- После объединения: полный debug-прогон 438 тестов, 429 прошли / 9 пропущены.
+  Фикстуры Compose есть только в debug: release-прогон проверяет Backup*, ContextAi,
+  AiKeyVault, AiLanguages и ReadAloud; UI покрыт полным debug-прогоном.
+  Рабочие JVM Robolectric перезапускаются через 15 классов, heap 1 ГБ: накопление mmap
+  больших словарей больше не исчерпывает direct memory тестового процесса.
 
 ## Сайт Amauta Reader — 16 ноября
 
