@@ -88,6 +88,10 @@
   details p { color: var(--muted); max-width: 50em; margin: 12px 0 0; }
   a:focus-visible, summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 5px; }
   @media (max-width: 600px) { .shots { grid-template-columns: 1fr; max-width: 330px; margin: auto; } }
+  .key-guide { margin-top: 24px; padding: 20px 24px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+  .key-guide .steps { margin-top: 18px; }
+  .key-guide .steps li { background: var(--bg); }
+  @media (max-width: 600px) { .key-guide { padding: 18px 16px; } }
 </style>
 </head>
 <body>
@@ -166,6 +170,19 @@
       <li>Выбери, как проверять значения: вручную по кнопке «Уточнить с DeepSeek» в карточке слова или автоматически во время чтения.</li>
       <li>При автоматической проверке достаточно уверенные исправления могут применяться сразу. Неоднозначные варианты остаются предложениями. Любое изменение можно отменить.</li>
     </ol>
+    <details id="deepseek-key" class="key-guide">
+      <summary>Как получить и подключить ключ DeepSeek</summary>
+      <p>Пока для контекстного ИИ нужен твой личный API-ключ DeepSeek. <strong>Это временный способ подключения.</strong> Читать книги, пользоваться словарями и повторять карточки можно без ключа.</p>
+      <ol class="steps">
+        <li><a href="https://platform.deepseek.com/" target="_blank" rel="noopener noreferrer">Открой платформу DeepSeek</a> и войди в аккаунт или зарегистрируйся.</li>
+        <li>Перейди в раздел <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer">API keys</a>, нажми <strong>Create API key</strong> и скопируй ключ. Сохрани его сразу: после закрытия окна полный ключ больше не показывается.</li>
+        <li>Проверь API-баланс в разделе <strong>Billing</strong>. Если средств нет, пополни его доступным способом — запросы ИИ оплачиваются с этого баланса.</li>
+        <li>В Amauta Reader открой <strong>Настройки → Контекстный ИИ</strong>, вставь ключ и сохрани его.</li>
+        <li>Подтверди согласие на передачу фрагментов текста и включи ИИ. Автоматическую проверку можно включить отдельно. Для ручной проверки нажми на слово и выбери <strong>«Уточнить с DeepSeek»</strong>.</li>
+      </ol>
+      <p>Результаты проверок сохраняются на телефоне. Пока контекст и настройки анализа не изменились, повторное открытие фрагмента не требует нового запроса.</p>
+      <p><strong>Не публикуй ключ и не отправляй его в переписке.</strong> Вставляй его только в поле ключа в настройках приложения.</p>
+    </details>
     <div class="callout">
       <p><strong>Одно слово — разные значения.</strong> Например, испанское <span lang="es">pista</span> может означать «дорожка» или «улика». Исправление действует только там, где оно нужно, и не меняет перевод этого слова во всех остальных книгах. Твои исправления важнее предложений ИИ.</p>
       <p><strong>Не нужно проверять одно и то же заново.</strong> Результаты сохраняются на телефоне. Если текст и настройки не изменились, приложение использует их повторно без нового запроса к DeepSeek. В настройках можно ограничить число запросов и посмотреть расход токенов.</p>
