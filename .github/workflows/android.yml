@@ -110,7 +110,7 @@ jobs:
         run: >-
           gradle :app:testReleaseUnitTest
           --tests '*Backup*Test' --tests '*ContextAiTest' --tests '*AiKeyVaultTest'
-          --tests '*AiLanguagesTest' --tests '*ReadAloudTest'
+          --tests '*AiLanguagesTest' --tests '*AiResponseTest' --tests '*ReadAloudTest'
           :app:lintRelease :app:assembleRelease --stacktrace
       # Keep the existing production identity. A different key would break Android updates.
       - name: Verify release signature and manifest

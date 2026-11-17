@@ -60,6 +60,7 @@ class AiRepository(
         val pending = fragment.terms.filter { (!automatic || it.base.isNotBlank()) && fragment.key(it, c.model) !in cached &&
             (!automatic || fragment.key(it, c.model) !in attempts) }
         if (pending.isEmpty() && existing.isNotEmpty() && !automatic) _message.value = "Показан сохранённый результат. Новый запрос не нужен."
+        if (pending.isNotEmpty()) _message.value = null
         val out = existing.toMutableList()
         for (batch in pending.chunked(AiContext.BATCH)) {
             currentCoroutineContext().ensureActive()
@@ -71,6 +72,9 @@ class AiRepository(
                 if (!reply.finished) throw AiFailure("Ответ DeepSeek обрезан. Переводы не сохранены.")
                 var rows = try { withContext(Dispatchers.Default) { AiContext.validate(reply.content, sub, c.model) } }
                     catch (e: CancellationException) { throw e }
+                    catch (e: AiResponseFailure) {
+                        throw AiFailure("Ответ DeepSeek отклонён: ${e.problem.description} [${e.problem.name}]. Переводы не сохранены.")
+                    }
                     catch (_: Exception) { throw AiFailure("Некорректный ответ DeepSeek. Переводы не сохранены.") }
                 currentCoroutineContext().ensureActive()
                 if (config() != c || !stillValid()) break
@@ -94,6 +98,7 @@ class AiRepository(
                 out += rows
                 _message.value = if (rows.any { it.state == "accepted" }) "Контекстные значения сохранены."
                     else if (rows.any { it.state == "proposed" }) "Есть предложение ИИ — открой карточку слова."
+                    else if (rows.any { it.base.isEmpty() }) "Проверено: надёжного значения для неизвестного слова не найдено."
                     else "Проверено: перевод сохранён без изменений."
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {

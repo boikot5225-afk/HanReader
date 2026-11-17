@@ -34,7 +34,16 @@ data class AiFragment(val book: Long, val chapter: Int, val block: Int, val reso
             .put("sentence", t.sentence).apply {
                 if (t.base.isBlank()) put("translation_missing", true)
                 t.reading?.let { put("reading", it) }
-            }) } })
+            }) } }).apply {
+            // One unknown word has no prior translation to echo. Give the model an exact
+            // occurrence-specific skeleton instead of relying on the generic example.
+            terms.singleOrNull()?.takeIf { it.base.isEmpty() }?.let { t ->
+                put("response_template", JSONObject().put("results", JSONArray().put(JSONObject()
+                    .put("term_id", t.id).put("original", t.original).put("current_translation", "")
+                    .put("needs_correction", false).put("suggested_translation", JSONObject.NULL)
+                    .put("explanation", JSONObject.NULL).put("confidence", "low"))))
+            }
+        }
 }
 
 /** Source positions, never page coordinates. Existing ContextMeanings keys retain their semantics. */
@@ -136,7 +145,21 @@ object AiContext {
     }
 
     /** All-or-nothing validation: malformed or incomplete packets never become successful checks. */
-    fun validate(content: String, fragment: AiFragment, model: String): List<AiCheck> {
+    fun validate(content: String, fragment: AiFragment, model: String): List<AiCheck> = try {
+        parseResponse(content, fragment, model)
+    } catch (e: AiResponseFailure) {
+        throw e
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        throw AiResponseFailure(AiResponseProblem.FORMAT)
+    }
+
+    private fun responseRequire(valid: Boolean, problem: AiResponseProblem) {
+        if (!valid) throw AiResponseFailure(problem)
+    }
+
+    private fun parseResponse(content: String, fragment: AiFragment, model: String): List<AiCheck> {
         require(content.length in 2..100_000)
         android.util.JsonReader(java.io.StringReader(content)).use { reader ->
             reader.isLenient = false
@@ -147,41 +170,45 @@ object AiContext {
         val root = parser.nextValue() as? JSONObject ?: error("JSON object required")
         require(parser.nextClean() == '\u0000')
         val results = root.getJSONArray("results")
-        require(results.length() == fragment.terms.size)
+        responseRequire(results.length() == fragment.terms.size, AiResponseProblem.TERMS)
         val terms = fragment.terms.associateBy { it.id }
         val seen = HashSet<String>()
         val rows = ArrayList<AiCheck>()
         for (i in 0 until results.length()) {
             val r = results.getJSONObject(i)
-            val id = r.get("term_id") as? String ?: error("term_id")
-            val t = terms[id] ?: error("Unknown term")
-            require(seen.add(id))
-            require(r.get("original") == t.original && r.get("current_translation") == t.base)
-            val correct = r.get("needs_correction") as? Boolean ?: error("needs_correction")
-            val confidence = r.get("confidence") as? String ?: error("confidence")
-            require(confidence in setOf("high", "medium", "low"))
+            val id = r.get("term_id") as? String ?: throw AiResponseFailure(AiResponseProblem.TERMS)
+            val t = terms[id] ?: throw AiResponseFailure(AiResponseProblem.TERMS)
+            responseRequire(seen.add(id), AiResponseProblem.TERMS)
+            // JSON null and an empty string both mean no dictionary hint. For known
+            // hints the echo must still match exactly, including its type.
+            responseRequire(r.get("original") == t.original && r.has("current_translation") &&
+                (r.get("current_translation") == t.base || (t.base.isEmpty() && r.isNull("current_translation"))),
+                AiResponseProblem.SOURCE)
+            val correct = r.get("needs_correction") as? Boolean ?: throw AiResponseFailure(AiResponseProblem.VALUE)
+            val confidence = r.get("confidence") as? String ?: throw AiResponseFailure(AiResponseProblem.VALUE)
+            responseRequire(confidence in setOf("high", "medium", "low"), AiResponseProblem.VALUE)
             require(r.has("suggested_translation") && r.has("explanation"))
             fun optional(name: String, limit: Int): String? {
                 if (r.isNull(name)) return null
-                val s = r.get(name) as? String ?: error(name)
-                require(s.isNotBlank() && s.length <= limit && s.none { it.isISOControl() })
-                return s.trim()
+                val s = r.get(name) as? String ?: throw AiResponseFailure(AiResponseProblem.VALUE)
+                // An empty optional explanation/unused suggestion means none. A requested
+                // correction still requires a nonempty translation below.
+                responseRequire(s.length <= limit, AiResponseProblem.VALUE)
+                val normalized = s.replace(Regex("[\\r\\n\\t]+"), " ").trim()
+                responseRequire(normalized.none { it.isISOControl() }, AiResponseProblem.VALUE)
+                return normalized.takeIf { it.isNotBlank() }
             }
             val translation = optional("suggested_translation", 100)
             val explanation = optional("explanation", 600)
-            require(if (correct) translation != null else translation == null)
+            responseRequire(if (correct) translation != null else translation == null, AiResponseProblem.VALUE)
             var start = t.start
             var end = t.end
-            if (r.has("span")) {
+            if (r.has("span") && !r.isNull("span")) {
                 val span = r.getJSONObject("span")
-                require(span.get("start") is Int && span.get("end") is Int)
-                start = span.getInt("start"); end = span.getInt("end")
-                require(start <= t.start && end >= t.end && start >= 0 && end <= fragment.text.length && end > start)
-                require(start in fragment.boundaries && end in fragment.boundaries)
-                require(fragment.text.substring(start, end) == span.get("text"))
-                require(end - start <= 180)
+                val sourceRange = sourceRange(span, t, fragment)
+                start = sourceRange.first; end = sourceRange.last + 1
             }
-            require(fragment.protected.none { it.first < end && it.last >= start })
+            responseRequire(fragment.protected.none { it.first < end && it.last >= start }, AiResponseProblem.PROTECTED)
             rows += AiCheck(fragment.key(t, model), fragment.book, fragment.chapter, fragment.block,
                 fragment.contextHash, t.start, t.end, start, end, fragment.text.substring(start, end), t.base,
                 translation, explanation, confidence, if (!correct) "checked" else if (confidence == "high") "accepted" else "proposed")
@@ -190,9 +217,32 @@ object AiContext {
         val accepted = rows.filter { it.translation != null }.sortedBy { it.start }
         for ((i, a) in accepted.withIndex()) for (b in accepted.drop(i + 1)) {
             if (b.start >= a.end) break
-            require(a.start == b.start && a.end == b.end && a.translation == b.translation)
+            responseRequire(a.start == b.start && a.end == b.end && a.translation == b.translation, AiResponseProblem.CONFLICT)
         }
         return rows
+    }
+
+    /** Anchor exact source text to the requested occurrence. The model need not count UTF-16. */
+    private fun sourceRange(span: JSONObject, term: AiTerm, fragment: AiFragment): IntRange {
+        val text = span.opt("text") as? String ?: throw AiResponseFailure(AiResponseProblem.SPAN)
+        responseRequire(text.length in 1..180, AiResponseProblem.SPAN)
+        for (key in listOf("start", "end")) {
+            responseRequire(!span.has(key) || span.isNull(key) || span.get(key) is Int, AiResponseProblem.SPAN)
+        }
+        val candidates = ArrayList<IntRange>()
+        var from = 0
+        while (from <= term.start) {
+            val start = fragment.text.indexOf(text, from)
+            if (start < 0 || start > term.start) break
+            val end = start + text.length
+            if (end >= term.end && start in fragment.boundaries && end in fragment.boundaries)
+                candidates += start until end
+            from = start + 1 // Include overlapping occurrences; never silently choose one.
+        }
+        if (candidates.size == 1) return candidates.single()
+        // Old clients/models can disambiguate repeated identical phrases with exact offsets.
+        val anchored = candidates.singleOrNull { it.first == span.opt("start") && it.last + 1 == span.opt("end") }
+        return anchored ?: throw AiResponseFailure(AiResponseProblem.SPAN)
     }
 
     /** Keep only rows whose context, base value and model still match; manual values always win. */
