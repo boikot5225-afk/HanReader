@@ -502,6 +502,9 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE id = :id")
     suspend fun get(id: Long): BookEntity?
 
+    @Query("SELECT * FROM books WHERE fileName = :fileName LIMIT 1")
+    suspend fun findByFileName(fileName: String): BookEntity?
+
     @Insert
     suspend fun insert(book: BookEntity): Long
 

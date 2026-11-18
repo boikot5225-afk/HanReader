@@ -87,6 +87,15 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf<BookEntity?>(null) }
     var langBook by remember { mutableStateOf<BookEntity?>(null) }
+    val demo = DemoBooks.forLanguage(com.hanreader.app.lang.Languages.current.tag)
+    val openDemo: () -> Unit = {
+        importing = true
+        error = null
+        vm.openDemoBook { result ->
+            importing = false
+            result.onSuccess(onOpen).onFailure { error = it.message }
+        }
+    }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             importing = true
@@ -137,12 +146,17 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
                 Panel(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            "Добавь ${com.hanreader.app.lang.Languages.current.bookAdjective} книгу" +
-                                ": EPUB, FB2, TXT или документ Word",
+                            if (demo != null) "Начни с пробной книги" else "Добавь ${com.hanreader.app.lang.Languages.current.bookAdjective} книгу",
                             style = MaterialTheme.typography.titleMedium
                         )
+                        if (demo != null) {
+                            Text("${demo.title} — ${demo.russianTitle}", style = MaterialTheme.typography.bodyLarge)
+                            Text("Короткий рассказ на несколько минут. Уже в приложении — ничего скачивать не нужно.",
+                                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (!importing) BigButton("Читать пробную книгу", onClick = openDemo)
+                        }
                         Text(
-                            (if (com.hanreader.app.lang.Languages.current.readingTitle != null) "Над словами появится пиньинь. " else "") + "Нажми на слово — увидишь перевод и сохранишь его в карточки вместе с предложением из книги. Книгу можно открыть и прямо из файлового менеджера или Telegram: «Открыть с помощью» → ${com.hanreader.app.BuildConfig.APP_NAME}.",
+                            (if (com.hanreader.app.lang.Languages.current.readingTitle != null) "Над словами появится пиньинь. " else "") + "Нажми на слово — увидишь перевод и сможешь сохранить его в карточки вместе с предложением. Словарь и карточки работают без API-ключа. Свою книгу можно добавить кнопкой ниже или открыть из файлового менеджера и Telegram через «Открыть с помощью».",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -183,6 +197,9 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
             } else {
                 BigButton("Добавить книгу", onClick = { picker.launch(BOOK_MIME_TYPES) })
                 androidx.compose.material3.TextButton(onClick = onPaste, modifier = Modifier.fillMaxWidth()) { Text("Вставить текст") }
+                if (demo != null && books.isNotEmpty()) {
+                    TextButton(onClick = openDemo, modifier = Modifier.fillMaxWidth()) { Text("Открыть пробную книгу") }
+                }
                 Text(
                     "EPUB, FB2, FB2.ZIP, TXT, DOCX, DOC",
                     Modifier.fillMaxWidth().padding(top = 6.dp),

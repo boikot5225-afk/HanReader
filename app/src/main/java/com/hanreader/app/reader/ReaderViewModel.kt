@@ -274,6 +274,36 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
 
     fun clearMessage() { _message.value = null }
 
+    /** One ordinary library copy, on demand. Never downloads, resets progress or duplicates it. */
+    fun openDemoBook(onDone: (Result<Long>) -> Unit) {
+        val sample = DemoBooks.forLanguage(lang)
+        if (sample == null) { onDone(Result.failure(EpubException("Для этого языка пока нет пробной книги"))); return }
+        viewModelScope.launch {
+            val result = try {
+                Result.success(withContext(Dispatchers.IO) {
+                    DemoBooks.importMutex.withLock {
+                        val existing = books.findByFileName(sample.fileName)
+                        val target = File(booksDir, sample.fileName)
+                        if (existing != null && target.isFile && target.length() > 0) return@withLock existing.id
+                        val temp = File.createTempFile("demo-", ".tmp", booksDir)
+                        try {
+                            getApplication<Application>().assets.open(sample.asset).use { input ->
+                                temp.outputStream().use { output -> input.copyTo(output) }
+                            }
+                            if (existing != null) {
+                                // Restore a missing bundled file without losing bookmarks or meanings.
+                                if (!temp.renameTo(target)) temp.copyTo(target, overwrite = true)
+                                existing.id
+                            } else importFile(temp, System.currentTimeMillis(), sample.title, sample.fileName)
+                        } finally { temp.delete() }
+                    }
+                })
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { Result.failure(EpubException("Не удалось открыть пробную книгу. Попробуй ещё раз.")) }
+            onDone(result)
+        }
+    }
+
     /**
      * Copies the chosen file into private storage, recognises its format (EPUB, FB2, FB2.ZIP, TXT)
      * from the content, checks that it opens, saves a cover thumbnail and adds it to the library.
@@ -319,13 +349,13 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
     }
 
     /** Recognises, checks and stores a book file copied to [temp]; returns the new book's id. */
-    private suspend fun importFile(temp: File, stamp: Long, shownName: String?): Long {
+    private suspend fun importFile(temp: File, stamp: Long, shownName: String?, storedName: String? = null): Long {
         val format = BookFiles.sniff(temp)
         if (format == null) {
             temp.delete()
             throw EpubException("Это не книга: поддерживаются EPUB, FB2, TXT, DOCX и DOC")
         }
-        val name = "book-$stamp.${format.extension}"
+        val name = storedName ?: "book-$stamp.${format.extension}"
         val target = File(booksDir, name)
         if (!temp.renameTo(target)) { temp.copyTo(target, overwrite = true); temp.delete() }
         var language: com.hanreader.app.lang.LanguageInfo? = null
