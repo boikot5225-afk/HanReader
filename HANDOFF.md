@@ -31,7 +31,19 @@
   прошёл без ошибок: /tmp/amauta-demo-final.log.
 - Посмотрены снимки библиотеки и читалки, build/screens/demo-*; повторная генерация
   EPUB дала одинаковые SHA-256. Документ: docs/DEMO_BOOKS_0.26.9.md.
-  Телефон не подключён, настоящий DeepSeek не вызывался. CI/APK ещё в работе.
+  Телефон не подключён, настоящий DeepSeek не вызывался.
+- CI 44391238701 — success: полный debug-прогон, release-проверки, lint и оба APK.
+  Источник 9222f898d1bec4314aba4ea6d8c953156d9b3fa1, версия 0.26.9/code77.
+  Release 52 153 769 байт, SHA-256 d68780fd8844b03cc76d3f9a57f6e764870d90729c9e7ee33665a1c1b72f9b1e.
+  Debug 61 645 942 байт, SHA-256 0d18c9ddb96776b061402683f4caf63939997f897c345bfb382ebbb30cb69897.
+  Сертификаты прежние, manifest/debuggable/zipalign16 проверены. В APK только три
+  разрешённых EPUB, их байты совпадают с исходными assets; других книг, приватных
+  ключей/настроек/серверной озвучки нет. DemoBooks/openDemoBook присутствуют в DEX.
+  Отчёты проверки и файлы: .work/release/0.26.9/.
+- Оба APK переданы в личный Drive владельца; metadata/размеры прочитаны после загрузки:
+  release https://drive.google.com/file/d/1ats1Wgrp19ee7sifUyJgGjm5V17hhkhB/view?usp=drivesdk
+  debug https://drive.google.com/file/d/19w3FVrvucuBu36W87-MffQTlYFcsM8fh/view?usp=drivesdk
+  В магазины не отправляли. Новых веток нет; изменения сайта по-прежнему отдельно.
   Изменения сайта не включать в коммит/сборку.
 
 ## Скорость открытия и обновление подсказок — 0.26.8
