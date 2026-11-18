@@ -85,13 +85,13 @@ class EnglishOpeningUiTest {
         compose.runOnIdle { vm.openBook(id) }
         awaitVm(10_000) { vm.openingError.value != null }
         compose.onNodeWithText("Не удалось открыть книгу", substring = true).assertExists()
-        compose.onNodeWithText("Назад").performClick()
+        compose.onNodeWithText("В библиотеку").performClick()
         compose.runOnIdle { assertTrue(closed) }
     }
 
     @Test fun loadingCanBeClosedBeforeAChapterHasBeenPrepared() {
         compose.onNodeWithText("Открываю книгу…").assertExists()
-        compose.onNodeWithText("Назад").performClick()
+        compose.onNodeWithText("В библиотеку").performClick()
         compose.runOnIdle { assertTrue(closed) }
     }
 }

@@ -141,7 +141,7 @@ private fun <T> readerWork(initial: T, vararg keys: Any?, work: () -> T): T {
 @OptIn(ExperimentalMaterial3Api::class, FlowPreview::class, ExperimentalLayoutApi::class)
 @Composable
 fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
-    BackHandler(onBack = onClose)
+    BackHandler { vm.closeBook(); onClose() }
     val open by vm.open.collectAsState()
     val saved by vm.savedWords.collectAsState()
     // Underlined as "in study": once learned (30+ days) a word reads like any known word.
@@ -150,15 +150,15 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val known by vm.knownWords.collectAsState()
     val pinyinMode by vm.pinyinMode.collectAsState()
     val speed by vm.speed.collectAsState()
+    val loadingState by vm.loadingState.collectAsState()
+    // Keep the document launcher alive if loading completes while the file picker is open.
+    val saveLoadingReport = rememberReaderReportSaver()
     val book = open ?: run {
         val error by vm.openingError.collectAsState()
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (error == null) CircularProgressIndicator()
-                Text(error ?: "Открываю книгу…", Modifier.padding(horizontal = 24.dp))
-                TextButton(onClick = onClose) { Text("Назад") }
-            }
-        }
+        val initial = remember { ReaderLoadState(ReaderLoadStage.FILE) }
+        ReaderLoadingPanel(loadingState ?: initial.copy(failure = if (error != null) ReaderLoadFailure.FILE else null),
+            onCancel = { vm.closeBook(); onClose() }, onRetry = vm::retryLoading,
+            initialLabel = if (loadingState == null) "Открываю книгу…" else null, onSaveReport = saveLoadingReport)
         return
     }
     val context = LocalContext.current
@@ -239,7 +239,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // Names of this book (found or «Не учить») and the reader's own «Это имя».
     // Names of this chapter: a word written with a capital inside a sentence and never in lower case here
     // (Amado Carrillo) is a name at the start of a sentence too («Amado está en el Caribe»), not «любимый».
-    val chapterNames = remember(chapter, engine) {
+    val chapterNames = readerWork(emptySet<String>(), chapter, engine) {
         val eng = engine
         val out = HashSet<String>()
         if (chapter != null && eng != null && eng !is ZhEngine) {
@@ -270,7 +270,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         if (!wantRecommended || chapter == null || eng == null || readerLevel == null) emptyList()
         else Recommendations.forChapter(chapter, matcher, saved, names, bookWordMap, eng, readerLevel, appearance.recommendedPerChapter)
     }
-    val chapterWords = remember(chapter) {
+    val chapterWords = readerWork(emptySet<String>(), chapter) {
         chapter?.blocks?.flatMap { b -> (b as? ReaderBlock.Text)?.tokens?.filter { it.kind == TokenKind.HAN }?.map { it.text }.orEmpty() }?.toHashSet() ?: hashSetOf()
     }
     // Recommendations are dictionary forms (Spanish hablar); the marks and hints go on the words of
@@ -346,7 +346,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // Fading translations: a word's first few appearances carry it, the later ones only the underline.
     // Counted from where reading started in this chapter (the place the book opened at), not from its start.
     val fadeFrom = remember(chapter?.index) { if (chapter != null && book.entity.chapterIndex == chapter.index) book.entity.blockIndex else 0 }
-    val glossTokens: Map<Int, Set<Int>>? = remember(glossFor, chapter, appearance.glossFade, fadeFrom) {
+    val glossTokens: Map<Int, Set<Int>>? = readerWork(null, glossFor, chapter, appearance.glossFade, fadeFrom) {
         val g = glossFor
         if (g == null || chapter == null || !appearance.glossFade) null else fadingGlosses(chapter, g, com.hanreader.app.Appearance.GLOSS_REPEATS, fadeFrom)
     }
@@ -512,23 +512,10 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
 
     Box(Modifier.fillMaxSize().background(scheme.background)) {
         when {
-            book.error != null -> Text(book.error, Modifier.padding(bars).padding(24.dp), color = scheme.error)
-            chapter == null || book.loading && chapter.index != book.entity.chapterIndex -> Column(
-                Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                CircularProgressIndicator()
-                Spacer(Modifier.height(12.dp))
-                Text(if (engine == null) "Готовлю словарь…" else "Открываю главу…", color = scheme.onSurfaceVariant)
-                if (engine == null) {
-                    Text(
-                        "После установки или обновления — несколько секунд, один раз",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
+            book.error != null || chapter == null || book.loading && loadingState?.keepContent != true -> {
+                val initial = remember(book.entity.id) { ReaderLoadState(ReaderLoadStage.CHAPTER) }
+                ReaderLoadingPanel(loadingState ?: initial.copy(failure = if (book.error != null) ReaderLoadFailure.CHAPTER else null),
+                    onCancel = { vm.closeBook(); onClose() }, onRetry = vm::retryLoading, onSaveReport = saveLoadingReport)
             }
             appearance.mode == ReadingMode.PAGES -> PagedChapter(
                 vm = vm,
@@ -555,7 +542,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 onProgress = { progress = it },
                 registerJump = { jumpToPage = it },
                 registerBlockJump = { blockJump = it },
-                bookmarkedBlocks = chapterBookmarks.map { it.blockIndex }.toSet()
+                bookmarkedBlocks = chapterBookmarks.map { it.blockIndex }.toSet(),
+                onCancelLoading = { vm.closeBook(); onClose() }, onSaveLoadingReport = saveLoadingReport
             )
             else -> ScrollChapter(
                 vm = vm,
@@ -1050,9 +1038,12 @@ internal fun PagedChapter(
     onProgress: (ReadingProgress) -> Unit,
     registerJump: (((Int) -> Unit)?) -> Unit,
     registerBlockJump: (((Int, Int) -> Unit)?) -> Unit,
-    bookmarkedBlocks: Set<Int>
+    bookmarkedBlocks: Set<Int>,
+    onCancelLoading: (() -> Unit)? = null,
+    onSaveLoadingReport: ((ReaderLoadState) -> Unit)? = null
 ) {
     val density = LocalDensity.current
+    val saveReport = onSaveLoadingReport ?: rememberReaderReportSaver()
     val spec = LocalThemeSpec.current
     BoxWithConstraints(Modifier.fillMaxSize().padding(bars)) {
         val margin = appearance.margin.dp
@@ -1079,13 +1070,41 @@ internal fun PagedChapter(
         // produceState compares keys by equality: comparing its result to chapter with ===
         // then discarded ready pages forever without starting another pagination job.
         // A different source/chapter/geometry gets a new key, rejecting stale pages.
-        val layoutKey = remember(book.entity.id, book.epub, chapter, pageSpec, metrics) { Any() }
-        val pages by produceState<Pair<Any, List<Page>>?>(null, layoutKey) {
-            value = layoutKey to Paginator.paginate(chapter, metrics, pageSpec) { vm.imageAspect(it) }
+        // Parse duration/title are metadata, not page geometry. Background analysis may
+        // rebuild identical blocks with another parseMs: keep their prepared pages too.
+        val layoutKey = remember(book.entity.id, book.epub, chapter.index, chapter.blocks, pageSpec, metrics) { Any() }
+        var retry by remember(layoutKey) { androidx.compose.runtime.mutableIntStateOf(0) }
+        val requestKey = remember(layoutKey, retry) { Any() }
+        val pageLoading = remember(requestKey) { ReaderLoadState(ReaderLoadStage.PAGES) }
+        var pageExpired by remember(requestKey) { mutableStateOf(false) }
+        val pages by produceState<Pair<Any, Result<List<Page>>>?>(null, requestKey) {
+            val result = try {
+                Result.success(kotlinx.coroutines.withTimeout(READER_LOAD_TIMEOUT_MS) {
+                    Paginator.paginate(chapter, metrics, pageSpec) { vm.imageAspect(it) }
+                })
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) { Result.failure(e) }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { Result.failure(e) }
+            value = requestKey to result
         }
-        val list = pages?.takeIf { it.first === layoutKey }?.second
+        val result = pages?.takeIf { it.first === requestKey }?.second
+        // Keep the escape UI bounded even if image IO ignores coroutine cancellation.
+        LaunchedEffect(requestKey, result != null) {
+            if (result == null) {
+                kotlinx.coroutines.delay(READER_LOAD_TIMEOUT_MS)
+                pageExpired = true
+            }
+        }
+        val list = result?.getOrNull()?.takeUnless { pageExpired }
         if (list == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            val error = result?.exceptionOrNull()
+            ReaderLoadingPanel(pageLoading.copy(failure = when {
+                pageExpired || error is kotlinx.coroutines.TimeoutCancellationException -> ReaderLoadFailure.TIMEOUT
+                error != null -> ReaderLoadFailure.PAGES
+                else -> null
+            }), onCancel = onCancelLoading ?: vm::closeBook,
+                onRetry = { retry++ }, onScroll = { AppearanceStore.update { it.copy(mode = ReadingMode.SCROLL) } },
+                onSaveReport = saveReport)
             return@BoxWithConstraints
         }
         val hasPrev = chapter.index > 0

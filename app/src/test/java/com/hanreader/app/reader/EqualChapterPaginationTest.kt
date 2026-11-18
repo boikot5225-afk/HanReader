@@ -36,6 +36,7 @@ class EqualChapterPaginationTest {
         val entity = BookEntity(id = 7, title = "Fixture", author = "", fileName = "fixture.epub", chapterCount = 1)
         var book by mutableStateOf(OpenBook(entity, source, chapter, false))
         var ready = false
+        var registrations = 0
         compose.setContent {
             LexiconTheme {
                 val appearance = Appearance(mode = ReadingMode.PAGES)
@@ -46,11 +47,12 @@ class EqualChapterPaginationTest {
                     showPinyin = true, hidePinyinFor = null, showBanner = false, glossFor = null,
                     banner = {}, paragraph = { _, _, _ -> }, bars = PaddingValues(), speed = 200f,
                     keysEnabled = false, onTapCenter = {}, onAnyTap = { false }, onProgress = { ready = true },
-                    registerJump = {}, registerBlockJump = {}, bookmarkedBlocks = emptySet())
+                    registerJump = { if (it != null) registrations++ }, registerBlockJump = {}, bookmarkedBlocks = emptySet())
             }
         }
         compose.waitUntil(20_000) { ready }
         compose.onNodeWithText("1 / 1").assertExists()
+        val originalRegistrations = registrations
         val replacement = chapter.copy()
         assertEquals(chapter, replacement)
         assertNotSame(chapter, replacement)
@@ -59,6 +61,10 @@ class EqualChapterPaginationTest {
         compose.runOnIdle { book = book.copy(entity = entity.copy(analyzedTokens = 123), chapter = replacement) }
         compose.waitForIdle()
         compose.onNodeWithText("1 / 1").assertExists()
+        compose.runOnIdle { book = book.copy(chapter = replacement.copy(parseMs = replacement.parseMs + 17, title = "Updated title")) }
+        compose.waitForIdle()
+        compose.onNodeWithText("1 / 1").assertExists()
+        assertEquals("Chapter metadata recreated the pager", originalRegistrations, registrations)
         source.close()
     }
 }

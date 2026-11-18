@@ -317,6 +317,7 @@ private fun placeGlosses(
     only: Set<Int>? = null,
     block: Int = -1
 ): List<GlossPlaced> {
+    if (glossFor.isEmpty()) return emptyList()
     val out = ArrayList<GlossPlaced>()
     // A word broken across lines gets its translation once, over its first part.
     val byLine = items.distinctBy { it.token }.filter { tokens[it.token].kind == TokenKind.HAN && (only == null || it.token in only || block >= 0 && "@$block:${tokens[it.token].start}" in glossFor) &&
@@ -335,6 +336,28 @@ private fun placeGlosses(
         }
     }
     return out
+}
+
+/** Hint updates repaint the translation row without measuring/wrapping the source text again. */
+@Composable
+internal fun rememberParagraphLayout(
+    block: ReaderBlock.Text, widthPx: Float, metrics: RubyMetrics,
+    showPinyin: Boolean, hidePinyinFor: Set<String>?, gapPx: Float, lineGapPx: Float,
+    justify: Boolean, indent: Boolean, glossFor: Map<String, String>?,
+    only: Set<Int>?, blockIndex: Int
+): RubyLayout {
+    val hasGlossRow = glossFor != null
+    val hidden = hidePinyinFor.takeIf { showPinyin }
+    val geometry = remember(block, widthPx, metrics, showPinyin, hidden, gapPx, lineGapPx, justify, indent, hasGlossRow) {
+        layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidden,
+            gapPx, lineGapPx, justify, indent, if (hasGlossRow) emptyMap() else null, style = block.style)
+    }
+    return remember(geometry, glossFor, only, blockIndex) {
+        if (glossFor.isNullOrEmpty() || block.heading) geometry
+        else RubyLayout(geometry.items, geometry.height, geometry.hanTop, geometry.hanHeight,
+            geometry.lineHeight, geometry.lineCount, geometry.pinTop,
+            placeGlosses(geometry.items, block.tokens, glossFor, metrics, widthPx, only, blockIndex))
+    }
 }
 
 /**
@@ -390,17 +413,18 @@ fun RubyParagraph(
         val gapPx = with(density) { colors.wordGap.toPx() }
         val lineGapPx = with(density) { colors.lineGap.toPx() }
         // Names (noMarks) get no translation over them either.
-        val only = if (noMarks.isEmpty()) glossOnly else (glossOnly ?: block.tokens.indices.toSet()) - noMarks
-        val laid = remember(block, widthPx, metrics, showPinyin, hidePinyinFor, colors, glossFor, only, blockIndex) {
-            layout(block.tokens, widthPx, metrics, block.heading, showPinyin, hidePinyinFor, gapPx, lineGapPx, colors.justify, colors.indent, glossFor, only, block.style, blockIndex)
+        val only = remember(noMarks, glossOnly, block.tokens) {
+            if (noMarks.isEmpty()) glossOnly else (glossOnly ?: block.tokens.indices.toSet()) - noMarks
         }
+        val laid = rememberParagraphLayout(block, widthPx, metrics, showPinyin, hidePinyinFor,
+            gapPx, lineGapPx, colors.justify, colors.indent, glossFor, only, blockIndex)
         val shown = lines ?: (0 until laid.lineCount)
         val offsetY = shown.first * laid.lineHeight
         val heightPx = if (lines == null) laid.height else (shown.last - shown.first + 1) * laid.lineHeight
         val heightDp = with(density) { heightPx.toDp() }
         val haptics = LocalHapticFeedback.current
         Canvas(
-            Modifier.fillMaxWidth().height(heightDp).pointerInput(laid, shown) {
+            Modifier.fillMaxWidth().height(heightDp).pointerInput(laid.items, shown) {
                 // Consume only taps on a word: other taps reach the page (turn, menu).
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)

@@ -36,6 +36,63 @@ class GlossStabilityTest {
         return ReaderBlock.Text(text, false, tokens)
     }
 
+    @Test fun changingHintsReusesWordPlacementForAllThreeLanguages() {
+        var paragraph by mutableStateOf(block())
+        var hints by mutableStateOf<Map<String, String>?>(emptyMap())
+        var only by mutableStateOf<Set<Int>?>(null)
+        var width by mutableStateOf(340f)
+        var current: RubyLayout? = null
+        compose.setContent { LexiconTheme {
+            val a = Appearance(gloss = GlossMode.UNKNOWN)
+            val theme = LocalThemeSpec.current
+            val metrics = rememberRubyMetrics(rememberTextMeasurer(cacheSize = 0), a, theme, a.hanFontFor(theme).family)
+            val laid = rememberParagraphLayout(paragraph, width, metrics, false, null, 0f, 4f,
+                true, false, hints, only, 2)
+            SideEffect { current = laid }
+        } }
+        for ((language, words) in listOf(
+            Languages.SPANISH to listOf("Buscaba", "una", "pista", "en", "los", "periódicos"),
+            Languages.ENGLISH to listOf("She", "looked", "for", "a", "clue", "in", "newspapers"),
+            Languages.CHINESE to listOf("他", "在", "报纸", "寻找", "线索")
+        )) {
+            val text = words.joinToString(" ")
+            var offset = 0
+            val tokens = words.flatMap { word ->
+                val start = offset; offset += word.length + 1
+                listOf(RToken(word, "", TokenKind.HAN, start, start + word.length, true),
+                    RToken(" ", "", TokenKind.SPACE, start + word.length, offset, false))
+            }
+            compose.runOnIdle {
+                Languages.current = language
+                paragraph = ReaderBlock.Text(text, false, tokens,
+                    style = com.hanreader.app.epub.EpubTextStyle(alignment = "center", inset = true))
+                hints = mapOf(words.first() to "исходное")
+                only = null; width = 340f
+            }
+            compose.waitForIdle()
+            val geometry = current!!
+            for (update in listOf(emptyMap(), mapOf(words.first() to "новое значение ·"),
+                mapOf("@2:0" to "ручное значение"))) {
+                compose.runOnIdle { hints = update }
+                compose.waitForIdle()
+                assertSame("${language.tag}: hint update wrapped the words again", geometry.items, current!!.items)
+                assertEquals(geometry.height, current!!.height, 0f)
+            }
+            assertEquals("ручное значение", current!!.glosses.single().layout.layoutInput.text.text)
+            compose.runOnIdle { only = emptySet() }
+            compose.waitForIdle()
+            assertSame(geometry.items, current!!.items)
+            // A real geometry change must still rebuild the paragraph.
+            compose.runOnIdle { width = 220f }
+            compose.waitForIdle()
+            assertNotSame(geometry.items, current!!.items)
+            val withRow = current!!
+            compose.runOnIdle { hints = null }
+            compose.waitForIdle()
+            assertTrue(current!!.lineHeight < withRow.lineHeight)
+        }
+    }
+
     @Test fun pendingTranslationsKeepTextAtTheSameHeightUntilTheUserTurnsThemOff() {
         val b = block()
         var checked = false

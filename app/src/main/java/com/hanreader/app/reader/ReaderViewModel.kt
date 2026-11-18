@@ -59,7 +59,9 @@ data class OpenBook(
 )
 
 class ReaderViewModel @JvmOverloads constructor(app: Application,
-    private val aiOverride: com.hanreader.app.ai.ContextAi? = null) : AndroidViewModel(app) {
+    private val aiOverride: com.hanreader.app.ai.ContextAi? = null,
+    private val loadTimeoutMs: Long = READER_LOAD_TIMEOUT_MS,
+    private val bookOpener: suspend (File) -> BookSource = { BookFiles.open(it) }) : AndroidViewModel(app) {
     private val db = LexiconDatabase.get(app)
     private val books = db.bookDao()
     private val cards = db.cardDao()
@@ -97,6 +99,7 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
 
     private val openMutex = Mutex()
     private var openingJob: kotlinx.coroutines.Job? = null
+    private val preparedChapters = PreparedChapterCache()
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val analysisDispatcher = Dispatchers.Default.limitedParallelism(1)
     private val _openingError = MutableStateFlow<String?>(null)
@@ -453,76 +456,133 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
         }
     }
 
-    fun openBook(id: Long) {
-        openingJob?.cancel()
-        openingJob = viewModelScope.launch {
-            openMutex.withLock {
-                closeBookInternal()
-                _openingError.value = null
-                val entity = books.get(id) ?: run {
-                    _openingError.value = "Книга не найдена в библиотеке"
-                    return@withLock
-                }
-                var openingSource: com.hanreader.app.epub.BookSource? = null
-                val epub = runCatching {
-                    withContext(Dispatchers.IO) { BookFiles.open(File(booksDir, entity.fileName)).also { openingSource = it } }
-                }.getOrElse {
-                    runCatching { openingSource?.close() }
-                    if (it is kotlinx.coroutines.CancellationException) throw it
-                    com.hanreader.app.CrashLog.record("Открытие книги", it)
-                    _message.value = "Не удалось открыть книгу: ${it.message}"
-                    _openingError.value = _message.value
-                    return@withLock
-                }
-                if (epub.chapters.isEmpty()) {
-                    runCatching { epub.close() }
-                    _message.value = "В книге не нашлось текста"
-                    _openingError.value = _message.value
-                    return@withLock
-                }
-                _open.value = OpenBook(entity, epub)
-                loadChapterLocked(entity.chapterIndex.coerceIn(0, epub.chapters.lastIndex))
-                if (entity.analyzedTokens == 0 || prefs.getInt("analysis_v_${entity.id}", 1) < BookAnalyzer.VERSION) analyzeBook(entity.id)
-                else snapshotProgress(entity.id)
+    private var chapterJob: kotlinx.coroutines.Job? = null
+    private var loadGeneration = 0L
+    private var loadWatchdog: kotlinx.coroutines.Job? = null
+    private var retryRequest: (() -> Unit)? = null
+    private val _loadingState = MutableStateFlow<ReaderLoadState?>(null)
+    val loadingState: StateFlow<ReaderLoadState?> = _loadingState.asStateFlow()
+
+    fun retryLoading() { retryRequest?.invoke() }
+
+    private fun loadingStage(stage: ReaderLoadStage, generation: Long, keepContent: Boolean = false) {
+        loadWatchdog?.cancel()
+        val state = ReaderLoadState(stage, keepContent = keepContent)
+        _loadingState.value = state
+        // An independent timer can stop the UI even if a provider/parser ignores
+        // coroutine cancellation. Late results are rejected by the generation check.
+        loadWatchdog = viewModelScope.launch {
+            kotlinx.coroutines.delay(loadTimeoutMs)
+            if (generation == loadGeneration && _loadingState.value?.id == state.id && _loadingState.value?.failure == null) {
+                openingJob?.cancel(); chapterJob?.cancel()
+                loadingFailure(++loadGeneration, ReaderLoadFailure.TIMEOUT)
             }
         }
     }
 
-    /**
-     * [atEnd]: open on the last page (turning back from the next chapter); [block]: open at that
-     * paragraph, at character [char] of it.
-     */
-    fun goToChapter(index: Int, atEnd: Boolean = false, block: Int? = null, char: Int = 0) {
-        viewModelScope.launch { openMutex.withLock { loadChapterLocked(index, atEnd, block, char) } }
+    private fun loadingFailure(generation: Long, failure: ReaderLoadFailure) {
+        if (generation != loadGeneration) return
+        loadWatchdog?.cancel()
+        val state = _loadingState.value ?: ReaderLoadState(ReaderLoadStage.FILE)
+        _loadingState.value = state.copy(failure = failure)
+        _openingError.value = failure.label
+        _open.value = _open.value?.copy(loading = false, error = failure.label)
     }
 
-    /** Rebuilds the open chapter (names changed) without moving the reader. */
+    fun openBook(id: Long) {
+        closeBook()
+        val generation = ++loadGeneration
+        retryRequest = { openBook(id) }
+        loadingStage(ReaderLoadStage.FILE, generation)
+        _openingError.value = null
+        openingJob = viewModelScope.launch {
+            var acquired: BookSource? = null
+            var published = false
+            try {
+                kotlinx.coroutines.withTimeout(loadTimeoutMs) {
+                    // Opening an external file must not hold the publication lock: a
+                    // provider ignoring cancellation must not block the next book.
+                    val entity = books.get(id) ?: throw EpubException("missing")
+                    val epub = withContext(Dispatchers.IO) {
+                        bookOpener(File(booksDir, entity.fileName)).also { acquired = it }
+                    }
+                    if (epub.chapters.isEmpty()) throw EpubException("empty")
+                    if (generation != loadGeneration) return@withTimeout
+                    openMutex.withLock {
+                        if (generation != loadGeneration) return@withLock
+                        closeBookInternal()
+                        _open.value = OpenBook(entity, epub)
+                        published = true
+                        loadChapterLocked(entity.chapterIndex.coerceIn(0, epub.chapters.lastIndex), generation = generation)
+                        if (generation == loadGeneration && _open.value?.error == null) {
+                            if (prefs.getInt("analysis_v_${entity.id}", 0) < BookAnalyzer.VERSION) analyzeBook(entity.id)
+                            else snapshotProgress(entity.id)
+                        }
+                    }
+                }
+            } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+                loadingFailure(generation, ReaderLoadFailure.TIMEOUT)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                loadingFailure(generation, ReaderLoadFailure.FILE)
+            } finally {
+                if (!published) runCatching { acquired?.close() }
+            }
+        }
+    }
+
+    /** Chapter changes are cancellable too, including rebuilds after vocabulary analysis. */
+    fun goToChapter(index: Int, atEnd: Boolean = false, block: Int? = null, char: Int = 0) {
+        chapterJob?.cancel()
+        val generation = ++loadGeneration
+        retryRequest = { goToChapter(index, atEnd, block, char) }
+        chapterJob = viewModelScope.launch {
+            openMutex.withLock { loadChapterLocked(index, atEnd, block, char, generation) }
+        }
+    }
+
     private fun rebuildOpenChapter(o: OpenBook) {
         val c = o.chapter ?: return
         goToChapter(c.index, block = o.entity.blockIndex, char = o.entity.charOffset)
     }
 
-    private suspend fun loadChapterLocked(index: Int, atEnd: Boolean = false, block: Int? = null, char: Int = 0) {
+    private suspend fun loadChapterLocked(index: Int, atEnd: Boolean = false, block: Int? = null, char: Int = 0,
+                                         generation: Long = loadGeneration) {
         val current = _open.value ?: return
-        if (index !in current.epub.chapters.indices) return
+        if (generation != loadGeneration || index !in current.epub.chapters.indices) return
         _open.value = current.copy(loading = true, error = null)
+        val keepContent = current.chapter?.index == index
+        loadingStage(ReaderLoadStage.DICTIONARY, generation, keepContent)
+        var cacheKey: PreparedChapterKey? = null
         val result = runCatching {
-            val engine = engineCore.await()
-            val extra = namesToKeepWhole(current.entity.id)
-            val blocked = splitDao.words().toHashSet()
-            withContext(Dispatchers.Default) { ChapterBuilder.build(current.epub, index, engine, extra,
-                com.hanreader.app.AppearanceStore.appearance.value.script, blocked, checkCancelled = { coroutineContext.ensureActive() }) }
-        }
-        result.exceptionOrNull()?.let { if (it is kotlinx.coroutines.CancellationException) throw it }
-        val now = _open.value ?: return
-        _open.value = result.fold(
-            onSuccess = { now.copy(chapter = it, loading = false) },
-            onFailure = {
-                com.hanreader.app.CrashLog.record("Открытие главы $index", it)
-                now.copy(loading = false, error = "Глава не открылась: ${it.message}")
+            kotlinx.coroutines.withTimeout(loadTimeoutMs) {
+                val engine = engineCore.await()
+                if (generation != loadGeneration) throw kotlinx.coroutines.CancellationException()
+                loadingStage(ReaderLoadStage.CHAPTER, generation, keepContent)
+                val extra = namesToKeepWhole(current.entity.id)
+                val blocked = splitDao.words().toHashSet()
+                val key = PreparedChapterKey(current.epub, index, engine, extra.toSet(), blocked,
+                    com.hanreader.app.AppearanceStore.appearance.value.script)
+                cacheKey = key
+                preparedChapters[key] ?: withContext(Dispatchers.Default) { ChapterBuilder.build(current.epub, index, engine, extra,
+                    key.script, blocked, checkCancelled = { coroutineContext.ensureActive() }) }
             }
-        )
-        if (result.isSuccess && (index != now.entity.chapterIndex || atEnd || block != null)) {
+        }
+        val failure = result.exceptionOrNull()
+        if (failure is kotlinx.coroutines.CancellationException && failure !is kotlinx.coroutines.TimeoutCancellationException) throw failure
+        if (generation != loadGeneration) return
+        val now = _open.value?.takeIf { it.epub === current.epub } ?: return
+        if (failure != null) {
+            loadingFailure(generation, if (failure is kotlinx.coroutines.TimeoutCancellationException) ReaderLoadFailure.TIMEOUT else ReaderLoadFailure.CHAPTER)
+            return
+        }
+        val content = result.getOrThrow()
+        cacheKey?.let { preparedChapters.put(it, content) }
+        _open.value = now.copy(chapter = content, loading = false)
+        loadWatchdog?.cancel()
+        _loadingState.value = null
+        if (index != now.entity.chapterIndex || atEnd || block != null) {
             savePosition(index, block ?: if (atEnd) END_OF_CHAPTER else 0, if (block != null) char else 0)
         }
     }
@@ -536,9 +596,18 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
     }
 
     fun closeBook() {
-        openingJob?.cancel()
-        _open.value?.entity?.id?.let { snapshotProgress(it) }
-        viewModelScope.launch { openMutex.withLock { closeBookInternal() } }
+        openingJob?.cancel(); chapterJob?.cancel(); loadWatchdog?.cancel()
+        ++loadGeneration
+        retryRequest = null
+        val closing = _open.value
+        closing?.entity?.id?.let { snapshotProgress(it) }
+        _open.value = null
+        preparedChapters.clear()
+        images.evictAll()
+        aspects.clear()
+        _loadingState.value = null
+        _openingError.value = null
+        if (closing != null) viewModelScope.launch { openMutex.withLock { runCatching { closing.epub.close() } } }
     }
 
     /** Today's share of known words in the book: the statistics show how it grows. */
@@ -560,6 +629,8 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
         _open.value?.epub?.let { runCatching { it.close() } }
         _open.value = null
         images.evictAll()
+        aspects.clear()
+        preparedChapters.clear()
     }
 
     private val aspects = HashMap<String, Float>()
@@ -573,7 +644,7 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
             val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, o)
             if (o.outWidth > 0) o.outHeight.toFloat() / o.outWidth else null
-        }?.also { aspects[path] = it }
+        }?.also { if (_open.value?.epub === epub) aspects[path] = it }
     }
 
     // ---- Names ----
@@ -771,7 +842,7 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
             var sample = 1
             while (bounds.outWidth / (sample * 2) >= maxWidth) sample *= 2
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
-        }?.also { images.put(key, it) }
+        }?.also { if (_open.value?.epub === epub) images.put(key, it) }
     }
 
     // ---- Book vocabulary ----
