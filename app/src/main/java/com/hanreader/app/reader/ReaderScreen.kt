@@ -1074,13 +1074,16 @@ internal fun PagedChapter(
             // passing the changing map here restarted pagination on every dictionary/AI update.
             glossFor = if (appearance.gloss != GlossMode.OFF || glossFor != null) emptyMap() else null
         )
-        // The pages remember which chapter they were made for: produceState keeps its last value
-        // while the next one is computed, and pages of another chapter must never be drawn with
-        // this chapter's paragraphs (that crashed: a page item pointing at an image found text).
-        val pages by produceState<Pair<ChapterContent, List<Page>>?>(null, chapter, pageSpec, metrics) {
-            value = chapter to Paginator.paginate(chapter, metrics, pageSpec) { vm.imageAspect(it) }
+        // Use the same identity for producing and accepting pages. A rebuilt chapter can
+        // be equal by content but be another object (especially an image-only cover).
+        // produceState compares keys by equality: comparing its result to chapter with ===
+        // then discarded ready pages forever without starting another pagination job.
+        // A different source/chapter/geometry gets a new key, rejecting stale pages.
+        val layoutKey = remember(book.entity.id, book.epub, chapter, pageSpec, metrics) { Any() }
+        val pages by produceState<Pair<Any, List<Page>>?>(null, layoutKey) {
+            value = layoutKey to Paginator.paginate(chapter, metrics, pageSpec) { vm.imageAspect(it) }
         }
-        val list = pages?.takeIf { it.first === chapter }?.second
+        val list = pages?.takeIf { it.first === layoutKey }?.second
         if (list == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             return@BoxWithConstraints
