@@ -742,8 +742,9 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
         val note = wikipediaNote(target, article, definition)
         db.withTransaction {
             check(books.get(target.book) != null)
-            val existing = highlightDao.all().firstOrNull { it.bookId == target.book && it.chapterIndex == target.chapter &&
-                it.blockIndex == target.block && it.startChar == target.start && it.endChar == target.end }
+            val rows = highlightDao.all().filter { it.bookId == target.book }
+            val existing = Highlights.bookWideAt(rows.filter { it.chapterIndex == Highlights.BOOK_WIDE }, block, target.start, target.end)
+                ?: rows.firstOrNull { it.chapterIndex == target.chapter && it.blockIndex == target.block && it.startChar == target.start && it.endChar == target.end }
             if (existing != null) {
                 if (!existing.note.contains(note)) highlightDao.update(existing.copy(note = existing.note.takeIf { it.isNotBlank() }?.let { "$it\n\n$note" } ?: note))
             } else highlightDao.insert(com.hanreader.app.Highlight(bookId = target.book, chapterIndex = target.chapter,
@@ -785,7 +786,62 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
     }
 
     fun updateHighlight(h: com.hanreader.app.Highlight) {
-        viewModelScope.launch { highlightDao.update(h) }
+        viewModelScope.launch { highlightDao.updateNoteAndColor(h.id, h.bookId, h.note, h.color) }
+    }
+
+    /** A shared spelling points to an existing note; no source note is deleted or overwritten. */
+    fun linkEntity(text: String, destination: Long?, seedNote: String = "", onDone: (Result<Unit>) -> Unit = {}) {
+        val book = _open.value?.entity?.id ?: run { onDone(Result.failure(IllegalStateException("Книга закрыта"))); return }
+        viewModelScope.launch {
+            val result = runCatching { db.withTransaction {
+                check(books.get(book) != null)
+                val spelling = text.trim().replace(Regex("\\s+"), " ")
+                EntityLinks.parse(EntityLinks.encode(listOf(spelling)))
+                val rows = highlightDao.all().filter { it.bookId == book && it.chapterIndex == Highlights.BOOK_WIDE }
+                if (destination == null) {
+                    require(rows.none { EntityLinks.aliases(it).any { alias -> EntityLinks.key(alias) == EntityLinks.key(spelling) } }) { "Сначала отмени связь этого варианта с общей записью" }
+                    if (rows.none { EntityLinks.key(it.text) == EntityLinks.key(spelling) }) highlightDao.insert(
+                        com.hanreader.app.Highlight(bookId = book, chapterIndex = Highlights.BOOK_WIDE, blockIndex = 0,
+                            startChar = 0, endChar = 0, color = 2, note = seedNote, text = spelling, chapterTitle = Highlights.BOOK_WIDE_TITLE))
+                } else {
+                    val selected = rows.firstOrNull { it.id == destination } ?: error("Запись уже удалена")
+                    val owner = EntityLinks.root(selected, rows) ?: error("Неоднозначная связь")
+                    if (EntityLinks.key(owner.text) == EntityLinks.key(spelling)) return@withTransaction
+                    val collision = rows.firstOrNull { it != owner && EntityLinks.aliases(it).any { alias -> EntityLinks.key(alias) == EntityLinks.key(spelling) } }
+                    if (collision != null) {
+                        require(EntityLinks.root(collision, rows) == owner) { "Этот вариант уже связан с другой записью. Сначала отмени прежнюю связь." }
+                        return@withTransaction
+                    }
+                    val changed = owner.copy(aliasesJson = EntityLinks.encode(EntityLinks.aliases(owner) + spelling),
+                        blockedAliasesJson = EntityLinks.encode(EntityLinks.blocked(owner).filter { EntityLinks.key(it) != EntityLinks.key(spelling) }))
+                    val updated = rows.map { if (it.id == owner.id) changed else it }
+                    require(EntityLinks.root(changed, updated) != null) { "Эта связь создаст замкнутую цепочку" }
+                    EntityLinks.validate(updated)
+                    highlightDao.update(changed)
+                }
+            }; Unit }
+            onDone(result)
+        }
+    }
+
+    fun unlinkEntity(ownerId: Long, spelling: String, onDone: (Result<Unit>) -> Unit = {}) {
+        val book = _open.value?.entity?.id ?: run { onDone(Result.failure(IllegalStateException("Книга закрыта"))); return }
+        viewModelScope.launch {
+            onDone(runCatching { db.withTransaction {
+                val rows = highlightDao.all().filter { it.bookId == book && it.chapterIndex == Highlights.BOOK_WIDE }
+                val owner = rows.firstOrNull { it.id == ownerId } ?: error("Запись уже удалена")
+                require(EntityLinks.key(spelling) != EntityLinks.key(owner.text))
+                for (member in rows) {
+                    if (member.id != owner.id && EntityLinks.root(member, rows) == owner && EntityLinks.aliases(member).any { EntityLinks.key(it) == EntityLinks.key(spelling) }) {
+                        highlightDao.update(member.copy(aliasesJson = EntityLinks.encode(EntityLinks.aliases(member).filter { EntityLinks.key(it) != EntityLinks.key(spelling) })))
+                    }
+                }
+                val changed = owner.copy(
+                    aliasesJson = EntityLinks.encode(EntityLinks.aliases(owner).filter { EntityLinks.key(it) != EntityLinks.key(spelling) }),
+                    blockedAliasesJson = EntityLinks.encode(EntityLinks.blocked(owner) + spelling))
+                highlightDao.update(changed)
+            } })
+        }
     }
 
     fun removeHighlight(id: Long) {

@@ -3,7 +3,7 @@ package com.hanreader.app.reader
 import com.hanreader.app.wiki.WikiArticle
 
 data class WikiNoteTarget(val book: Long, val chapter: Int, val chapterTitle: String, val block: Int,
-    val start: Int, val end: Int, val term: String, val sentence: String)
+    val start: Int, val end: Int, val term: String, val sentence: String, val lookupTerm: String = term)
 
 fun wikipediaNote(target: WikiNoteTarget, article: WikiArticle, definition: String): String {
     require(!article.ambiguous && article.language in com.hanreader.app.wiki.WikipediaRepository.languages)

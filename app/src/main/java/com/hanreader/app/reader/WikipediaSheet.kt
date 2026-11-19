@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun WikipediaSheet(target: WikiNoteTarget, bookLanguage: String, source: WikipediaSource,
     onSave: suspend (WikiArticle, String) -> Unit, onDismiss: () -> Unit) {
-    var query by remember(target) { mutableStateOf(target.term.take(200)) }
+    var query by remember(target) { mutableStateOf(target.lookupTerm.take(200)) }
     var language by remember(target) { mutableStateOf("ru") }
     var hits by remember(target) { mutableStateOf<List<WikiHit>?>(null) }
     var article by remember(target) { mutableStateOf<WikiArticle?>(null) }

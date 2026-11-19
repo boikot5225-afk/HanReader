@@ -115,7 +115,7 @@ class MigrationTest {
             assertEquals(listOf("雷蒙德"), db.userNameDao().all().map { it.word })
             assertEquals(emptyList<String>(), db.bookDao().ignoredWords(7)) // cascade
         }
-        assertEquals(15, db.openHelper.readableDatabase.version)
+        assertEquals(16, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -166,7 +166,39 @@ class MigrationTest {
             assertEquals(setOf("red", "@7|b|limitarse"), db.userMeaningDao().observeAll("es-ES").first().map { it.word }.toSet())
             assertEquals(setOf("端", "@7|b|limitarse"), db.userMeaningDao().observeAll("zh-CN").first().map { it.word }.toSet())
         }
-        assertEquals(15, db.openHelper.readableDatabase.version)
+        assertEquals(16, db.openHelper.readableDatabase.version)
+        db.close()
+    }
+
+    @Test fun v15HighlightsSurviveAndReceiveEmptyAliasLists() {
+        val file = app.getDatabasePath("migration-15.db")
+        file.parentFile?.mkdirs(); file.delete()
+        val schema = JSONObject(File("schemas/com.hanreader.app.LexiconDatabase/15.json").readText()).getJSONObject("database")
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { old ->
+            val entities = schema.getJSONArray("entities")
+            for (i in 0 until entities.length()) {
+                val entity = entities.getJSONObject(i)
+                val table = entity.getString("tableName")
+                old.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", table))
+                val indices = entity.optJSONArray("indices") ?: continue
+                for (j in 0 until indices.length()) old.execSQL(indices.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", table))
+            }
+            old.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
+            old.execSQL("INSERT OR REPLACE INTO room_master_table VALUES(42, '${schema.getString("identityHash")}')")
+            old.execSQL("INSERT INTO books (id,title,author,fileName,chapterCount,addedAt,lastOpenedAt,chapterIndex,blockIndex,analyzedTokens,charOffset) VALUES(7,'Book','','book.epub',1,1,0,0,0,0,0)")
+            old.execSQL("INSERT INTO highlights (id,bookId,chapterIndex,blockIndex,startChar,endChar,color,note,text,chapterTitle,createdAt) VALUES(5,7,-1,0,0,0,2,'Original note','Osiel Cárdenas','Whole book',1)")
+            old.version = 15
+        }
+        val db = Room.databaseBuilder(app, LexiconDatabase::class.java, file.name)
+            .addMigrations(*LexiconDatabase.MIGRATIONS).allowMainThreadQueries().build()
+        runBlocking {
+            val old = db.highlightDao().all().single()
+            assertEquals(5L, old.id); assertEquals("Original note", old.note)
+            assertEquals("[]", old.aliasesJson); assertEquals("[]", old.blockedAliasesJson)
+            db.highlightDao().update(old.copy(aliasesJson = "[\"Cárdenas\"]"))
+            assertEquals("[\"Cárdenas\"]", db.highlightDao().all().single().aliasesJson)
+        }
+        assertEquals(16, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

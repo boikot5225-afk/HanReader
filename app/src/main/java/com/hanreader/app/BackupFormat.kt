@@ -54,8 +54,8 @@ object BackupFormat {
     /** 2: HanReader library, word sources. Version 1 files still restore. */
     /** 3 (0.24.2): known words, names and meanings carry their language. */
     /** 4: context corrections, paid checks and rejections (book ids and hashes stay unchanged). */
-    /** 5: an empty base explicitly means the requested word has no dictionary hint. */
-    const val VERSION = 5
+    /** 5: explicit missing dictionary base. 6: aliases and rejected automatic name links. */
+    const val VERSION = 6
 
     fun encode(backup: Backup): String {
         validateAi(backup.aiChecks, backup.library)
@@ -159,6 +159,7 @@ object BackupFormat {
                             put("bookId", h.bookId); put("chapterIndex", h.chapterIndex); put("blockIndex", h.blockIndex)
                             put("startChar", h.startChar); put("endChar", h.endChar); put("color", h.color); put("note", h.note)
                             put("text", h.text); put("chapterTitle", h.chapterTitle); put("createdAt", h.createdAt)
+                            put("aliases", JSONArray(h.aliasesJson)); put("blockedAliases", JSONArray(h.blockedAliasesJson))
                         })
                     }
                 })
@@ -387,9 +388,13 @@ object BackupFormat {
                 bookId = h.getLong("bookId"), chapterIndex = h.getInt("chapterIndex"), blockIndex = h.getInt("blockIndex"),
                 startChar = h.getInt("startChar"), endChar = h.getInt("endChar"), color = h.optInt("color", 0),
                 note = h.optString("note", ""), text = h.optString("text", ""), chapterTitle = h.optString("chapterTitle", ""),
-                createdAt = h.optLong("createdAt", 0L)
+                createdAt = h.optLong("createdAt", 0L),
+                aliasesJson = if (h.has("aliases")) h.getJSONArray("aliases").toString() else "[]",
+                blockedAliasesJson = if (h.has("blockedAliases")) h.getJSONArray("blockedAliases").toString() else "[]"
             )
-        }.filter { it.bookId in ids && it.endChar > it.startChar }
+        }.filter { it.bookId in ids && (it.endChar > it.startChar || it.chapterIndex == com.hanreader.app.reader.Highlights.BOOK_WIDE) }
+        try { com.hanreader.app.reader.EntityLinks.validate(highlights) }
+        catch (_: Exception) { throw BackupFormatException("Файл копии повреждён: неверные связи названий") }
         val igJson = arr("ignored")
         val ignored = (0 until igJson.length()).map { i ->
             val w = igJson.getJSONObject(i)

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.runtime.key
 import androidx.compose.ui.input.pointer.pointerInput
@@ -289,7 +290,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
     // Short translations above the pinyin: over unknown words or over recommended ones.
-    val baseGlossFor: Map<String, String>? = readerWork(null, appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, bookWide, known) {
+    val baseGlossFor: Map<String, String>? = readerWork(null, appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, known) {
         val eng = engine
         // A language with an alphabet: phrases carry one hint, words their reading in context.
         val zhless = eng is com.hanreader.app.lang.AlphabeticModule
@@ -721,6 +722,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 highlight = null
                 // A highlight of the whole book has no one place to open.
                 if (h.chapterIndex >= 0) jump(h.chapterIndex, h.blockIndex)
+                else bookNote = Triple(h, -1, -1)
             },
             onRemoveHighlight = { vm.removeHighlight(it.id) },
             onExport = {
@@ -743,12 +745,22 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val sel = selection
     val block = sel?.let { chapter?.blocks?.getOrNull(it.block) as? ReaderBlock.Text }
     val eng = engine
+    val entityMatch = if (sel != null && block != null) EntityLinks.at(bookWide, block, block.tokens[sel.first].start, block.tokens[sel.last].end) else null
+    val entityControls: @Composable () -> Unit = {
+        if (sel != null && block != null && chapter != null) {
+            val selectedText = block.shown.substring(block.tokens[sel.first].start, block.tokens[sel.last].end)
+            val local = Highlights.at(highlights, chapter.index, sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end)
+            EntityLinksPanel(bookWide, entityMatch?.entry, selectedText, entityMatch?.automatic == true,
+                onLink = { text, id, done -> vm.linkEntity(text, id, local?.note.orEmpty(), done) }, onUnlink = vm::unlinkEntity,
+                canUnlink = entityMatch?.let { EntityLinks.key(it.spelling) == EntityLinks.key(selectedText) } == true)
+        }
+    }
     val openWikipedia: () -> Unit = {
         if (sel != null && block != null && chapter != null) {
             val start = block.tokens[sel.first].start
             val end = block.tokens[sel.last].end
             wikiTarget = WikiNoteTarget(book.entity.id, chapter.index, chapter.title, sel.block, start, end,
-                block.shown.substring(start, end), ChapterBuilder.sentence(block.shown, start, end))
+                block.shown.substring(start, end), ChapterBuilder.sentence(block.shown, start, end), entityMatch?.entry?.text ?: block.shown.substring(start, end))
             selection = null
         }
     }
@@ -765,7 +777,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         PhraseSheet(
             text = block.shown.substring(start, end),
             reading = block.tokens.subList(sel.first, sel.last + 1).filter { it.kind == TokenKind.HAN }.joinToString(" ") { it.pinyin },
-            highlight = Highlights.at(highlights, chapter.index, sel.block, start, end) ?: Highlights.bookWideAt(bookWide, block, start, end),
+            highlight = entityMatch?.entry ?: Highlights.at(highlights, chapter.index, sel.block, start, end),
             canWiden = Highlights.sentence(block, sel.first, sel.last) != sel.first..sel.last,
             onSentence = { val r = Highlights.sentence(block, sel.first, sel.last); selection = sel.copy(first = r.first, last = r.last) },
             onColor = { color, existing, whole ->
@@ -777,10 +789,12 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onNote = { h, note -> vm.updateHighlight(h.copy(note = note)) },
             onRemove = { vm.removeHighlight(it.id); selection = null },
             onDismiss = { selection = null },
-            onWikipedia = openWikipedia
+            onWikipedia = openWikipedia,
+            entityPanel = entityControls
         )
     }
-    bookNote?.let { (h, bi, t) ->
+    bookNote?.let { (record, bi, t) ->
+        val h = bookWide.firstOrNull { it.id == record.id }?.let { EntityLinks.root(it, bookWide) } ?: record
         ModalBottomSheet(onDismissRequest = { bookNote = null }) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -789,9 +803,28 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                     Spacer(Modifier.width(8.dp))
                     Text(h.text, style = MaterialTheme.typography.titleMedium, fontFamily = WordFont)
                 }
-                Text(h.note, style = MaterialTheme.typography.bodyLarge)
+                var editingNote by remember(h.id) { mutableStateOf(false) }
+                var sharedNote by remember(h.id) { mutableStateOf(h.note) }
+                if (editingNote) {
+                    OutlinedTextField(sharedNote, { sharedNote = it }, label = { Text("Общая заметка") }, modifier = Modifier.fillMaxWidth(), maxLines = 8)
+                    TextButton(onClick = { vm.updateHighlight(h.copy(note = sharedNote)); editingNote = false }) { Text("Сохранить общую заметку") }
+                } else {
+                    Text(h.note, style = MaterialTheme.typography.bodyLarge)
+                    TextButton(onClick = { sharedNote = h.note; editingNote = true }) { Text("Изменить общую заметку") }
+                }
+                val selectedBlock = chapter?.blocks?.getOrNull(bi) as? ReaderBlock.Text
+                if (selectedBlock != null) {
+                    val spelling = selectedBlock.tokens.getOrNull(t)?.text.orEmpty()
+                    val match = selectedBlock.tokens.getOrNull(t)?.let { EntityLinks.at(bookWide, selectedBlock, it.start, it.end) }
+                    EntityLinksPanel(bookWide, match?.entry ?: h, spelling, match?.automatic == true,
+                        onLink = { text, id, done -> vm.linkEntity(text, id, "", done) }, onUnlink = vm::unlinkEntity,
+                        onChanged = { bookNote = null },
+                        canUnlink = match?.let { EntityLinks.key(it.spelling) == EntityLinks.key(spelling) } == true)
+                } else EntityLinksPanel(bookWide, h, h.text, false,
+                    onLink = { text, id, done -> vm.linkEntity(text, id, "", done) }, onUnlink = vm::unlinkEntity,
+                    onChanged = { bookNote = null })
                 Text(Highlights.BOOK_WIDE_TITLE, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = { bookNote = null; selection = Selection(bi, t, t) }, contentPadding = PaddingValues(0.dp)) {
+                if (bi >= 0 && t >= 0) TextButton(onClick = { bookNote = null; selection = Selection(bi, t, t) }, contentPadding = PaddingValues(0.dp)) {
                     Text("Карточка слова · изменить заметку")
                 }
             }
@@ -809,6 +842,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     if (sel != null && block != null && eng != null && chapter != null && (!sel.phrase || asWord)) {
         WordSheet(
             onWikipedia = openWikipedia,
+            entityPanel = entityControls,
             selection = sel,
             block = block,
             engine = eng,
@@ -819,8 +853,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             speaker = speaker,
             onKnown = vm::setKnown,
             onClearKnown = vm::clearKnown,
-            highlight = Highlights.at(highlights, chapter.index, sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end)
-                ?: Highlights.bookWideAt(bookWide, block, block.tokens[sel.first].start, block.tokens[sel.last].end),
+            highlight = entityMatch?.entry ?: Highlights.at(highlights, chapter.index, sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end),
             onHighlight = { color, existing, whole ->
                 val start = block.tokens[sel.first].start
                 val end = block.tokens[sel.last].end
@@ -1623,7 +1656,8 @@ internal fun WordSheet(
     onUserName: (String, Boolean) -> Unit = { _, _ -> },
     /** Where the word stands, for a doubted translation: «El narco · 5. Magnates». */
     doubtSource: String = "",
-    onWikipedia: (() -> Unit)? = null
+    onWikipedia: (() -> Unit)? = null,
+    entityPanel: (@Composable () -> Unit)? = null
 ) {
     val tokens = block.tokens
     val first = tokens[selection.first]
@@ -1769,6 +1803,7 @@ internal fun WordSheet(
             }
             }
             if (onWikipedia != null) TextButton(onClick = onWikipedia, contentPadding = PaddingValues(0.dp)) { Text("Найти в Википедии") }
+            entityPanel?.invoke()
             if (canMark && knownReason != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(knownReason.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall,

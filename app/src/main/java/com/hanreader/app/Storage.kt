@@ -187,11 +187,16 @@ data class Highlight(
     /** The highlighted text, kept for the list and the export. */
     val text: String,
     val chapterTitle: String,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(defaultValue = "'[]'") val aliasesJson: String = "[]",
+    @ColumnInfo(defaultValue = "'[]'") val blockedAliasesJson: String = "[]"
 )
 
 @Dao
 interface HighlightDao {
+    @Query("UPDATE highlights SET note = :note, color = :color WHERE id = :id AND bookId = :book")
+    suspend fun updateNoteAndColor(id: Long, book: Long, note: String, color: Int)
+
     @Query("SELECT * FROM highlights WHERE bookId = :bookId ORDER BY chapterIndex, blockIndex, startChar")
     fun observe(bookId: Long): Flow<List<Highlight>>
 
@@ -760,7 +765,7 @@ interface CardDao {
         WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
         Bookmark::class, UserName::class, Highlight::class, DailyActivity::class, BookProgress::class, UserMeaning::class, UserSplit::class, com.hanreader.app.ai.AiCheck::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
@@ -963,7 +968,14 @@ abstract class LexiconDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE highlights ADD COLUMN aliasesJson TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE highlights ADD COLUMN blockedAliasesJson TEXT NOT NULL DEFAULT '[]'")
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {

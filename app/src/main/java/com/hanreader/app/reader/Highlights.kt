@@ -71,8 +71,8 @@ object Highlights {
     fun bookTokens(block: ReaderBlock.Text, book: List<Highlight>): Map<Int, Color> {
         if (book.isEmpty()) return emptyMap()
         val out = HashMap<Int, Color>()
-        for (h in book) for (range in occurrences(block, h.text)) for (k in range) {
-            if (block.tokens[k].kind == com.hanreader.app.zh.TokenKind.HAN) out[k] = color(h.color)
+        for (mention in EntityLinks.mentions(block, book)) for (k in mention.tokens) {
+            if (block.tokens[k].kind == com.hanreader.app.zh.TokenKind.HAN) out[k] = color(mention.entry.color)
         }
         return out
     }
@@ -102,10 +102,7 @@ object Highlights {
 
     /** The book-wide highlight whose text stands at characters [start, end) of [block], if any. */
     fun bookWideAt(book: List<Highlight>, block: ReaderBlock.Text, start: Int, end: Int): Highlight? {
-        val first = block.tokens.indexOfFirst { it.end > start }
-        val last = block.tokens.indexOfLast { it.start < end }
-        if (first !in 0..last) return null
-        return book.firstOrNull { h -> occurrences(block, h.text).any { r -> first >= r.first && last <= r.last } }
+        return EntityLinks.at(book, block, start, end)?.entry
     }
 
     /** Tokens overlapping characters [start, end). */
@@ -150,6 +147,8 @@ object Highlights {
             }
             append('\n')
             h.text.trim().lines().forEach { append("> ").append(it).append('\n') }
+            if (EntityLinks.aliases(h).isNotEmpty()) append("\nВарианты: ").append(EntityLinks.aliases(h).joinToString(", ")).append('\n')
+            if (h.wholeBook) EntityLinks.root(h, list.filter { it.wholeBook })?.takeIf { it != h }?.let { append("\nОбщая запись: ").append(it.text).append('\n') }
             if (h.note.isNotBlank()) append('\n').append(h.note.trim()).append('\n')
         }
     }
@@ -245,14 +244,17 @@ internal fun HighlightList(
         )
         return
     }
+    val displayed = remember(list) {
+        EntityLinks.roots(list.filter { it.chapterIndex == Highlights.BOOK_WIDE }) + list.filter { it.chapterIndex != Highlights.BOOK_WIDE }
+    }
     Column {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("${list.size} · заметок ${list.count { it.note.isNotBlank() }}", style = MaterialTheme.typography.bodySmall,
+            Text("${displayed.size} · заметок ${list.count { it.note.isNotBlank() }}", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
             TextButton(onClick = onExport) { Text("Экспорт в Markdown") }
         }
         LazyColumn(Modifier.fillMaxWidth()) {
-            items(list, key = { it.id }) { h ->
+            items(displayed, key = { it.id }) { h ->
                 Row(
                     Modifier.fillMaxWidth().clickable { onPick(h) }.padding(start = 20.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -291,7 +293,8 @@ internal fun PhraseSheet(
     onDismiss: () -> Unit,
     /** Moves [highlight] to the whole book (true) or back to this place. */
     onWholeBook: (Highlight?, Boolean) -> Unit = { _, _ -> },
-    onWikipedia: (() -> Unit)? = null
+    onWikipedia: (() -> Unit)? = null,
+    entityPanel: (@Composable () -> Unit)? = null
 ) {
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
@@ -303,6 +306,7 @@ internal fun PhraseSheet(
         ) {
             Text(text, fontFamily = WordFont, style = MaterialTheme.typography.headlineSmall)
             if (onWikipedia != null) TextButton(onClick = onWikipedia) { Text("Найти в Википедии") }
+            entityPanel?.invoke()
             if (reading.isNotBlank()) {
                 Text(reading, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
             }
