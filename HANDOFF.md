@@ -30,8 +30,21 @@
   панели: /tmp/amauta-entities-final.log, app/build/screens/entity-links.png.
   Прямые проверки нового функционала: EntityLinksTest (6), EntityLinksFlowTest (4),
   MigrationTest включая настоящий переход 15→16, прежние book highlights/backup/wiki/UI.
-- Подробности: docs/ENTITY_LINKS_0.27.1.md. Телефон не подключён, сетевые/платные API
-  для связывания не вызывались. CI/APK ещё в работе. Новых веток нет; сайт не трогать.
+- Финальный повтор 17 тестов успешен, снимок панели проверен. Подробности:
+  docs/ENTITY_LINKS_0.27.1.md. Телефон не подключён, сетевые/платные API для связывания
+  не вызывались. Новых веток нет; сайт не трогать.
+- CI 44618992412 — success: полный debug-прогон, release-проверки/lint и оба APK.
+  Источник 7fc880fb5bedc34ef166b6f47cb568f90f50fbdf, 0.27.1/code79.
+  Release 52 202 929 байт, SHA-256 6f6b4d04c775523ed65a6da9e0c35e84b58770b361887fc18e79b0f208e09b0f.
+  Debug 61 744 304 байт, SHA-256 4826b4e45dbe04dde0547ce8fc321c1f5d13f1eb8524a82e52cb22b2dd0f8a8d.
+  Прежние сертификаты, manifest/debuggable и zipalign16 проверены; EntityLinks и поля
+  aliasesJson/blockedAliasesJson присутствуют в DEX. Демо-EPUB соответствуют assets;
+  пользовательских книг, ключей/настроек/серверной озвучки нет. .work/release/0.27.1/.
+- Оба APK переданы в личный Drive владельца, metadata/размеры прочитаны после загрузки:
+  release https://drive.google.com/file/d/18EKamYfJVT0iCVBff0ch53_1S6h5XG5s/view?usp=drivesdk
+  debug https://drive.google.com/file/d/1miwfe11lK0l2EBU25_na3YgeUp57H87B/view?usp=drivesdk
+  В магазины не отправляли. Одна попытка получения debug-артефакта прервалась заменой
+  exec runtime; наличие файлов проверено, повторено только чтение артефакта.
 
 ## Википедия → заметка к выделению — 0.27.0
 
