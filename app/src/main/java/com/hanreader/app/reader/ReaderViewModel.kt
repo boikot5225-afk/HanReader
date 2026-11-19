@@ -8,6 +8,7 @@ import android.provider.OpenableColumns
 import android.util.LruCache
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
 import com.hanreader.app.BookEntity
 import com.hanreader.app.KnownWord
 import com.hanreader.app.isLearned
@@ -729,6 +730,27 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
     private val highlightDao = db.highlightDao()
 
     fun highlights(bookId: Long) = highlightDao.observe(bookId)
+
+    val wikipedia by lazy { com.hanreader.app.wiki.WikipediaRepository(getApplication()) }
+
+    suspend fun saveWikipediaNote(target: WikiNoteTarget, article: com.hanreader.app.wiki.WikiArticle, definition: String) {
+        val current = _open.value ?: error("closed")
+        val chapter = current.chapter ?: error("closed")
+        val block = chapter.blocks.getOrNull(target.block) as? ReaderBlock.Text ?: error("stale")
+        require(current.entity.id == target.book && chapter.index == target.chapter && target.start >= 0 &&
+            target.end <= block.shown.length && target.start < target.end && block.shown.substring(target.start, target.end) == target.term)
+        val note = wikipediaNote(target, article, definition)
+        db.withTransaction {
+            check(books.get(target.book) != null)
+            val existing = highlightDao.all().firstOrNull { it.bookId == target.book && it.chapterIndex == target.chapter &&
+                it.blockIndex == target.block && it.startChar == target.start && it.endChar == target.end }
+            if (existing != null) {
+                if (!existing.note.contains(note)) highlightDao.update(existing.copy(note = existing.note.takeIf { it.isNotBlank() }?.let { "$it\n\n$note" } ?: note))
+            } else highlightDao.insert(com.hanreader.app.Highlight(bookId = target.book, chapterIndex = target.chapter,
+                blockIndex = target.block, startChar = target.start, endChar = target.end, color = 2,
+                note = note, text = target.term, chapterTitle = target.chapterTitle))
+        }
+    }
 
     /** Highlights characters [start, end) of paragraph [block]. */
     fun addHighlight(chapter: ChapterContent, block: Int, start: Int, end: Int, color: Int, note: String = "") {

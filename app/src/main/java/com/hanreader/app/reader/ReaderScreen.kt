@@ -194,7 +194,9 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // Words highlighted in the whole book (a name and who it is).
     val bookWide = remember(highlights) { highlights.filter { it.chapterIndex == Highlights.BOOK_WIDE } }
 
-    val sheetOpen = showAppearance || showToc || showPrepare || selection != null || summaryOpen != null
+    var wikiTarget by remember(book.entity.id) { mutableStateOf<WikiNoteTarget?>(null) }
+    LaunchedEffect(book.chapter?.index) { wikiTarget = null }
+    val sheetOpen = showAppearance || showToc || showPrepare || selection != null || summaryOpen != null || wikiTarget != null
     // Reading aloud: one sentence at a time, the page follows the voice.
     val readAloud = remember(context) { ReadAloud(context) }
     DisposableEffect(readAloud) { onDispose { readAloud.close() } }
@@ -741,6 +743,20 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val sel = selection
     val block = sel?.let { chapter?.blocks?.getOrNull(it.block) as? ReaderBlock.Text }
     val eng = engine
+    val openWikipedia: () -> Unit = {
+        if (sel != null && block != null && chapter != null) {
+            val start = block.tokens[sel.first].start
+            val end = block.tokens[sel.last].end
+            wikiTarget = WikiNoteTarget(book.entity.id, chapter.index, chapter.title, sel.block, start, end,
+                block.shown.substring(start, end), ChapterBuilder.sentence(block.shown, start, end))
+            selection = null
+        }
+    }
+    wikiTarget?.let { target ->
+        WikipediaSheet(target, com.hanreader.app.lang.Languages.current.tag, vm.wikipedia,
+            onSave = { article, definition -> vm.saveWikipediaNote(target, article, definition) },
+            onDismiss = { wikiTarget = null })
+    }
     // A long press on one word is the same as a tap on it.
     val asWord = sel != null && block != null && sel.phrase && sel.done && sel.first == sel.last && block.tokens[sel.first].kind == TokenKind.HAN
     if (sel != null && block != null && chapter != null && sel.phrase && sel.done && !asWord) {
@@ -760,7 +776,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onWholeBook = { h, on -> moveHighlight(vm, h, on, chapter, sel.block, start, end) },
             onNote = { h, note -> vm.updateHighlight(h.copy(note = note)) },
             onRemove = { vm.removeHighlight(it.id); selection = null },
-            onDismiss = { selection = null }
+            onDismiss = { selection = null },
+            onWikipedia = openWikipedia
         )
     }
     bookNote?.let { (h, bi, t) ->
@@ -791,6 +808,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     }
     if (sel != null && block != null && eng != null && chapter != null && (!sel.phrase || asWord)) {
         WordSheet(
+            onWikipedia = openWikipedia,
             selection = sel,
             block = block,
             engine = eng,
@@ -1604,7 +1622,8 @@ internal fun WordSheet(
     bookNames: Set<String> = emptySet(),
     onUserName: (String, Boolean) -> Unit = { _, _ -> },
     /** Where the word stands, for a doubted translation: «El narco · 5. Magnates». */
-    doubtSource: String = ""
+    doubtSource: String = "",
+    onWikipedia: (() -> Unit)? = null
 ) {
     val tokens = block.tokens
     val first = tokens[selection.first]
@@ -1749,6 +1768,7 @@ internal fun WordSheet(
                 }
             }
             }
+            if (onWikipedia != null) TextButton(onClick = onWikipedia, contentPadding = PaddingValues(0.dp)) { Text("Найти в Википедии") }
             if (canMark && knownReason != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(knownReason.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall,

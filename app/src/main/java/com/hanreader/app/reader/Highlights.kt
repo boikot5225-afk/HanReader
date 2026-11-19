@@ -290,7 +290,8 @@ internal fun PhraseSheet(
     onRemove: (Highlight) -> Unit,
     onDismiss: () -> Unit,
     /** Moves [highlight] to the whole book (true) or back to this place. */
-    onWholeBook: (Highlight?, Boolean) -> Unit = { _, _ -> }
+    onWholeBook: (Highlight?, Boolean) -> Unit = { _, _ -> },
+    onWikipedia: (() -> Unit)? = null
 ) {
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
@@ -301,6 +302,7 @@ internal fun PhraseSheet(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(text, fontFamily = WordFont, style = MaterialTheme.typography.headlineSmall)
+            if (onWikipedia != null) TextButton(onClick = onWikipedia) { Text("Найти в Википедии") }
             if (reading.isNotBlank()) {
                 Text(reading, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
             }

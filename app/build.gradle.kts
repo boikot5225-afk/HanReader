@@ -16,8 +16,8 @@ android {
         buildConfigField("String", "APP_NAME", "\"$appName\"")
         minSdk = 26
         targetSdk = 36
-        versionCode = 77
-        versionName = "0.26.9"
+        versionCode = 78
+        versionName = "0.27.0"
         // The first language remains the default; English is the third reader module.
         buildConfigField("String", "LANGUAGES", "\"es,zh,en\"")
         // Instrumented tests (app/src/androidTest) on emulators in CI.
@@ -49,7 +49,7 @@ android {
             providers.environmentVariable("HANREADER_TEST_EPUB").orNull?.let {
                 test.environment("HANREADER_TEST_EPUB", it)
             }
-            for (name in listOf("HANREADER_SEG_IN", "HANREADER_SEG_OUT")) {
+            for (name in listOf("HANREADER_SEG_IN", "HANREADER_SEG_OUT", "HANREADER_LIVE_WIKIPEDIA")) {
                 providers.environmentVariable(name).orNull?.let { test.environment(name, it) }
             }
             providers.environmentVariable("HANREADER_STORE_SHOTS").orNull?.let {
