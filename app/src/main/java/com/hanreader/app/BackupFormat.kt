@@ -55,7 +55,7 @@ object BackupFormat {
     /** 3 (0.24.2): known words, names and meanings carry their language. */
     /** 4: context corrections, paid checks and rejections (book ids and hashes stay unchanged). */
     /** 5: explicit missing dictionary base. 6: aliases and rejected automatic name links. */
-    const val VERSION = 6
+    const val VERSION = 7
 
     fun encode(backup: Backup): String {
         validateAi(backup.aiChecks, backup.library)
@@ -160,6 +160,7 @@ object BackupFormat {
                             put("startChar", h.startChar); put("endChar", h.endChar); put("color", h.color); put("note", h.note)
                             put("text", h.text); put("chapterTitle", h.chapterTitle); put("createdAt", h.createdAt)
                             put("aliases", JSONArray(h.aliasesJson)); put("blockedAliases", JSONArray(h.blockedAliasesJson))
+                            put("entityName", h.entityName); put("contextQuote", h.contextQuote)
                         })
                     }
                 })
@@ -390,11 +391,15 @@ object BackupFormat {
                 note = h.optString("note", ""), text = h.optString("text", ""), chapterTitle = h.optString("chapterTitle", ""),
                 createdAt = h.optLong("createdAt", 0L),
                 aliasesJson = if (h.has("aliases")) h.getJSONArray("aliases").toString() else "[]",
-                blockedAliasesJson = if (h.has("blockedAliases")) h.getJSONArray("blockedAliases").toString() else "[]"
+                blockedAliasesJson = if (h.has("blockedAliases")) h.getJSONArray("blockedAliases").toString() else "[]",
+                entityName = if (h.has("entityName")) (h.get("entityName") as? String ?: throw BackupFormatException("Неверная связь цитаты")) else "",
+                contextQuote = if (h.has("contextQuote")) (h.get("contextQuote") as? String ?: throw BackupFormatException("Неверная цитата")) else ""
             )
         }.filter { it.bookId in ids && (it.endChar > it.startChar || it.chapterIndex == com.hanreader.app.reader.Highlights.BOOK_WIDE) }
         try { com.hanreader.app.reader.EntityLinks.validate(highlights) }
         catch (_: Exception) { throw BackupFormatException("Файл копии повреждён: неверные связи названий") }
+        try { com.hanreader.app.reader.BookKnowledge.validate(highlights) }
+        catch (_: Exception) { throw BackupFormatException("Файл копии повреждён: неверные связи цитат") }
         val igJson = arr("ignored")
         val ignored = (0 until igJson.length()).map { i ->
             val w = igJson.getJSONObject(i)

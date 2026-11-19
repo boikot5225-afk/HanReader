@@ -90,6 +90,9 @@ class FullBackupTest {
         waitFor { runBlocking { db.bookDao().get(bookId)!!.charOffset == 5 } }
         val highlight = runBlocking { db.highlightDao().all().single() }
         runBlocking {
+            db.highlightDao().update(highlight.copy(entityName = "夜晚", contextQuote = "那天晚上一直在下雨。"))
+            db.highlightDao().insert(com.hanreader.app.Highlight(bookId = bookId, chapterIndex = -1, blockIndex = 0,
+                startChar = 0, endChar = 0, color = 2, note = "Вечер и ночь", text = "夜晚", chapterTitle = "Во всей книге"))
             db.statsDao().addReading(20261105, 600_000, 2_000)
             db.statsDao().putProgress(com.hanreader.app.BookProgress(bookId, 20261105, 61))
         }
@@ -123,8 +126,12 @@ class FullBackupTest {
         assertEquals(listOf(0, 2, 5), listOf(book.chapterIndex, book.blockIndex, book.charOffset))
         assertTrue(File(app.filesDir, "books/$fileName").isFile)
         assertEquals(1, runBlocking { db.bookmarkDao().observe(bookId).first() }.size)
-        val h = runBlocking { db.highlightDao().observe(bookId).first() }.single()
+        val restoredHighlights = runBlocking { db.highlightDao().observe(bookId).first() }
+        val h = restoredHighlights.single { it.chapterIndex >= 0 }
         assertEquals(listOf(highlight.startChar, highlight.endChar, highlight.color, highlight.text), listOf(h.startChar, h.endChar, h.color, h.text))
+        assertEquals("夜晚", h.entityName); assertEquals("那天晚上一直在下雨。", h.contextQuote)
+        val knowledge = BookKnowledge.entries(bookId, restoredHighlights).single()
+        assertEquals("夜晚", knowledge.record.text); assertEquals(h, knowledge.quotes.single())
         assertEquals(listOf("老板"), runBlocking { db.bookDao().ignoredWords(bookId) })
         assertEquals(KnownWord("下雨", ReaderViewModel.UNKNOWN).source, runBlocking { db.knownWordDao().all() }.single().source)
         val source = runBlocking { db.cardDao().allSources() }.single { it.sentence.contains("老板") }

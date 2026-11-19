@@ -733,20 +733,115 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
 
     val wikipedia by lazy { com.hanreader.app.wiki.WikipediaRepository(getApplication()) }
 
-    suspend fun saveWikipediaNote(target: WikiNoteTarget, article: com.hanreader.app.wiki.WikiArticle, definition: String) {
+    private fun checkedNoteTarget(target: WikiNoteTarget): ReaderBlock.Text {
         val current = _open.value ?: error("closed")
         val chapter = current.chapter ?: error("closed")
         val block = chapter.blocks.getOrNull(target.block) as? ReaderBlock.Text ?: error("stale")
         require(current.entity.id == target.book && chapter.index == target.chapter && target.start >= 0 &&
             target.end <= block.shown.length && target.start < target.end && block.shown.substring(target.start, target.end) == target.term)
+        return block
+    }
+
+    private suspend fun knowledgeRows(book: Long): List<com.hanreader.app.Highlight> {
+        check(_open.value?.entity?.id == book && books.get(book) != null) { "Книга закрыта или удалена" }
+        return highlightDao.all().filter { it.bookId == book }
+    }
+
+    private fun quoteText(target: WikiNoteTarget) = (if (target.term.length > target.sentence.length) target.term else target.sentence)
+        .also { require(it.isNotBlank() && it.length <= 5_000) { "Выбери фрагмент не длиннее 5000 знаков" } }
+
+    private suspend fun storeQuote(target: WikiNoteTarget, owner: com.hanreader.app.Highlight, rows: List<com.hanreader.app.Highlight>) {
+        EntityLinks.parse(EntityLinks.encode(listOf(owner.text)))
+        val samePlace = rows.filter { it.chapterIndex == target.chapter && it.blockIndex == target.block && it.startChar == target.start && it.endChar == target.end }
+        val wide = rows.filter { it.chapterIndex == Highlights.BOOK_WIDE }
+        val existing = samePlace.firstOrNull { BookKnowledge.owner(it, wide)?.id == owner.id }
+            ?: samePlace.firstOrNull { it.entityName.isEmpty() && BookKnowledge.owner(it, wide) == null }
+        if (existing != null) highlightDao.update(existing.copy(entityName = owner.text, contextQuote = quoteText(target)))
+        else highlightDao.insert(com.hanreader.app.Highlight(bookId = target.book, chapterIndex = target.chapter, blockIndex = target.block,
+            startChar = target.start, endChar = target.end, color = 2, text = target.term, chapterTitle = target.chapterTitle,
+            entityName = owner.text, contextQuote = quoteText(target)))
+    }
+
+    suspend fun saveEntityQuote(target: WikiNoteTarget, destinationId: Long) {
+        checkedNoteTarget(target)
+        db.withTransaction {
+            val rows = knowledgeRows(target.book)
+            val wide = rows.filter { it.chapterIndex == Highlights.BOOK_WIDE }
+            val owner = wide.firstOrNull { it.id == destinationId }?.let { EntityLinks.root(it, wide) } ?: error("Запись уже удалена")
+            storeQuote(target, owner, rows)
+        }
+    }
+
+    suspend fun attachExistingQuote(id: Long, destinationId: Long) {
+        val book = _open.value?.entity?.id ?: error("closed")
+        db.withTransaction {
+            val rows = knowledgeRows(book)
+            val source = rows.firstOrNull { it.id == id && it.chapterIndex >= 0 } ?: error("Фрагмент уже удалён")
+            val wide = rows.filter { it.chapterIndex == Highlights.BOOK_WIDE }
+            val owner = wide.firstOrNull { it.id == destinationId }?.let { EntityLinks.root(it, wide) } ?: error("Запись уже удалена")
+            EntityLinks.parse(EntityLinks.encode(listOf(owner.text)))
+            highlightDao.update(source.copy(entityName = owner.text, contextQuote = BookKnowledge.quote(source).take(5_000)))
+        }
+    }
+
+    suspend fun promoteKnowledgeNote(id: Long): Long {
+        val book = _open.value?.entity?.id ?: error("closed")
+        return db.withTransaction {
+            val rows = knowledgeRows(book)
+            val source = rows.firstOrNull { it.id == id && it.chapterIndex >= 0 } ?: error("Фрагмент уже удалён")
+            EntityLinks.parse(EntityLinks.encode(listOf(source.text)))
+            val wide = rows.filter { it.chapterIndex == Highlights.BOOK_WIDE }
+            val owner = BookKnowledge.owner(source.copy(entityName = source.text), wide)
+            val ownerId = owner?.id ?: highlightDao.insert(com.hanreader.app.Highlight(bookId = book,
+                chapterIndex = Highlights.BOOK_WIDE, blockIndex = 0, startChar = 0, endChar = 0, color = source.color,
+                text = source.text, note = source.note, chapterTitle = Highlights.BOOK_WIDE_TITLE))
+            highlightDao.update(source.copy(entityName = owner?.text ?: source.text, contextQuote = BookKnowledge.quote(source).take(5_000)))
+            ownerId
+        }
+    }
+
+    suspend fun detachEntityQuote(id: Long) {
+        val book = _open.value?.entity?.id ?: error("closed")
+        db.withTransaction {
+            val source = knowledgeRows(book).firstOrNull { it.id == id && it.chapterIndex >= 0 } ?: error("Фрагмент уже удалён")
+            highlightDao.update(source.copy(entityName = "", contextQuote = BookKnowledge.quote(source).take(5_000)))
+        }
+    }
+
+    suspend fun saveKnowledgeWikipedia(id: Long, article: com.hanreader.app.wiki.WikiArticle, definition: String) {
+        val book = _open.value?.entity?.id ?: error("closed")
+        db.withTransaction {
+            val rows = knowledgeRows(book)
+            val source = rows.firstOrNull { it.id == id } ?: error("Запись уже удалена")
+            val existing = if (source.chapterIndex == Highlights.BOOK_WIDE)
+                EntityLinks.root(source, rows.filter { it.chapterIndex == Highlights.BOOK_WIDE }) ?: error("Неоднозначная связь") else source
+            val target = WikiNoteTarget(book, existing.chapterIndex, existing.chapterTitle, existing.blockIndex, existing.startChar,
+                existing.endChar, existing.text, if (existing.chapterIndex >= 0) BookKnowledge.quote(existing) else "")
+            val note = wikipediaNote(target, article, definition)
+            if (!existing.note.contains(note)) highlightDao.update(existing.copy(note = existing.note.takeIf { it.isNotBlank() }?.let { "$it\n\n$note" } ?: note))
+        }
+    }
+
+    suspend fun saveKnowledgeNote(id: Long, note: String) {
+        require(note.length <= 50_000)
+        val book = _open.value?.entity?.id ?: error("closed")
+        db.withTransaction {
+            val source = knowledgeRows(book).firstOrNull { it.id == id } ?: error("Запись уже удалена")
+            highlightDao.updateNoteAndColor(id, book, note, source.color)
+        }
+    }
+
+    suspend fun saveWikipediaNote(target: WikiNoteTarget, article: com.hanreader.app.wiki.WikiArticle, definition: String) {
+        val block = checkedNoteTarget(target)
         val note = wikipediaNote(target, article, definition)
         db.withTransaction {
-            check(books.get(target.book) != null)
-            val rows = highlightDao.all().filter { it.bookId == target.book }
+            val rows = knowledgeRows(target.book)
             val existing = Highlights.bookWideAt(rows.filter { it.chapterIndex == Highlights.BOOK_WIDE }, block, target.start, target.end)
                 ?: rows.firstOrNull { it.chapterIndex == target.chapter && it.blockIndex == target.block && it.startChar == target.start && it.endChar == target.end }
             if (existing != null) {
                 if (!existing.note.contains(note)) highlightDao.update(existing.copy(note = existing.note.takeIf { it.isNotBlank() }?.let { "$it\n\n$note" } ?: note))
+                if (existing.chapterIndex == Highlights.BOOK_WIDE &&
+                    runCatching { EntityLinks.encode(listOf(existing.text)) }.isSuccess) storeQuote(target, existing, rows)
             } else highlightDao.insert(com.hanreader.app.Highlight(bookId = target.book, chapterIndex = target.chapter,
                 blockIndex = target.block, startChar = target.start, endChar = target.end, color = 2,
                 note = note, text = target.term, chapterTitle = target.chapterTitle))

@@ -63,10 +63,12 @@ fun NavigationSheet(
     highlights: List<com.hanreader.app.Highlight> = emptyList(),
     onHighlight: (com.hanreader.app.Highlight) -> Unit = {},
     onRemoveHighlight: (com.hanreader.app.Highlight) -> Unit = {},
-    onExport: () -> Unit = {}
+    onExport: () -> Unit = {},
+    onEntities: (() -> Unit)? = null
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        onEntities?.let { open -> androidx.compose.material3.TextButton(onClick = open, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Люди и понятия") } }
         TabRow(selectedTabIndex = tab, containerColor = MaterialTheme.colorScheme.surface) {
             listOf("Оглавление", "Закладки", "Выделения", "Поиск").forEachIndexed { i, title ->
                 Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })

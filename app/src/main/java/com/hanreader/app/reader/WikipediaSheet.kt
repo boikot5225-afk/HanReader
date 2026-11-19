@@ -91,7 +91,7 @@ internal fun WikipediaSheet(target: WikiNoteTarget, bookLanguage: String, source
                     Text("Описание из вступления статьи; его можно сократить или дополнить.", style = MaterialTheme.typography.bodySmall)
                     Button(enabled = !busy && definition.isNotBlank(), onClick = {
                         run {
-                            try { onSave(selected, definition); message = "Сохранено. Заметка доступна в оглавлении → «Выделения»." }
+                            try { onSave(selected, definition); message = "Сохранено. Заметка доступна в меню книги → «Люди и понятия»." }
                             catch (e: CancellationException) { throw e }
                             catch (_: Exception) { message = "Не удалось сохранить заметку. Проверь, что книга ещё открыта, и повтори." }
                         }

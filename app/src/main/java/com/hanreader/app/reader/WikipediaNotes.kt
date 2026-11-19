@@ -10,7 +10,7 @@ fun wikipediaNote(target: WikiNoteTarget, article: WikiArticle, definition: Stri
     require(article.id > 0 && article.revision > 0 && definition.isNotBlank() && definition.length <= 12_000)
     return buildString {
         append(target.term).append("\n\n").append(definition.trim())
-        append("\n\nКонтекст книги:\n").append(target.sentence)
+        if (target.sentence.isNotBlank()) append("\n\nКонтекст книги:\n").append(target.sentence)
         append("\n\nИсточник: Википедия — ").append(article.title).append("\n").append(article.revisionUrl)
         append("\nАвторы: участники Википедии; история правок: ").append(article.historyUrl)
         append("\nCC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/")

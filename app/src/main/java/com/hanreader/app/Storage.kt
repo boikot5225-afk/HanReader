@@ -189,7 +189,10 @@ data class Highlight(
     val chapterTitle: String,
     val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo(defaultValue = "'[]'") val aliasesJson: String = "[]",
-    @ColumnInfo(defaultValue = "'[]'") val blockedAliasesJson: String = "[]"
+    @ColumnInfo(defaultValue = "'[]'") val blockedAliasesJson: String = "[]",
+    /** Canonical spelling, not a Room PK: backup restore renumbers highlights. */
+    @ColumnInfo(defaultValue = "''") val entityName: String = "",
+    @ColumnInfo(defaultValue = "''") val contextQuote: String = ""
 )
 
 @Dao
@@ -765,7 +768,7 @@ interface CardDao {
         WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
         Bookmark::class, UserName::class, Highlight::class, DailyActivity::class, BookProgress::class, UserMeaning::class, UserSplit::class, com.hanreader.app.ai.AiCheck::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
@@ -975,7 +978,14 @@ abstract class LexiconDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE highlights ADD COLUMN entityName TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE highlights ADD COLUMN contextQuote TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {

@@ -169,6 +169,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val appearance by AppearanceStore.appearance.collectAsState()
     var showAppearance by remember { mutableStateOf(false) }
     var showToc by remember { mutableStateOf(false) }
+    var showKnowledge by remember(book.entity.id) { mutableStateOf(false) }
+    var knowledgeEntry by remember(book.entity.id) { mutableStateOf<Long?>(null) }
     var showPrepare by remember { mutableStateOf(false) }
     // The end-of-chapter review, frozen while it is open (a word marked «Знаю» stays in the list).
     var summaryOpen by remember { mutableStateOf<List<SummaryItem>?>(null) }
@@ -197,7 +199,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
 
     var wikiTarget by remember(book.entity.id) { mutableStateOf<WikiNoteTarget?>(null) }
     LaunchedEffect(book.chapter?.index) { wikiTarget = null }
-    val sheetOpen = showAppearance || showToc || showPrepare || selection != null || summaryOpen != null || wikiTarget != null
+    val sheetOpen = showAppearance || showToc || showKnowledge || showPrepare || selection != null || summaryOpen != null || wikiTarget != null
     // Reading aloud: one sentence at a time, the page follows the voice.
     val readAloud = remember(context) { ReadAloud(context) }
     DisposableEffect(readAloud) { onDispose { readAloud.close() } }
@@ -504,11 +506,11 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     }
 
     /** Jump to a paragraph, remembering where the reader was. */
-    fun jump(toChapter: Int, toBlock: Int) {
+    fun jump(toChapter: Int, toBlock: Int, toChar: Int = 0) {
         val cur = chapter ?: return
         returnTo = cur.index to book.entity.blockIndex
         chrome = false
-        if (toChapter == cur.index) blockJump?.invoke(toBlock, 0) else vm.goToChapter(toChapter, block = toBlock)
+        if (toChapter == cur.index) blockJump?.invoke(toBlock, toChar) else vm.goToChapter(toChapter, block = toBlock, char = toChar)
     }
     val chapterBookmarks = bookmarks.filter { it.chapterIndex == chapter?.index }
     val pageBookmark = chapterBookmarks.firstOrNull { it.blockIndex in progress.firstBlock..progress.lastBlock }
@@ -704,6 +706,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             book = book,
             bookmarks = bookmarks,
             onDismiss = { showToc = false },
+            onEntities = { showToc = false; knowledgeEntry = null; showKnowledge = true },
             onChapter = { index ->
                 showToc = false
                 selection = null
@@ -742,6 +745,24 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         )
     }
 
+    if (showKnowledge) BookKnowledgeSheet(vm, book, highlights,
+        initialEntry = knowledgeEntry,
+        onDismiss = { showKnowledge = false },
+        onQuote = { h ->
+            showKnowledge = false
+            selection = null
+            highlight = SearchHit(h.chapterIndex, h.chapterTitle, h.blockIndex, h.startChar, h.endChar, h.text, h.text.indices)
+            jump(h.chapterIndex, h.blockIndex, h.startChar)
+        },
+        onExport = { entries ->
+            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(android.content.Intent.EXTRA_SUBJECT, book.entity.title + " — люди и понятия")
+                putExtra(android.content.Intent.EXTRA_TEXT, BookKnowledge.markdown(book.entity.title, book.entity.author, entries))
+            }
+            runCatching { context.startActivity(android.content.Intent.createChooser(send, "Экспорт записей")) }
+        })
+
     val sel = selection
     val block = sel?.let { chapter?.blocks?.getOrNull(it.block) as? ReaderBlock.Text }
     val eng = engine
@@ -753,6 +774,10 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             EntityLinksPanel(bookWide, entityMatch?.entry, selectedText, entityMatch?.automatic == true,
                 onLink = { text, id, done -> vm.linkEntity(text, id, local?.note.orEmpty(), done) }, onUnlink = vm::unlinkEntity,
                 canUnlink = entityMatch?.let { EntityLinks.key(it.spelling) == EntityLinks.key(selectedText) } == true)
+            val quoteTarget = WikiNoteTarget(book.entity.id, chapter.index, chapter.title, sel.block,
+                block.tokens[sel.first].start, block.tokens[sel.last].end, selectedText,
+                ChapterBuilder.sentence(block.shown, block.tokens[sel.first].start, block.tokens[sel.last].end))
+            EntityQuoteAction(bookWide, entityMatch?.entry) { id -> vm.saveEntityQuote(quoteTarget, id) }
         }
     }
     val openWikipedia: () -> Unit = {
@@ -820,10 +845,19 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                         onLink = { text, id, done -> vm.linkEntity(text, id, "", done) }, onUnlink = vm::unlinkEntity,
                         onChanged = { bookNote = null },
                         canUnlink = match?.let { EntityLinks.key(it.spelling) == EntityLinks.key(spelling) } == true)
+                    selectedBlock.tokens.getOrNull(t)?.let { token ->
+                        val range = match?.tokens
+                        val start = range?.let { selectedBlock.tokens[it.first].start } ?: token.start
+                        val end = range?.let { selectedBlock.tokens[it.last].end } ?: token.end
+                        val target = WikiNoteTarget(book.entity.id, chapter!!.index, chapter.title, bi, start, end,
+                            selectedBlock.shown.substring(start, end), ChapterBuilder.sentence(selectedBlock.shown, start, end))
+                        EntityQuoteAction(bookWide, match?.entry ?: h) { id -> vm.saveEntityQuote(target, id) }
+                    }
                 } else EntityLinksPanel(bookWide, h, h.text, false,
                     onLink = { text, id, done -> vm.linkEntity(text, id, "", done) }, onUnlink = vm::unlinkEntity,
                     onChanged = { bookNote = null })
                 Text(Highlights.BOOK_WIDE_TITLE, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = { bookNote = null; knowledgeEntry = h.id; showKnowledge = true }) { Text("Открыть запись и сохранённые фрагменты") }
                 if (bi >= 0 && t >= 0) TextButton(onClick = { bookNote = null; selection = Selection(bi, t, t) }, contentPadding = PaddingValues(0.dp)) {
                     Text("Карточка слова · изменить заметку")
                 }
