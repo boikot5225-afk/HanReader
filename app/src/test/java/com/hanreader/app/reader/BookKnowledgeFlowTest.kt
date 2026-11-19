@@ -116,7 +116,8 @@ class BookKnowledgeFlowTest {
         var exported = ""
         compose.setContent { LexiconTheme {
             val all by vm.highlights(t.book).collectAsState(initial = emptyList())
-            BookKnowledgeSheet(vm, vm.open.value!!, all, {}, { jumped = it }, { exported = BookKnowledge.markdown("Книга", "", it) })
+            val open by vm.open.collectAsState()
+            BookKnowledgeSheet(vm, open!!, all, {}, { jumped = it }, { exported = BookKnowledge.markdown("Книга", "", it) })
         } }
         compose.onNodeWithText("Найти в записях").performTextReplacement("Ничего")
         compose.onNodeWithText("Ничего не найдено").assertExists()
