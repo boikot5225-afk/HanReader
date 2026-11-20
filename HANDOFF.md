@@ -9,6 +9,8 @@
   PagedChapter/Paginator/RubyParagraph/AppearanceSheet, общие AppearanceStore и Room
   «Знаю / Не знаю» через VM текущего языка. Подсказки/рекомендации/пиньинь, страницы
   и прокрутка; исходная книга не получает позицию/статистику статьи.
+  AppearanceSheet(showChapterTools=false) скрывает в wiki ещё не подключённые
+  итог главы/затухание подсказок; book defaults прежние. Native ReaderTest 7/7 повторно PASS.
 - PagedChapter VM nullable + callbacks позиции/изображений с прежними book defaults.
   Исправлен общий ReaderKeys.turns: неактивный reader не потребляет события статьи;
   отдельный native regression проверяет два одновременно скомпонованных pager.

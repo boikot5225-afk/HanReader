@@ -184,6 +184,7 @@ class WikipediaReaderTest {
         compose.runOnIdle { assertFalse("pista" in known) }
         compose.onNodeWithText("Закрыть", substring = false).performClick()
         compose.onNodeWithText("Оформление", substring = false).performClick()
+        compose.onNodeWithText("Итог главы", substring = true).assertDoesNotExist()
         compose.onNodeWithText("Страницы", substring = false).performScrollTo().assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(ReadingMode.PAGES, AppearanceStore.appearance.value.mode) }
         // Dismiss the existing appearance sheet, then exercise the shared pager below it.

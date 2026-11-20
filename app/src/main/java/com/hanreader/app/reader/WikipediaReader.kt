@@ -255,7 +255,7 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                     text = { Column { PinyinMode.entries.forEach { mode ->
                         TextButton(onClick = { onPinyinMode?.invoke(mode); pinyinSettings = false }) { Text(mode.title) }
                     } } }, confirmButton = { TextButton(onClick = { pinyinSettings = false }) { Text("Закрыть") } })
-                if (settings) AppearanceSheet(onDismiss = { settings = false })
+                if (settings) AppearanceSheet(onDismiss = { settings = false }, showChapterTools = false)
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 message?.let { Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall) }
             }
