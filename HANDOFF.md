@@ -26,9 +26,11 @@
 - Ошибки контекста/Room/HTTP/JSON не ломают чтение, состояния устаревшей проверки не
   накладываются при изменении ручного значения. Текст settings/prompt учитывает статьи.
 - Широкий регрессионный прогон (AI языки/UI/проверка ключей/JSON/контекст, Wiki/Room
-  migrations/backup/рендеринг/глоссы/пагинация) PASS. Финальные 44/44: ContextAi20,
-  WikiAi13, WikipediaReader7, WikipediaAi4 native. Отдельные новые native проверяют
+  migrations/backup/рендеринг/глоссы/пагинация) PASS. Финальные 45/45: ContextAi20,
+  WikiAi14, WikipediaReader7, WikipediaAi4 native. Отдельные новые native проверяют
   manual/reopen/font/undo, viewport auto/cache, picture-only page без API и close-cancel.
+- Проверка границ ручного выделения до API: целый абзац с финальной пунктуацией
+  не оплачивается как одно слово; финальные 45/45 после guard PASS.
 - Все новые AI ответы мокированы! Реального DeepSeek ключа нет, платные реальные
   запросы НЕ выполнялись, качество реальных ответов НЕ подтверждено. Физического
   телефона нет. Старый tablet smoke0.30 не считать исправленным.

@@ -223,4 +223,11 @@ class WikiAiTest {
         assertEquals(0,calls)
     }
 
+    @Test fun wholeParagraphSelectionWithPunctuationCannotBeBilledAsOneWord() = runBlocking {
+        val r = reading("pista para investigar.")
+        assertNull(WikiAiContext.build(r,0,engine,emptyMap(),appearance,range = 0 until r.document.blocks[0].text.length))
+        assertNotNull(WikiAiContext.build(r,0,engine,emptyMap(),appearance,range = 0 until 5))
+        assertEquals(0,calls)
+    }
+
 }

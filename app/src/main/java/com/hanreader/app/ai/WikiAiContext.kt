@@ -10,6 +10,11 @@ internal object WikiAiContext {
         glosses: Map<String, String>? = null, range: IntRange? = null, includeMissing: Boolean = false): AiFragment? {
         if (engine.info.tag.substringBefore('-') != reading.document.article.language) return null
         val key = reading.document.key
+        if (range != null) {
+            val paragraph = reading.textChapter.blocks.getOrNull(block) as? ReaderBlock.Text ?: return null
+            val words = paragraph.tokens.filter { it.kind == com.hanreader.app.zh.TokenKind.HAN }
+            if (words.none { it.start == range.first } || words.none { it.end == range.last + 1 }) return null
+        }
         return try {
             AiContext.build(0, reading.textChapter, block, "wikipedia:$key:${appearance.script.name}", engine,
                 meanings.filterKeys { !ContextMeanings.isScoped(it) }, appearance.esVariant.name, glosses, range, includeMissing)
