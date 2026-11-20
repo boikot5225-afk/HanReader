@@ -36,10 +36,23 @@
   en/es/zh full text, ru link, en 4 images (первая 526843 bytes Public domain), es 1
   (116699 bytes Public domain), реальная загрузка и pin/readback с сетью, отключённой
   в source. В zh-статье подходящих картинок нет. Физического телефона нет.
-- lintDebug 0 errors / 41 warnings / 3 hints; окончательная release lint — CI.
+- lintDebug 0 errors / 41 warnings / 3 hints; окончательный lintRelease в CI PASS.
 - Полный отчёт: docs/WIKIPEDIA_READER_0.30.0.md. Snapshot/image pins по-прежнему вне
   ручного ZIP-бэкапа; DeepSeek/SRS-карточки из wiki не добавлялись.
-- Сборка 0.30.0 отправляется в прежний CI; результаты/доставка будут дописаны.
+- APK source 7e0e4b28e1a60a6bf2791a7705f8b8da1cc07e2c, Android CI 44723884994,
+  job 136246463593 SUCCESS: весь unit-suite/debug, release lint/build, cert/manifest/zipalign.
+  Старые CI исходников e49e9b0/ee63587 заменены итоговым manual run; артефакты брать
+  только из 44723884994. Новых веток/публикаций beta/store не создавали.
+- Release 52 350 389 bytes, SHA 374598c02c44cb68017bf615841b1d01b1b2538c81b380a57c807472fed30c56,
+  прежний постоянный cert 59345a3b…d97859; debug 61 957 296 bytes,
+  SHA ce9cd46fcbaf11c548f5c4c5028b4a45edc67898bddd19b016621ba7c89a0307.
+  ZIP artifacts debug 14622474600 / release 14623552861, hashes/подписи/package83/
+  16KiB alignment/три демо/отсутствие пользовательских книг и серверной TTS проверены.
+- Запасной Drive Philip Marlow (основной boikot5225@gmail.com был full), размеры
+  readback совпали. Release https://drive.google.com/file/d/1JklmBODZRrjL_wHuAS8NYghGV730-h6T/view?usp=drivesdk
+  Debug https://drive.google.com/file/d/1v3kG1Wrkpj-7O1fFTu2BXKONstdd_4r9/view?usp=drivesdk
+  /workspace/artifacts/Amauta-Reader-0.30.0-{release,debug}.apk — проверенные копии;
+  .work/release/0.30.0 — verification/delivery metadata и скрипты (игнорируются Git).
 - Чужой WIP сайта (docs/index.html, docs/privacy.html, tools/build_site.py,
   docs/img/amauta-icon.png, docs/img/es-reader.png) не включать в коммит/публикацию.
 

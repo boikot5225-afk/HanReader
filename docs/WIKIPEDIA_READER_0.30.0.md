@@ -22,9 +22,31 @@ WikiReading — адаптер для показа, не новая запись
 
 - 58 локальных регрессионных/мокированных сценариев: 57/57 общим запуском, затем 11/11 для обновления старых снимков и интерфейса (10 повторных и один новый). Проверены общий экран оформления, страницы, отметки знакомых слов, приоритет своих значений, сохранение исходного места книги, изоляция кнопок громкости (включая задержанное завершение пагинации неактивной книги и владение ReaderKeys; финальные native 9/9 PASS), подписи/лицензии, офлайн после перезапуска, частичная загрузка, общие изображения при удалении, v1 → v2, заметки, связи имён и ZIP-бэкап.
 - Отдельный реальный `WikipediaLiveTest` — PASS. Получены полные статьи en/es/zh и русская версия через языковую ссылку. В en обнаружены 4 подходящие иллюстрации, первая загружена (526843 байта, Public domain), сохранена и прочитана с запрещённой сетью; в es — 1 иллюстрация, 116699 байт, Public domain, та же офлайн-проверка. В выбранной zh-статье подходящих иллюстраций нет. Тест требует ненулевого числа изображений в заведомо иллюстрированной en-статье: прежний фильтр хоста не может дать ложный успех.
-- `lintDebug`: 0 ошибок, 41 предупреждение, 3 подсказки; после этого добавлен небольшой путь обновления старых снимков, окончательная release-проверка выполняется в CI.
+- `lintDebug`: 0 ошибок, 41 предупреждение, 3 подсказки; окончательный `lintRelease` в CI также PASS (0 ошибок).
 - На физическом Android-устройстве не проверено. Robolectric native graphics и настоящие HTTP-запросы не заменяют проверку на телефоне.
 
 ## Сборка
 
-0.30.0 / versionCode 83. Подписанный release и debug APK готовятся в прежнем Android CI; ссылки и результаты сборки будут внесены после проверки артефактов.
+0.30.0 / versionCode 83, package `com.hanreader.app.es`, minSdk 26 / targetSdk 36.
+
+Исходники APK: `7e0e4b28e1a60a6bf2791a7705f8b8da1cc07e2c`, ветка `amauta`. [Android CI 44723884994](https://github.com/boikot5225-afk/HanReader/actions/runs/44723884994), job 136246463593 — SUCCESS: все unit-тесты и debug APK (4 мин 47 с), `lintRelease` и release APK (4 мин 21 с), проверка подписи/manifest/16 KiB zipalign. Публикация beta/AppGallery/RuStore не запускалась.
+
+| APK | Размер | SHA-256 | Скачать |
+|---|---:|---|---|
+| release | 52 350 389 байт | `374598c02c44cb68017bf615841b1d01b1b2538c81b380a57c807472fed30c56` | [Google Диск](https://drive.google.com/file/d/1JklmBODZRrjL_wHuAS8NYghGV730-h6T/view?usp=drivesdk) |
+| debug | 61 957 296 байт | `ce9cd46fcbaf11c548f5c4c5028b4a45edc67898bddd19b016621ba7c89a0307` | [Google Диск](https://drive.google.com/file/d/1v3kG1Wrkpj-7O1fFTu2BXKONstdd_4r9/view?usp=drivesdk) |
+
+Доставка — прежний запасной аккаунт Philip Marlow; размеры повторно сверены через Drive metadata. Release подписан прежним постоянным сертификатом SHA-256 `59345a3b2a7007d83b95832fe30e120fb71686c413680ed86fb078f813d97859`, debug — прежним debug-сертификатом. Локальные копии: `/workspace/artifacts/Amauta-Reader-0.30.0-{release,debug}.apk`.
+
+Артефакты GitHub: debug 14622474600, ZIP SHA-256 `1960588cf6ad597aa663259b8eeaff6a42a35fea179820778d2174dcd58571c7`; release 14623552861, ZIP SHA-256 `2c88b2ebaf3847ab5f00df22b759daf64bdc37df96e06f18240e316e80f89eda`. ZIP CRC/digest и APK package/version/signature/16 KiB alignment проверены локально. APK содержит ровно три прежних CC0 demo EPUB; нет пользовательских книг, приватных ключей, настроек и серверной озвучки.
+
+## Изменённые файлы
+
+- `reader/WikipediaReader.kt`, `WikiReading.kt`, `WikipediaImage.kt`: общий рендеринг, оформление/режимы, отметки слов, привязки, изображения и авторство.
+- `reader/ReaderScreen.kt`, `Appearance.kt`: callbacks для повторного использования PagedChapter без VM исходной книги, фильтрация событий клавиш и владение ReaderKeys.
+- `reader/AppearanceSheet.kt`: общие настройки с отключением пока не подключённых к статье функций глав.
+- `reader/WikipediaSheet.kt`, `WikipediaLibrary.kt`, `BookKnowledgeSheet.kt`: передача существующего словаря, отметок, уровня, пиньиня и сохранений.
+- `wiki/WikiDocuments.kt`, `WikiImages.kt`, `Wikipedia.kt`: снимки v2, безопасный разбор изображений/метаданных, кеш/pins, совместное использование и обновление v1.
+- `app/build.gradle.kts`: версия; тесты `WikiDocumentsTest`, `WikiImageStoreTest`, `WikipediaFullTest`, `WikipediaLiveTest`, `WikipediaReaderTest`, `EqualChapterPaginationTest`; `HANDOFF.md` и этот отчёт.
+
+Чужие изменения `docs/index.html`, `docs/privacy.html`, `tools/build_site.py`, `docs/img/amauta-icon.png`, `docs/img/es-reader.png` сохранены в рабочей копии и в коммиты этой задачи не включены.
