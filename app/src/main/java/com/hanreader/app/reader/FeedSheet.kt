@@ -62,9 +62,26 @@ internal fun FeedSheet(vm: ReaderViewModel, onDismiss: () -> Unit) {
         try {
             val result = withTimeout(60_000) { feed.refresh(settings) }
             feedItems = feed.cached(settings)
+            var fallbackUsed = false
+            var failed = result.failed
+            if (feedItems.isEmpty()) {
+                val fallback = settings.copy(languages = FeedCatalog.languages().toSet())
+                if (fallback.languages != settings.languages) {
+                    val fallbackResult = withTimeout(60_000) { feed.refresh(fallback) }
+                    failed = (failed + fallbackResult.failed).distinctBy { it.id }
+                    feedItems = feed.cached(fallback).filter { it.topic in settings.topics }
+                    fallbackUsed = feedItems.isNotEmpty()
+                }
+            }
             message = when {
-                result.attempted > 0 && result.failed.size == result.attempted -> "Нет сети или источники недоступны. Показана сохранённая лента."
-                result.failed.isNotEmpty() -> "Не все источники ответили: ${result.failed.joinToString { it.name }}"
+                fallbackUsed && failed.isNotEmpty() ->
+                    "По выбранному языку пусто: показаны доступные материалы на других языках. Не ответили: ${failed.joinToString { it.name }}"
+                fallbackUsed ->
+                    "По выбранному языку пусто: показаны доступные материалы на других языках."
+                result.attempted > 0 && result.failed.size == result.attempted ->
+                    "Нет сети или источники недоступны. Показана сохранённая лента."
+                result.failed.isNotEmpty() ->
+                    "Не все источники ответили: ${result.failed.joinToString { it.name }}"
                 else -> null
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) { message = "Лента обновляется слишком долго"
