@@ -1,6 +1,6 @@
 # Amauta Reader (HanReader) — передача дел следующей сессии
 
-Состояние на 19 ноября 2026, исходники **0.28.0** (versionCode 80), ветка **`amauta`**.
+Состояние на 20 ноября 2026, исходники **0.28.0** (versionCode 80), ветка **`amauta`**.
 
 ## Люди и понятия книги — 0.28.0
 
@@ -25,8 +25,28 @@
 - BookKnowledgeTest (5) + BookKnowledgeFlowTest (4), включая Compose search/detail/export/
   callback перехода, сохранение после нового ViewModel, приоритет ручной заметки, attach/
   detach, удаление адресата, неверные/чужие/закрытые цели, backup v7/v6 и экспорт атрибуции.
-  Первый запуск 42 тестов прошёл; окончательная серия с новой миграцией/регрессиями и
-  lint выполняется. Подробности: docs/BOOK_KNOWLEDGE_0.28.0.md.
+  Первый запуск 42 тестов прошёл; расширенная серия 66 (1 optional live Wiki skipped),
+  без ошибок. Окончательная серия 18/18 после всех изменений, включая FullBackupTest.
+  lintRelease: 0 errors, 35 warnings, 3 hints. Первый lint нашёл StateFlow.value в новой
+  тестовой композиции; исправлено collectAsState в 21bb355, повторный lint прошёл.
+  Исходники: 7f3b11a + 21bb3558ab35a76c9bc07d94ca742362705c1dca.
+  Подробности: docs/BOOK_KNOWLEDGE_0.28.0.md. Окончательный CI 44641070539 / job135972100568
+  SUCCESS, 6m12s: полные debug-тесты/сборка, release-тесты/lint/сборка и подпись.
+  Прежний CI 44640610254 заменён после исправления теста. Не использовать его APK.
+- Оба APK скачаны из окончательного CI; ZIP SHA совпадает с GitHub artifact digest.
+  Debug artifact14585584583, ZIP78afe34698ffa4fe5528635cf28b51113a2d26815439af29a0396063f1f37d42;
+  release artifact14587420405, ZIP50fc33081d5a54269eb2893fc704fd4d95728c5a27f288e42ee8a08a03270f4a.
+  Release 52 235 693 байт, APK SHA a66b406b4efaa053d71618b727f71fb72aeb9946206a3c1ace2c022eba01d44c.
+  Debug 61 793 456 байт, APK SHA ce3cbfb7c8dc4dded29d1a1643775d6b172bc79368a66568969cf610c17abd4e.
+  Сертификаты прежние (release59345a..., debug95cc5b...), manifest/code80/debuggable,
+  zipalign16, новые классы/поля и прежние исправления проверены. В APK только три штатных
+  demo EPUB с исходными байтами; пользовательских книг, ключей/настроек и серверной TTS нет.
+  .work/release/0.28.0/ содержит APK и JSON verification. Копии для скачивания:
+  /workspace/artifacts/Amauta-Reader-0.28.0-release.apk и ...-debug.apk (SHA сверены).
+- Drive debug upload вернул 403 storageQuotaExceeded для основного аккаунта владельца.
+  Файл не создан, новых Drive URL нет; старые файлы не удаляли и другой аккаунт не использовали.
+  При необходимости запасная загрузка из Artifacts по адресу
+  https://github.com/boikot5225-afk/HanReader/actions/runs/44641070539 (нужен вход в GitHub).
 - Физический Android-телефон не подключён. DeepSeek в этой задаче не вызывался.
   Не выдавать тест Compose callback за реальное ручное чтение на телефоне.
 - Чужие изменения docs/index.html, docs/privacy.html, tools/build_site.py и два PNG
