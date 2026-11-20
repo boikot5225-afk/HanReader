@@ -91,6 +91,7 @@ class EnglishReaderUiTest {
 
     @Test fun phraseHeadSavesTheWholeDictionaryExpression() {
         show("She looked up the word.", "looked")
+        compose.onNodeWithText("Инструменты").performClick()
         compose.onNodeWithText("Выражение: look up").assertExists()
         compose.onNodeWithText("Знаю").performClick()
         compose.runOnIdle { assertEquals("look up", marked) }

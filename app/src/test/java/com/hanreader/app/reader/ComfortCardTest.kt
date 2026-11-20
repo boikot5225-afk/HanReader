@@ -62,7 +62,6 @@ class ComfortCardTest {
     @Test fun wrongMeaningCanBeCorrectedHereAndSavedFromTheActualChineseCard() {
         Languages.current=Languages.CHINESE
         show(ZhContextRegressionTest.engine,"妖精来到银行。","妖精")
-        compose.onNodeWithText("Разбор и словарь").assertExists()
         compose.onNodeWithText("Не подходит").performClick()
         compose.onNodeWithText("Здесь").assertIsSelected()
         compose.onNodeWithText("Моё значение").performTextReplacement("мой гоблин")
@@ -81,6 +80,7 @@ class ComfortCardTest {
     @Test fun spanishSelectionExpandsThroughASpaceWithoutCountingAnotherLookup() {
         Languages.current=Languages.SPANISH
         show(EsEngineTest.load(),"Una casa grande.","casa")
+        compose.onNodeWithText("Инструменты").performClick()
         compose.onNodeWithText("слово →").performClick()
         compose.onNodeWithText("casa grande",substring=false).assertExists()
         compose.onNodeWithText("Убрать справа").performClick()
