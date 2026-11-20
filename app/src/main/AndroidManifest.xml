@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Optional DeepSeek context checks, enabled by the reader. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <queries>
         <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>
         <!-- Translator apps that take selected text («Открыть в переводчике»). -->
