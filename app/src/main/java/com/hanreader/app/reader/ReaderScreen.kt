@@ -1225,8 +1225,9 @@ internal fun PagedChapter(
                 onDispose { registerJump(null); registerBlockJump(null) }
             }
             DisposableEffect(keysEnabled) {
-                ReaderKeys.active = keysEnabled
-                onDispose { ReaderKeys.active = false }
+                val owner = Any()
+                if (keysEnabled) ReaderKeys.acquire(owner)
+                onDispose { ReaderKeys.release(owner) }
             }
             // A nested article reader must never turn the suspended book's pages too.
             LaunchedEffect(pager, keysEnabled) { if (keysEnabled) ReaderKeys.turns.collect { turn(it) } }

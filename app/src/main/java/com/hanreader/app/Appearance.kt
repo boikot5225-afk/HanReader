@@ -354,7 +354,11 @@ object AppearanceStore {
 
 /** Volume-key page turns: the reader switches this on, MainActivity forwards the keys. */
 object ReaderKeys {
+    private val owners = HashSet<Any>()
     @Volatile var active: Boolean = false
+        private set
+    @Synchronized fun acquire(owner: Any) { owners += owner; active = true }
+    @Synchronized fun release(owner: Any) { owners -= owner; active = owners.isNotEmpty() }
     val turns = kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 8)
 }
 

@@ -82,16 +82,20 @@ class EqualChapterPaginationTest {
             val metrics = rememberRubyMetrics(rememberTextMeasurer(cacheSize = 0), appearance, theme, WordFont)
             androidx.compose.foundation.layout.Box {
                 for (active in listOf(false, true)) {
-                    PagedChapter(null, book, chapter, metrics, rubyColors(appearance, theme), appearance,
+                    // The suspended book finishes pagination AFTER the active article.
+                    val shownChapter = if (active) chapter else chapter.copy(blocks = listOf(ReaderBlock.Image("slow")) + chapter.blocks)
+                    PagedChapter(null, book.copy(chapter = shownChapter), shownChapter, metrics, rubyColors(appearance, theme), appearance,
                         showPinyin = false, hidePinyinFor = null, showBanner = false, glossFor = null,
                         banner = {}, paragraph = { _, _, _ -> }, bars = PaddingValues(), speed = 200f,
                         keysEnabled = active, onTapCenter = {}, onAnyTap = { false },
                         onProgress = { if (active) articlePage = it.position else parentPage = it.position },
-                        registerJump = {}, registerBlockJump = {}, bookmarkedBlocks = emptySet())
+                        registerJump = {}, registerBlockJump = {}, bookmarkedBlocks = emptySet(),
+                        imageAspect = { kotlinx.coroutines.delay(750); .3f })
                 }
             }
         } }
         compose.waitUntil(20_000) { parentPage == 0 && articlePage == 0 }
+        assertTrue("A late inactive reader disabled the active article's volume keys", ReaderKeys.active)
         compose.runOnIdle { ReaderKeys.turns.tryEmit(1) }
         compose.waitUntil(20_000) { articlePage == 1 }
         assertEquals("A suspended book consumed the article's volume key", 0, parentPage)

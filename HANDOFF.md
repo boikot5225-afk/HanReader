@@ -14,6 +14,10 @@
 - PagedChapter VM nullable + callbacks позиции/изображений с прежними book defaults.
   Исправлен общий ReaderKeys.turns: неактивный reader не потребляет события статьи;
   отдельный native regression проверяет два одновременно скомпонованных pager.
+  ReaderKeys теперь acquire/release по владельцу: поздно готовая неактивная книга
+  не сбрасывает active у статьи. Тест искусственно задерживает пагинацию книги
+  через imageAspect, проверяет active и отсутствие двойного листания. 9/9 native
+  EqualChapterPaginationTest + WikipediaReaderTest после исправления PASS.
 - WikiDocument v2: прежние текстовые блоки/ключи v1 сохранены, изображения отдельно
   с beforeBlock; позиция source paragraph + UTF-16 char, layout ↔ source mapping.
   Старый снимок можно дополнить через «Об источнике → Загрузить иллюстрации»;
