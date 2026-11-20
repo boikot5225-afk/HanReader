@@ -53,6 +53,12 @@
   Debug https://drive.google.com/file/d/1v3kG1Wrkpj-7O1fFTu2BXKONstdd_4r9/view?usp=drivesdk
   /workspace/artifacts/Amauta-Reader-0.30.0-{release,debug}.apk — проверенные копии;
   .work/release/0.30.0 — verification/delivery metadata и скрипты (игнорируются Git).
+- Отдельный emulator run 44723273442 на промежуточном ee63587: Android 8/11 SUCCESS,
+  Android 14 Nexus 10 FAILURE в общем SmokeTest.readABook: после swipeUp не дождался
+  hasContentDescription(Назад в библиотеку) за 15с. Книга открылась; crash не установлен.
+  Причина не выяснена, не повторяли на финальном source7e0e4b2. Новый wiki flow этим
+  instrumentation smoke вообще не проверяется. Не объявлять планшеты проверенными;
+  при следующем аудите посмотреть menu gesture/условия SmokeTest на tablet landscape.
 - Чужой WIP сайта (docs/index.html, docs/privacy.html, tools/build_site.py,
   docs/img/amauta-icon.png, docs/img/es-reader.png) не включать в коммит/публикацию.
 
