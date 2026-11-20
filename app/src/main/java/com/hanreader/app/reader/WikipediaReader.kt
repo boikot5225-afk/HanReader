@@ -3,6 +3,14 @@ package com.hanreader.app.reader
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.toSize
+import com.hanreader.app.ai.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -36,7 +44,7 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
     onDismiss: () -> Unit, onSaveExcerpt: (suspend (WikiArticle, String) -> Unit)? = null, meanings: Map<String, String> = emptyMap(),
     onKnown: ((String, Boolean) -> Unit)? = null, studying: Set<String> = emptySet(),
     levelMark: LevelMark = LevelMark(HskSystem.HSK3, 0), pinyinMode: PinyinMode = PinyinMode.UNKNOWN,
-    onPinyinMode: ((PinyinMode) -> Unit)? = null) {
+    onPinyinMode: ((PinyinMode) -> Unit)? = null, aiOverride: ContextAi? = null) {
     var document by remember(initialDocument) { mutableStateOf(initialDocument) }
     val context = LocalContext.current
     val focus = LocalFocusManager.current
@@ -54,6 +62,22 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
     var message by remember(document.key) { mutableStateOf<String?>(null) }
     var offline by remember(document.key) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val contextAi = aiOverride ?: remember(context) { ContextAi.get(context) }
+    val aiConfig by contextAi.settings.config.collectAsState()
+    var aiSettings by remember { mutableStateOf(false) }
+    var viewport by remember { mutableStateOf(Rect.Zero) }
+    val paragraphBounds = remember(document.key) { mutableStateMapOf<String, Pair<Int, Rect>>() }
+    val lineRanges = remember(document.key) { mutableStateMapOf<String, List<ReaderLineRange>>() }
+    val visible by remember(paragraphBounds, lineRanges) { derivedStateOf {
+        paragraphBounds.entries.mapNotNull { (key, source) ->
+            val (block, rect) = source
+            if (!rect.overlaps(viewport)) null else {
+                val lines = lineRanges[key].orEmpty().filter { rect.top + it.bottom > viewport.top && rect.top + it.top < viewport.bottom }
+                if (lines.isEmpty()) null else WikiVisibleSpan(block, lines.minOf { it.start }, lines.maxOf { it.end })
+            }
+        }.groupBy { it.block }.map { (block, spans) -> WikiVisibleSpan(block, spans.minOf { it.start }, spans.maxOf { it.end }) }.sortedBy { it.block }.take(3)
+    } }
+
     val dictionary = engine?.takeIf { it.info.tag.substringBefore('-') == document.article.language }
     val globalMeanings = remember(meanings, dictionary) { if (dictionary == null) emptyMap() else meanings.filterKeys { !ContextMeanings.isScoped(it) } }
     val appearance = appAppearance
@@ -108,16 +132,32 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
         PinyinMode.UNKNOWN -> learning.knownHere
         PinyinMode.RECOMMENDED -> ready?.chapter?.blocks?.flatMap { (it as? ReaderBlock.Text)?.tokens.orEmpty() }?.mapTo(HashSet()) { it.text }?.minus(learning.recommended) ?: emptySet()
     } }
-    val glosses = if (hints && dictionary != null && appearance.gloss != GlossMode.OFF) learning.glosses else null
+    val wikiAi = rememberWikipediaAi(contextAi, ready, dictionary, globalMeanings, appearance, visible,
+        settings || aiSettings || contents || pinyinSettings || selected != null, learning.glosses)
+    val overlayKey = remember(ready, learning.glosses, wikiAi.rows, aiConfig.indicators) { Any() }
+    val overlay by produceState<Pair<Any, Map<String, String>>?>(null, overlayKey) {
+        value = overlayKey to withContext(Dispatchers.Default) {
+            HashMap(learning.glosses).apply { if (ready != null) wikiAi.rows.groupBy { it.block }.forEach { (bi, rows) ->
+                (ready.textChapter.blocks.getOrNull(bi) as? ReaderBlock.Text)?.let { AiContext.overlay(this, it, bi, rows, aiConfig.indicators) }
+            } }
+        }
+    }
+    val glosses = if (hints && dictionary != null) overlay?.takeIf { it.first === overlayKey }?.second ?: learning.glosses else null
     var jump by remember { mutableStateOf<((Int, Int) -> Unit)?>(null) }
     val paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit = { block, layout, lines ->
         val index = ready!!.source(layout)
+        val boundsKey = "$index:${lines?.first}:${lines?.last}"
+        DisposableEffect(boundsKey) { onDispose { paragraphBounds.remove(boundsKey); lineRanges.remove(boundsKey) } }
         RubyParagraph(block, metrics, showPinyin, hidePinyinFor, studying,
             selected?.takeIf { it.first == index }?.let { Highlights.range(block, it.second, it.third) }, colors,
-            modifier = Modifier.testTag("wiki-block-$index").semantics {
+            modifier = Modifier.testTag("wiki-block-$index").onGloballyPositioned { coordinates ->
+                val bounds = index to Rect(coordinates.positionInWindow(), coordinates.size.toSize())
+                if (paragraphBounds[boundsKey] != bounds) paragraphBounds[boundsKey] = bounds
+            }.semantics {
                 contentDescription = document.blocks[index].text
                 onClick(label = "Выбрать абзац") { selected = Triple(index, 0, document.blocks[index].text.length); true }
             },
+            onLines = { ranges -> if (lineRanges[boundsKey] != ranges) lineRanges[boundsKey] = ranges },
             lines = lines, unknownMarks = if (appearance.markUnknown) learning.unknown else null,
             recommendedMarks = if (appearance.markRecommended) learning.recommended else null,
             noMarks = remember(block, dictionary) { dictionary?.let { VocabularyStats.nameTokens(block, emptySet(), it) } ?: emptySet() },
@@ -158,10 +198,11 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                     }
                 }
                 FlowRow(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    IconButton(enabled = fontSize > 16, onClick = { AppearanceStore.update { it.copy(fontSize = (it.fontSize - 2).coerceAtLeast(16)) } }) { Text("А−") }
-                    IconButton(enabled = fontSize < 36, onClick = { AppearanceStore.update { it.copy(fontSize = (it.fontSize + 2).coerceAtMost(36)) } }) { Text("А+") }
+                    IconButton(enabled = fontSize > Appearance.FONT_SIZES.first, onClick = { AppearanceStore.update { it.copy(fontSize = (it.fontSize - 2).coerceAtLeast(Appearance.FONT_SIZES.first)) } }) { Text("А−") }
+                    IconButton(enabled = fontSize < Appearance.FONT_SIZES.last, onClick = { AppearanceStore.update { it.copy(fontSize = (it.fontSize + 2).coerceAtMost(Appearance.FONT_SIZES.last)) } }) { Text("А+") }
                     TextButton(onClick = { settings = true }) { Text("Оформление") }
                     TextButton(onClick = { sourceDetails = !sourceDetails }) { Text("Об источнике") }
+                    if (dictionary != null) TextButton(onClick = { aiSettings = true }) { Text("DeepSeek") }
                     TextButton(onClick = { contents = !contents }) { Text("Разделы") }
                     if (dictionary is ZhEngine && onPinyinMode != null) TextButton(onClick = { pinyinSettings = true }) { Text("Пиньинь") }
                     if (dictionary != null) TextButton(onClick = { AppearanceStore.update { it.copy(gloss = if (hints) GlossMode.OFF else GlossMode.UNKNOWN) } }) { Text(if (hints) "Подсказки: вкл." else "Подсказки: выкл.") }
@@ -191,17 +232,17 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                 if (ready == null) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) {
                     if (preparationFailed) TextButton(onClick = { retry++ }) { Text("Повторить подготовку статьи") } else CircularProgressIndicator()
                 }
-                else if (appearance.mode == ReadingMode.PAGES) Box(Modifier.weight(1f).fillMaxWidth().testTag("wiki-pages")) {
+                else if (appearance.mode == ReadingMode.PAGES) Box(Modifier.weight(1f).fillMaxWidth().testTag("wiki-pages").onGloballyPositioned { viewport = it.boundsInWindow() }) {
                     PagedChapter(null, ready.book(position.first, position.second), ready.chapter, metrics, colors, appearance,
                         showPinyin, hidePinyinFor, false, glosses, banner = {}, paragraph = paragraph, bars = PaddingValues(0.dp), speed = 600f,
-                        keysEnabled = appearance.volumeKeys && !settings && !pinyinSettings && selected == null,
+                        keysEnabled = appearance.volumeKeys && !settings && !aiSettings && !pinyinSettings && selected == null,
                         onTapCenter = { contents = !contents }, onAnyTap = { if (selected != null) { selected = null; true } else false },
                         onProgress = {}, registerJump = {}, registerBlockJump = { jump = it }, bookmarkedBlocks = emptySet(), onCancelLoading = onDismiss,
                         onPosition = { _, layout, char -> savePosition(ready.source(layout), char); scrollAnchor = position.first + 1; prefs.edit().putInt(document.key, scrollAnchor).apply() },
                         imageAspect = { path -> document.images[path.toInt()].let { it.height.toFloat() / it.width + .3f } },
                         imageContent = { path -> WikipediaImage(document, document.images[path.toInt()], source, paged = true) })
                 }
-                else LazyColumn(state = list, modifier = Modifier.weight(1f).fillMaxWidth().testTag("wiki-article-list"), contentPadding = PaddingValues(horizontal = appearance.margin.dp, vertical = 12.dp),
+                else LazyColumn(state = list, modifier = Modifier.weight(1f).fillMaxWidth().testTag("wiki-article-list").onGloballyPositioned { viewport = it.boundsInWindow() }, contentPadding = PaddingValues(horizontal = appearance.margin.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(appearance.paragraphSpacing.dp)) {
                     item(key = "source") {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -227,11 +268,17 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                 selected?.let { selection ->
                     val block = document.blocks[selection.first]
                     val text = block.text.substring(selection.second, selection.third)
-                    val translation by produceState<String?>(null, document.key, dictionary, text, globalMeanings) {
-                        value = withContext(Dispatchers.Default) { globalMeanings[dictionary?.lemma(text)] ?: dictionary?.cardTranslation(text) }
+                    val row = wikiAi.rows.filter { it.block == selection.first && it.start < selection.third && it.end > selection.second }
+                        .sortedBy { if (it.state == "accepted") 0 else 1 }.firstOrNull()
+                    val selectedToken = ready?.textChapter?.blocks?.getOrNull(selection.first)?.let { it as? ReaderBlock.Text }
+                        ?.tokens?.firstOrNull { it.start == selection.second && it.end == selection.third }
+                    val manual = dictionary?.let { e -> globalMeanings[text] ?: globalMeanings[e.lemma(text)] ?: selectedToken?.let { globalMeanings[ContextMeanings.keyOf(it, e)] } }
+                    val translation by produceState<String?>(null, document.key, dictionary, text, globalMeanings, row, selectedToken) {
+                        value = withContext(Dispatchers.Default) { manual ?: row?.takeIf { it.state == "accepted" }?.translation
+                            ?: selectedToken?.let { dictionary?.glossShort(it) } ?: dictionary?.cardTranslation(text) }
                     }
                     Surface(tonalElevation = 8.dp) {
-                        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(text.take(400), maxLines = 3, style = MaterialTheme.typography.titleMedium)
                             if (dictionary != null && (translation != null || text.none(Char::isWhitespace))) Text(translation ?: "Словарного значения нет", maxLines = 3)
                             if (dictionary != null && onKnown != null && text.length <= 200) {
@@ -241,6 +288,10 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                                 val isKnown = remember(known, key, dictionary) { KnownMatcher(known, dictionary).isKnown(key) }
                                 if (token != null) KnownToggle(isKnown, { value -> onKnown(key, value) })
                             }
+                            if (aiConfig.enabled && !wikiAi.enabled) wikiAi.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                            if (dictionary != null && text.length <= 180) AiWordControls(row, wikiAi.enabled, wikiAi.busy, wikiAi.message,
+                                manual != null, onCheck = { wikiAi.check(selection.first, selection.second until selection.third) },
+                                onState = wikiAi.state)
                             FlowRow {
                                 TextButton(onClick = { selected = Triple(selection.first, 0, block.text.length) }) { Text("Весь абзац") }
                                 if (onSaveExcerpt != null) TextButton(enabled = !busy && text.length <= 12_000, onClick = {
@@ -255,6 +306,7 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                     text = { Column { PinyinMode.entries.forEach { mode ->
                         TextButton(onClick = { onPinyinMode?.invoke(mode); pinyinSettings = false }) { Text(mode.title) }
                     } } }, confirmButton = { TextButton(onClick = { pinyinSettings = false }) { Text("Закрыть") } })
+                if (aiSettings) AiSettingsDialog { aiSettings = false }
                 if (settings) AppearanceSheet(onDismiss = { settings = false }, showChapterTools = false)
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 message?.let { Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall) }

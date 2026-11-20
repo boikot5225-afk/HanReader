@@ -143,7 +143,7 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                     userMeanings = db.userMeaningDao().all(),
                     userSplits = db.userSplitDao().all().map { it.word },
                     activity = db.statsDao().allDays(),
-                    aiChecks = db.aiCheckDao().all()
+                    aiChecks = db.aiCheckDao().forBackup()
                 ) }
                 withContext(Dispatchers.IO) {
                     val stream = app.contentResolver.openOutputStream(uri, "wt")

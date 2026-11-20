@@ -14,7 +14,7 @@ data class AiFragment(val book: Long, val chapter: Int, val block: Int, val reso
     val text: String, val previous: String, val next: String, val variant: String,
     val manualHash: String, val terms: List<AiTerm>, val boundaries: Set<Int>,
     val protected: List<IntRange> = emptyList(), val language: String = "es-ES",
-    val readings: Map<Int, String> = emptyMap()) {
+    val readings: Map<Int, String> = emptyMap(), val articleKey: String? = null) {
     val contextHash: String get() = AiContext.hash(JSONArray(listOf(book, resource, chapter, block,
         text, previous, next, variant, manualHash, AiContext.rules(language))).toString())
     fun key(term: AiTerm, model: String): String {
@@ -209,9 +209,9 @@ object AiContext {
                 start = sourceRange.first; end = sourceRange.last + 1
             }
             responseRequire(fragment.protected.none { it.first < end && it.last >= start }, AiResponseProblem.PROTECTED)
-            rows += AiCheck(fragment.key(t, model), fragment.book, fragment.chapter, fragment.block,
+            rows += AiCheck(fragment.key(t, model), fragment.book.takeIf { fragment.articleKey == null }, fragment.chapter, fragment.block,
                 fragment.contextHash, t.start, t.end, start, end, fragment.text.substring(start, end), t.base,
-                translation, explanation, confidence, if (!correct) "checked" else if (confidence == "high") "accepted" else "proposed")
+                translation, explanation, confidence, if (!correct) "checked" else if (confidence == "high") "accepted" else "proposed", articleKey = fragment.articleKey)
         }
         // Multiple terms can identify the same construction. Deduplicate consistent answers, reject conflicts.
         val accepted = rows.filter { it.translation != null }.sortedBy { it.start }
@@ -252,7 +252,7 @@ object AiContext {
             val reading = if (term?.reading != null && row.termEnd != term.end) fragment.readings
                 .filterKeys { it >= row.termStart && it < row.termEnd }.toSortedMap().values.filter { it.isNotBlank() }.joinToString(" ")
                 else term?.reading
-            term != null && row.contextHash == fragment.contextHash && row.start in fragment.boundaries && row.end in fragment.boundaries && row.termEnd in term.end..fragment.text.length &&
+            term != null && row.articleKey == fragment.articleKey && row.bookId == fragment.book.takeIf { fragment.articleKey == null } && row.contextHash == fragment.contextHash && row.start in fragment.boundaries && row.end in fragment.boundaries && row.termEnd in term.end..fragment.text.length &&
                 row.cacheKey == fragment.key(term.copy(end = row.termEnd,
                     original = fragment.text.substring(term.start, row.termEnd), reading = reading), model)
         }

@@ -338,7 +338,7 @@ object BackupFormat {
         val keys = HashSet<String>()
         val hash = Regex("[a-f0-9]{64}")
         for (c in checks) {
-            if (c.bookId !in books || !keys.add(c.cacheKey) || !hash.matches(c.cacheKey) || !hash.matches(c.contextHash) ||
+            if (c.articleKey != null || c.bookId == null || c.bookId !in books || !keys.add(c.cacheKey) || !hash.matches(c.cacheKey) || !hash.matches(c.contextHash) ||
                 c.chapter < 0 || c.block < 0 || c.termStart < 0 || c.termEnd <= c.termStart ||
                 c.start < 0 || c.end <= c.start || c.start > c.termStart || c.end < c.termEnd ||
                 c.original.isBlank() || c.createdAt < 0 ||

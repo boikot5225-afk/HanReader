@@ -50,7 +50,7 @@ fun AiSettingsDialog(onClose: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().heightIn(max = 760.dp).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Контекстный ИИ", style = MaterialTheme.typography.titleLarge)
-            Text("Проверка испанских, английских и китайских подсказок на русском языке. Фрагменты книги будут переданы DeepSeek. Запросы, включая проверку подключения, оплачиваются с твоего личного API-баланса.")
+            Text("Проверка испанских, английских и китайских подсказок на русском языке. Фрагменты книг и статей Википедии будут переданы DeepSeek. Запросы, включая проверку подключения, оплачиваются с твоего личного API-баланса.")
             Text("Ключ, выбранный режим и лимит запросов общие для всех трёх языков.", style = MaterialTheme.typography.bodySmall)
             Row {
                 Checkbox(c.consent, onCheckedChange = { ai.settings.update(c.copy(consent = it, enabled = c.enabled && it)) })
@@ -84,7 +84,7 @@ fun AiSettingsDialog(onClose: () -> Unit) {
                 Spacer(Modifier.width(8.dp))
                 FilterChip(c.automatic, { ai.settings.update(c.copy(automatic = true)) }, label = { Text("Автоматически") })
             }
-            Text("В автоматическом режиме проверяются показанные подсказки читаемого абзаца пакетами. Книга целиком не отправляется. Уверенные исправления применяются здесь; сомнительные остаются предложениями.", style = MaterialTheme.typography.bodySmall)
+            Text("В автоматическом режиме проверяются показанные подсказки читаемого абзаца пакетами. Книга или статья целиком не отправляется. Уверенные исправления применяются здесь; сомнительные остаются предложениями.", style = MaterialTheme.typography.bodySmall)
             if (appearance.gloss == com.hanreader.app.GlossMode.OFF) {
                 Text("Переводы над словами сейчас выключены: автоматических запросов при чтении не будет.", style = MaterialTheme.typography.bodySmall)
                 TextButton(onClick = { com.hanreader.app.AppearanceStore.update { it.copy(gloss = com.hanreader.app.GlossMode.UNKNOWN) } }) { Text("Показать переводы над незнакомыми словами") }
@@ -99,14 +99,14 @@ fun AiSettingsDialog(onClose: () -> Unit) {
             }
             Text("За сеанс: запросов ${usage.requests}/${c.limit}, токенов ${usage.tokens}" +
                 if (usage.unknown > 0) ". Расход ещё ${usage.unknown} запросов неизвестен." else ".")
-            Text("Сеанс длится до завершения процесса приложения. Смена книги не сбрасывает лимит.", style = MaterialTheme.typography.bodySmall)
+            Text("Сеанс длится до завершения процесса приложения. Смена книги или статьи не сбрасывает лимит.", style = MaterialTheme.typography.bodySmall)
             TextButton(enabled = c.enabled && c.hasKey && c.consent && !busy && !saving,
                 onClick = { localMessage = null; action { ai.repository.probe() } }) { Text(if (busy) "Проверяю…" else "Проверить подключение (платный запрос)") }
             (localMessage ?: message)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             HorizontalDivider()
             TextButton(enabled = !busy && !saving, onClick = { action { ai.repository.clear(false); localMessage = "Кеш проверок очищен. Принятые исправления и отказы сохранены." } }) { Text("Очистить кеш проверок") }
             TextButton(enabled = !busy && !saving, onClick = { confirmClear = true }) { Text("Удалить все результаты ИИ…") }
-            Text("Исправления и выполненные проверки сохраняются в резервной копии вместе с книгами. После восстановления ключ DeepSeek нужно ввести заново.", style = MaterialTheme.typography.bodySmall)
+            Text("Исправления книг сохраняются в резервной копии вместе с книгами. Статьи Википедии и их исправления пока хранятся только на этом устройстве. После восстановления ключ DeepSeek нужно ввести заново.", style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onClose) { Text("Готово") }
         }
     }

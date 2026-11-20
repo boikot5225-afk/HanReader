@@ -13,6 +13,7 @@ import kotlin.coroutines.coroutineContext
 /** Display-only adapter: no synthetic Room book, reading history or source-book mutations. */
 internal class WikiReading(val document: WikiDocument, val chapter: ChapterContent,
     val sourceBlocks: List<Int>, val layoutBlocks: List<Int>) : BookSource {
+    val textChapter = chapter.copy(blocks = layoutBlocks.map { chapter.blocks[it] })
     override val title = document.article.title
     override val author = "Участники Википедии"
     override val chapters = listOf(EpubChapter(0, document.key, title))

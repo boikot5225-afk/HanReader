@@ -41,6 +41,7 @@ class WikipediaRepository(context: Context,
     private val now: () -> Long = System::currentTimeMillis,
     fetchImage: suspend (String) -> ByteArray = WikiImages::download
 ) : WikipediaSource {
+    private val appContext = context.applicationContext
     private val directory = File(context.noBackupFilesDir, "wikipedia-v1")
     private val savedDirectory = File(context.filesDir, "wikipedia-reading-v1")
     private val mutex = Mutex()
@@ -229,6 +230,7 @@ class WikipediaRepository(context: Context,
                 runCatching { require(entry.length() <= WikiDocuments.MAX_FILE_BYTES); WikiDocuments.decode(entry.readText()).images.map { it.url } }.getOrDefault(emptyList())
             }.toSet()
         }
+        com.hanreader.app.LexiconDatabase.get(appContext).aiCheckDao().deleteArticle("v1:${article.language}:${article.id}:${article.revision}")
         images.prune(retained)
     } }
 }

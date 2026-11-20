@@ -115,7 +115,7 @@ class MigrationTest {
             assertEquals(listOf("雷蒙德"), db.userNameDao().all().map { it.word })
             assertEquals(emptyList<String>(), db.bookDao().ignoredWords(7)) // cascade
         }
-        assertEquals(17, db.openHelper.readableDatabase.version)
+        assertEquals(18, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -166,7 +166,7 @@ class MigrationTest {
             assertEquals(setOf("red", "@7|b|limitarse"), db.userMeaningDao().observeAll("es-ES").first().map { it.word }.toSet())
             assertEquals(setOf("端", "@7|b|limitarse"), db.userMeaningDao().observeAll("zh-CN").first().map { it.word }.toSet())
         }
-        assertEquals(17, db.openHelper.readableDatabase.version)
+        assertEquals(18, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -198,7 +198,7 @@ class MigrationTest {
                 aliasesJson = "[]", entityName = h.text, contextQuote = "Cárdenas pidió ayuda."))
             assertEquals("Osiel Cárdenas", db.highlightDao().all().last().entityName)
         }
-        assertEquals(17, db.openHelper.readableDatabase.version)
+        assertEquals(18, db.openHelper.readableDatabase.version)
         db.close()
     }
 
@@ -230,7 +230,7 @@ class MigrationTest {
             db.highlightDao().update(old.copy(aliasesJson = "[\"Cárdenas\"]"))
             assertEquals("[\"Cárdenas\"]", db.highlightDao().all().single().aliasesJson)
         }
-        assertEquals(17, db.openHelper.readableDatabase.version)
+        assertEquals(18, db.openHelper.readableDatabase.version)
         db.close()
     }
 }

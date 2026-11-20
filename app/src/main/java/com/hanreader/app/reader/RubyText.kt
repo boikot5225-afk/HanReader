@@ -41,6 +41,9 @@ import com.hanreader.app.TextAlignMode
 import com.hanreader.app.ThemeSpec
 import com.hanreader.app.zh.TokenKind
 
+/** Source characters and local pixel bounds of a displayed line, independent of its hints. */
+data class ReaderLineRange(val start: Int, val end: Int, val top: Float, val bottom: Float)
+
 /**
  * Measures and caches every distinct string of a chapter once, for the two styles
  * (characters and pinyin). Shared by all paragraphs on screen.
@@ -405,7 +408,8 @@ fun RubyParagraph(
     /** The paragraph's index in its chapter, for the reader's meanings of one place; -1: none. */
     blockIndex: Int = -1,
     /** Words highlighted in the whole book: token -> colour of the dashed line under them. */
-    dashed: Map<Int, Color> = emptyMap()
+    dashed: Map<Int, Color> = emptyMap(),
+    onLines: ((List<ReaderLineRange>) -> Unit)? = null
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val density = LocalDensity.current
@@ -420,6 +424,16 @@ fun RubyParagraph(
             gapPx, lineGapPx, colors.justify, colors.indent, glossFor, only, blockIndex)
         val shown = lines ?: (0 until laid.lineCount)
         val offsetY = shown.first * laid.lineHeight
+        if (onLines != null) {
+            val listener = androidx.compose.runtime.rememberUpdatedState(onLines)
+            androidx.compose.runtime.LaunchedEffect(laid, shown) {
+                val ranges = laid.items.filter { laid.lineOf(it) in shown }.groupBy { laid.lineOf(it) }.map { (line, items) ->
+                    ReaderLineRange(items.minOf { block.tokens[it.token].start }, items.maxOf { block.tokens[it.token].end },
+                        line * laid.lineHeight - offsetY, (line + 1) * laid.lineHeight - offsetY)
+                }
+                listener.value?.invoke(ranges)
+            }
+        }
         val heightPx = if (lines == null) laid.height else (shown.last - shown.first + 1) * laid.lineHeight
         val heightDp = with(density) { heightPx.toDp() }
         val haptics = LocalHapticFeedback.current

@@ -29,6 +29,13 @@ class AiRepository(
     val busy = _busy.asStateFlow()
     fun notice(message: String) { _message.value = message }
     private val dao = db.aiCheckDao()
+    fun observeArticle(key: String) = dao.observeArticle(key)
+    suspend fun attachArticle(key: String) {
+        require(key.matches(Regex("v1:(es|en|zh):[1-9][0-9]*:[1-9][0-9]*")))
+        dao.attachArticle(AiArticle(key))
+    }
+    private suspend fun exists(fragment: AiFragment): Boolean = fragment.articleKey?.let { dao.hasArticle(it) }
+        ?: (db.bookDao().get(fragment.book) != null)
     fun observe(book: Long) = dao.observe(book)
     fun observeChapter(book: Long, chapter: Int) = dao.observeChapter(book, chapter)
 
@@ -52,8 +59,20 @@ class AiRepository(
         }
     }
 
-    suspend fun check(fragment: AiFragment, automatic: Boolean, stillValid: suspend () -> Boolean): List<AiCheck> = mutex.withLock {
+    suspend fun check(fragment: AiFragment, automatic: Boolean, stillValid: suspend () -> Boolean): List<AiCheck> =
+        checkInternal(fragment, automatic, stillValid, stillValid)
+
+    /** Recheck viewport eligibility after waiting for another paid request, before billing. */
+    suspend fun checkVisible(fragment: AiFragment, canStart: suspend () -> Boolean, stillValid: suspend () -> Boolean): List<AiCheck> =
+        checkInternal(fragment, true, canStart, stillValid)
+
+    private suspend fun checkInternal(fragment: AiFragment, automatic: Boolean, canStart: suspend () -> Boolean,
+        stillValid: suspend () -> Boolean): List<AiCheck> = mutex.withLock {
+        fragment.articleKey?.let {
+            require(fragment.book == 0L && it.split(':').getOrNull(1) == fragment.language.substringBefore('-') && fragment.resource.startsWith("wikipedia:$it:"))
+        }
         val c = config()
+        if (!exists(fragment)) return@withLock emptyList()
         if (!c.enabled || !c.consent || !c.hasKey || automatic && !c.automatic) return@withLock emptyList()
         val existing = fragment.terms.mapNotNull { dao.get(fragment.key(it, c.model)) }
         val cached = existing.mapTo(HashSet()) { it.cacheKey }
@@ -64,7 +83,7 @@ class AiRepository(
         val out = existing.toMutableList()
         for (batch in pending.chunked(AiContext.BATCH)) {
             currentCoroutineContext().ensureActive()
-            if (!stillValid()) break
+            if (!exists(fragment) || !canStart() || !stillValid()) break
             val sub = fragment.copy(terms = batch)
             attempts += batch.map { sub.key(it, c.model) }
             try {
@@ -79,8 +98,8 @@ class AiRepository(
                 currentCoroutineContext().ensureActive()
                 if (config() != c || !stillValid()) break
                 val saved = db.withTransaction {
-                    if (db.bookDao().get(fragment.book) != null && stillValid()) {
-                        val prior = dao.context(fragment.book, fragment.contextHash)
+                    if (exists(fragment) && stillValid()) {
+                        val prior = dao.context(fragment.book.takeIf { fragment.articleKey == null }, fragment.contextHash, fragment.articleKey)
                         rows = rows.map { row ->
                             if (row.translation == null) row else {
                                 val overlaps = prior.filter { it.start < row.end && it.end > row.start }
@@ -123,9 +142,9 @@ class AiRepository(
         require(state in setOf("accepted", "rejected"))
         try { db.withTransaction { dao.get(key)?.let {
             if (state == "accepted" && it.translation != null) {
-                dao.rejectOverlaps(it.bookId, it.contextHash, it.start, it.end)
-                dao.acceptSpan(it.bookId, it.contextHash, it.start, it.end, it.translation)
-            } else dao.stateSpan(it.bookId, it.contextHash, it.start, it.end, state)
+                dao.rejectOverlaps(it.bookId, it.contextHash, it.start, it.end, it.articleKey)
+                dao.acceptSpan(it.bookId, it.contextHash, it.start, it.end, it.translation, it.articleKey)
+            } else dao.stateSpan(it.bookId, it.contextHash, it.start, it.end, state, it.articleKey)
         } } }
         catch (e: CancellationException) { throw e }
         catch (_: Exception) { _message.value = "Не удалось сохранить изменение ИИ." }
