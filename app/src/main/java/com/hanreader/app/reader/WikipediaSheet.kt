@@ -18,7 +18,9 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun WikipediaSheet(target: WikiNoteTarget, bookLanguage: String, source: WikipediaSource,
-    onSave: suspend (WikiArticle, String) -> Unit, onDismiss: () -> Unit) {
+    onSave: suspend (WikiArticle, String) -> Unit, onDismiss: () -> Unit,
+    engine: com.hanreader.app.lang.LanguageModule? = null, known: Set<String> = emptySet(), notesEnabled: Boolean = true,
+    meanings: Map<String, String> = emptyMap()) {
     var query by remember(target) { mutableStateOf(target.lookupTerm.take(200)) }
     var language by remember(target) { mutableStateOf("ru") }
     var hits by remember(target) { mutableStateOf<List<WikiHit>?>(null) }
@@ -28,6 +30,7 @@ internal fun WikipediaSheet(target: WikiNoteTarget, bookLanguage: String, source
     var busy by remember(target) { mutableStateOf(false) }
     var job by remember { mutableStateOf<Job?>(null) }
     var generation by remember { mutableIntStateOf(0) }
+    var reading by remember(target) { mutableStateOf<WikiDocument?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     fun run(work: suspend () -> Unit) {
@@ -42,6 +45,11 @@ internal fun WikipediaSheet(target: WikiNoteTarget, bookLanguage: String, source
         }
     }
     fun show(value: WikiArticle) { article = value; definition = value.extract; hits = null }
+    reading?.let { document ->
+        WikipediaReader(document, source, engine, known, onDismiss = { reading = null },
+            onSaveExcerpt = if (notesEnabled) onSave else null, meanings = meanings)
+        return
+    }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp)
             .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -86,6 +94,8 @@ internal fun WikipediaSheet(target: WikiNoteTarget, bookLanguage: String, source
                     Text("Это страница неоднозначности. Уточни запрос или открой оригинал, чтобы выбрать нужное понятие.")
                     Text(selected.extract)
                 } else {
+                    Button(enabled = !busy, onClick = { run { reading = source.fullArticle(selected) } }) { Text("Читать статью целиком") }
+                    if (notesEnabled) {
                     OutlinedTextField(definition, { if (it.length <= 12_000) definition = it },
                         Modifier.fillMaxWidth(), label = { Text("Описание для заметки") }, minLines = 4, enabled = !busy)
                     Text("Описание из вступления статьи; его можно сократить или дополнить.", style = MaterialTheme.typography.bodySmall)
@@ -96,6 +106,7 @@ internal fun WikipediaSheet(target: WikiNoteTarget, bookLanguage: String, source
                             catch (_: Exception) { message = "Не удалось сохранить заметку. Проверь, что книга ещё открыта, и повтори." }
                         }
                     }) { Text("Сохранить в заметки") }
+                    }
                 }
                 Text("Википедия · CC BY-SA 4.0 · версия ${selected.revision}", style = MaterialTheme.typography.bodySmall)
                 TextButton(onClick = {
@@ -104,7 +115,7 @@ internal fun WikipediaSheet(target: WikiNoteTarget, bookLanguage: String, source
                 }) { Text("Открыть оригинал") }
             }
             message?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-            TextButton(onClick = onDismiss) { Text("Вернуться к книге") }
+            TextButton(onClick = onDismiss) { Text(if (notesEnabled) "Вернуться к книге" else "К сохранённым статьям") }
         }
     }
 }

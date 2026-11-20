@@ -203,6 +203,9 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     // Reading aloud: one sentence at a time, the page follows the voice.
     val readAloud = remember(context) { ReadAloud(context) }
     DisposableEffect(readAloud) { onDispose { readAloud.close() } }
+    LaunchedEffect(wikiTarget, showKnowledge) {
+        if ((wikiTarget != null || showKnowledge) && readAloud.playing) readAloud.pause()
+    }
     ImmersiveEffects(hideBars = !chrome && !sheetOpen, keepOn = appearance.keepScreenOn || readAloud.playing, brightness = appearance.brightness)
 
     val spec = LocalThemeSpec.current
@@ -791,6 +794,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     }
     wikiTarget?.let { target ->
         WikipediaSheet(target, com.hanreader.app.lang.Languages.current.tag, vm.wikipedia,
+            engine = eng, known = known, meanings = userMeanings,
             onSave = { article, definition -> vm.saveWikipediaNote(target, article, definition) },
             onDismiss = { wikiTarget = null })
     }

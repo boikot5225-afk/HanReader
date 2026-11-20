@@ -19,6 +19,7 @@ class WikipediaLiveTest {
         assumeTrue(System.getenv("HANREADER_LIVE_WIKIPEDIA") == "1")
         val app = ApplicationProvider.getApplicationContext<Application>()
         File(app.noBackupFilesDir, "wikipedia-v1").deleteRecursively()
+        File(app.filesDir, "wikipedia-reading-v1").deleteRecursively()
         val repo = WikipediaRepository(app)
         for ((language, query) in listOf("en" to "Cognitive dissonance", "es" to "Disonancia cognitiva", "zh" to "认知失调")) {
             val hits = repo.search(language, query)
@@ -27,10 +28,18 @@ class WikipediaLiveTest {
             assertTrue(article.extract.length > 30); assertTrue(article.revision > 0)
             assertFalse(article.ambiguous)
             println("WIKIPEDIA_LIVE $language ${article.id} ${article.title} revision=${article.revision}")
+            val document = repo.fullArticle(article)
+            assertTrue(document.blocks.size > 5)
+            assertTrue(document.blocks.any { it.heading > 0 })
+            repo.saveArticle(document)
+            val offline = WikipediaRepository(app, { error("Offline") })
+            assertEquals(document, offline.fullArticle(document.article))
+            println("WIKIPEDIA_FULL_LIVE $language blocks=${document.blocks.size} chars=${document.blocks.sumOf { it.text.length }} revision=${document.article.revision}")
             if (language == "en") {
                 val russian = repo.translation(article, "ru")!!
                 assertTrue(russian.title.contains("диссонанс", ignoreCase = true))
                 assertTrue(russian.extract.length > 30)
+                assertTrue(repo.fullArticle(russian).blocks.size > 5)
                 println("WIKIPEDIA_LIVE ru ${russian.id} ${russian.title} revision=${russian.revision}")
             }
         }

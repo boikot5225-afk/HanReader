@@ -26,6 +26,10 @@ interface WikipediaSource {
     suspend fun search(language: String, query: String): List<WikiHit>
     suspend fun article(language: String, id: Long): WikiArticle
     suspend fun translation(article: WikiArticle, language: String): WikiArticle?
+    suspend fun fullArticle(article: WikiArticle): WikiDocument = error("Full articles unavailable")
+    suspend fun savedArticles(): List<WikiArticle> = emptyList()
+    suspend fun saveArticle(document: WikiDocument) { error("Offline storage unavailable") }
+    suspend fun removeSavedArticle(article: WikiArticle) { error("Offline storage unavailable") }
 }
 
 /** Only the selected/editable query is sent. No book text, cookies or API key. */
@@ -34,6 +38,7 @@ class WikipediaRepository(context: Context,
     private val now: () -> Long = System::currentTimeMillis
 ) : WikipediaSource {
     private val directory = File(context.noBackupFilesDir, "wikipedia-v1")
+    private val savedDirectory = File(context.filesDir, "wikipedia-reading-v1")
     private val mutex = Mutex()
     companion object {
         val languages = mapOf("ru" to "Русский", "es" to "Испанский", "en" to "Английский", "zh" to "Китайский")
@@ -41,7 +46,7 @@ class WikipediaRepository(context: Context,
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.connectTimeout = 10_000; connection.readTimeout = 10_000
             connection.instanceFollowRedirects = false
-            connection.setRequestProperty("User-Agent", "AmautaReader/0.27 (https://github.com/boikot5225-afk/HanReader)")
+            connection.setRequestProperty("User-Agent", "AmautaReader/${com.hanreader.app.BuildConfig.VERSION_NAME} (https://github.com/boikot5225-afk/HanReader)")
             connection.setRequestProperty("Accept", "application/json")
             try {
                 if (connection.responseCode != 200) error("Wikipedia unavailable")
@@ -73,14 +78,20 @@ class WikipediaRepository(context: Context,
             val cached = runCatching { parse(JSONObject(file.readText())) }.getOrNull()
             if (cached != null) return@withLock cached
             val json = load().put("amautaFetchedAt", now())
+            coroutineContext.ensureActive()
             val value = parse(json) // Invalid responses are never treated as a successful cache entry.
+            coroutineContext.ensureActive()
             directory.mkdirs()
             val temp = File.createTempFile("wiki-", ".tmp", directory)
             try {
                 temp.writeText(json.toString())
                 check(temp.renameTo(file))
-                directory.listFiles()?.filter { it.extension == "json" }?.sortedByDescending { it.lastModified() }
-                    ?.drop(100)?.forEach { it.delete() }
+                var bytes = 0L
+                directory.listFiles()?.filter { it.extension == "json" }
+                    ?.sortedWith(compareByDescending<File> { it == file }.thenByDescending { it.lastModified() })
+                    ?.forEachIndexed { i, entry ->
+                        if (i >= 100 || bytes + entry.length() > 20L * 1024 * 1024) entry.delete() else bytes += entry.length()
+                    }
             } finally { temp.delete() }
             value
         } }
@@ -123,4 +134,58 @@ class WikipediaRepository(context: Context,
         }) { request(article.language, mapOf("pageids" to article.id.toString(), "prop" to "langlinks", "lllang" to language, "lllimit" to "1")) }
         return title.takeIf { it.isNotBlank() }?.let { articleBy(language, "titles", it) }
     }
+
+    private fun savedFile(article: WikiArticle): File {
+        WikiDocuments.validateArticle(article)
+        return File(savedDirectory, "${article.language}-${article.id}-${article.revision}.json")
+    }
+
+    override suspend fun fullArticle(article: WikiArticle): WikiDocument {
+        WikiDocuments.validateArticle(article)
+        require(!article.ambiguous)
+        val saved = withContext(Dispatchers.IO) { mutex.withLock {
+            savedFile(article).takeIf { it.isFile }?.let { stored -> runCatching {
+                require(stored.length() <= WikiDocuments.MAX_FILE_BYTES)
+                WikiDocuments.decode(stored.readText()).also { doc ->
+                    require(doc.article.language == article.language && doc.article.id == article.id && doc.article.revision == article.revision)
+                }
+            }.getOrNull() }
+        } }
+        if (saved != null) return saved
+        return cached("full-v1:${article.language}:${article.id}:${article.revision}", { json ->
+            WikiDocuments.parse(article, json)
+        }) { request(article.language, mapOf("action" to "parse", "oldid" to article.revision.toString(),
+            "prop" to "text|revid", "disableeditsection" to "1", "disabletoc" to "1", "disablelimitreport" to "1")) }
+    }
+
+    override suspend fun savedArticles(): List<WikiArticle> = withContext(Dispatchers.IO) { mutex.withLock {
+        savedDirectory.listFiles().orEmpty().filter { it.extension == "json" }.mapNotNull { file ->
+            runCatching {
+                require(file.length() <= WikiDocuments.MAX_FILE_BYTES)
+                WikiDocuments.decode(file.readText()).article.also { require(savedFile(it) == file) }
+            }.getOrNull()
+        }.sortedByDescending { it.fetchedAt }
+    } }
+
+    override suspend fun saveArticle(document: WikiDocument) = withContext(Dispatchers.IO) { mutex.withLock {
+        val text = WikiDocuments.encode(document)
+        val target = savedFile(document.article)
+        savedDirectory.mkdirs()
+        val files = savedDirectory.listFiles().orEmpty().filter { it.extension == "json" && it != target }
+        check(files.size < 30 && files.sumOf { it.length() } + text.toByteArray().size <= 20L * 1024 * 1024) {
+            "Освободи место: удали ненужные сохранённые статьи"
+        }
+        val temp = File.createTempFile("wiki-", ".tmp", savedDirectory)
+        try { temp.writeText(text); check(temp.renameTo(target)) } finally { temp.delete() }
+        Unit
+    } }
+
+    override suspend fun removeSavedArticle(article: WikiArticle) = withContext(Dispatchers.IO) { mutex.withLock {
+        val stored = savedFile(article)
+        check(!stored.exists() || stored.delete())
+        // Remove the disposable snapshot too: deleting a saved article frees its cached text.
+        val cache = file("full-v1:${article.language}:${article.id}:${article.revision}")
+        if (cache.exists()) check(cache.delete())
+        Unit
+    } }
 }

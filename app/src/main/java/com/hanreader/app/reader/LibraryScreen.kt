@@ -83,11 +83,13 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
     val known by vm.knownWords.collectAsState()
     val levelMark by vm.levelMark.collectAsState()
     var showLevel by remember { mutableStateOf(false) }
+    var showWikipedia by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf<BookEntity?>(null) }
     var langBook by remember { mutableStateOf<BookEntity?>(null) }
     val demo = DemoBooks.forLanguage(com.hanreader.app.lang.Languages.current.tag)
+    if (showWikipedia) WikipediaLibrary(vm, onDismiss = { showWikipedia = false })
     val openDemo: () -> Unit = {
         importing = true
         error = null
@@ -127,6 +129,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
                 withLevels = com.hanreader.app.lang.Languages.current.levelsTitle != null)
         }
         item { ActivityPanel(vm, onReadingStats) }
+        item { androidx.compose.material3.TextButton(onClick = { showWikipedia = true }) { Text("Википедия · читать и сохранять статьи") } }
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Overline("Моя библиотека", Modifier.weight(1f))

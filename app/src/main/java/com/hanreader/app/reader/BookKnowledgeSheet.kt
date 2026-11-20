@@ -48,7 +48,11 @@ internal fun BookKnowledgeSheet(vm: ReaderViewModel, book: OpenBook, highlights:
     val target = wiki
     if (target != null) {
         val id = selected
+        val engine by vm.engine.collectAsState()
+        val known by vm.knownWords.collectAsState()
+        val meanings by vm.userMeanings.collectAsState()
         WikipediaSheet(target, com.hanreader.app.lang.Languages.current.tag, vm.wikipedia,
+            engine = engine, known = known, meanings = meanings,
             onSave = { article, definition -> check(id != null); vm.saveKnowledgeWikipedia(id, article, definition) },
             onDismiss = { wiki = null })
         return
