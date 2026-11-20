@@ -84,14 +84,12 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
     val levelMark by vm.levelMark.collectAsState()
     var showLevel by remember { mutableStateOf(false) }
     var showWikipedia by remember { mutableStateOf(false) }
-    var showFeed by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf<BookEntity?>(null) }
     var langBook by remember { mutableStateOf<BookEntity?>(null) }
     val demo = DemoBooks.forLanguage(com.hanreader.app.lang.Languages.current.tag)
     if (showWikipedia) WikipediaLibrary(vm, onDismiss = { showWikipedia = false })
-    if (showFeed) FeedSheet(vm = vm, onDismiss = { showFeed = false })
     val openDemo: () -> Unit = {
         importing = true
         error = null
@@ -131,12 +129,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
                 withLevels = com.hanreader.app.lang.Languages.current.levelsTitle != null)
         }
         item { ActivityPanel(vm, onReadingStats) }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                androidx.compose.material3.TextButton(onClick = { showFeed = true }, modifier = Modifier.weight(1f)) { Text("Лента новостей") }
-                androidx.compose.material3.TextButton(onClick = { showWikipedia = true }, modifier = Modifier.weight(1f)) { Text("Википедия · читать и сохранять статьи") }
-            }
-        }
+        item { androidx.compose.material3.TextButton(onClick = { showWikipedia = true }) { Text("Википедия · читать и сохранять статьи") } }
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Overline("Моя библиотека", Modifier.weight(1f))

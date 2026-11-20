@@ -169,7 +169,6 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val appearance by AppearanceStore.appearance.collectAsState()
     var showAppearance by remember { mutableStateOf(false) }
     var showToc by remember { mutableStateOf(false) }
-    var showFeed by remember { mutableStateOf(false) }
     var showKnowledge by remember(book.entity.id) { mutableStateOf(false) }
     var knowledgeEntry by remember(book.entity.id) { mutableStateOf<Long?>(null) }
     var showPrepare by remember { mutableStateOf(false) }
@@ -200,7 +199,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
 
     var wikiTarget by remember(book.entity.id) { mutableStateOf<WikiNoteTarget?>(null) }
     LaunchedEffect(book.chapter?.index) { wikiTarget = null }
-    val sheetOpen = showAppearance || showToc || showFeed || showKnowledge || showPrepare || selection != null || summaryOpen != null || wikiTarget != null
+    val sheetOpen = showAppearance || showToc || showKnowledge || showPrepare || selection != null || summaryOpen != null || wikiTarget != null
     // Reading aloud: one sentence at a time, the page follows the voice.
     val readAloud = remember(context) { ReadAloud(context) }
     DisposableEffect(readAloud) { onDispose { readAloud.close() } }
@@ -602,7 +601,6 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                     pinyinMode = pinyinMode,
                     onBack = onClose,
                     onToc = { showToc = true },
-                    onFeed = { showFeed = true },
                     onPinyin = vm::setPinyinMode,
                     appearanceOpen = showAppearance,
                     onAppearance = { showAppearance = true },
@@ -748,10 +746,6 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 jump(h.chapter, h.block)
             }
         )
-    }
-
-    if (showFeed) {
-        FeedSheet(vm = vm, onDismiss = { showFeed = false })
     }
 
     if (showKnowledge) BookKnowledgeSheet(vm, book, highlights,
@@ -1525,7 +1519,6 @@ private fun ReaderTopBar(
     pinyinMode: PinyinMode,
     onBack: () -> Unit,
     onToc: () -> Unit,
-    onFeed: () -> Unit,
     onPinyin: (PinyinMode) -> Unit,
     appearanceOpen: Boolean,
     onAppearance: () -> Unit,
@@ -1563,7 +1556,6 @@ private fun ReaderTopBar(
                 tint = if (bookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
             )
         }
-        TextButton(onClick = onFeed) { Text("Лента") }
         IconButton(onClick = onToc) { Icon(LexiconIcons.ListBullets, contentDescription = "Оглавление, закладки, поиск") }
         if (com.hanreader.app.lang.Languages.current.readingTitle != null) PinyinMenu(pinyinMode, onPinyin)
         TextButton(onClick = onAppearance) {
