@@ -75,6 +75,7 @@ object FeedCatalog {
     private const val BBC = "BBC: заголовки и ссылки из открытой RSS-ленты"
     private const val DW = "Deutsche Welle: заголовки и ссылки из открытой RSS-ленты"
     private const val WIKINEWS = "Викиновости, CC BY 2.5"
+    private const val GOOGLE = "Google News RSS: заголовки и ссылки из открытой RSS-ленты"
 
     private fun bbcNews(l: String, topic: FeedTopic, path: String, name: String) =
         FeedSource("bbc-$l-${topic.name.lowercase()}", l, topic, FeedKind.RSS, name, "https://feeds.bbci.co.uk/$path/rss.xml", BBC)
@@ -86,6 +87,9 @@ object FeedCatalog {
         FeedSource("wikinews-es", "es", FeedTopic.WORLD, FeedKind.RSS, "Викиновости", "https://es.wikinews.org/w/index.php?title=Special:NewsFeed&feed=atom&categories=Publicado&count=20", WIKINEWS),
         FeedSource("wikinews-en", "en", FeedTopic.WORLD, FeedKind.RSS, "Wikinews", "https://en.wikinews.org/w/index.php?title=Special:NewsFeed&feed=atom&categories=Published&count=20", WIKINEWS),
         FeedSource("wikinews-zh", "zh", FeedTopic.WORLD, FeedKind.RSS, "維基新聞", "https://zh.wikinews.org/w/index.php?title=Special:NewsFeed&feed=atom&categories=Published&count=20", WIKINEWS),
+        FeedSource("google-es-world", "es", FeedTopic.WORLD, FeedKind.RSS, "Google News (ES)", "https://news.google.com/rss?hl=es-419&gl=US&ceid=US:es-419", GOOGLE),
+        FeedSource("google-en-world", "en", FeedTopic.WORLD, FeedKind.RSS, "Google News (EN)", "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en", GOOGLE),
+        FeedSource("google-zh-world", "zh", FeedTopic.WORLD, FeedKind.RSS, "Google 新闻", "https://news.google.com/rss?hl=zh-CN&gl=CN&ceid=CN:zh-Hans", GOOGLE),
         bbcNews("es", FeedTopic.WORLD, "mundo", "BBC Mundo"),
         bbcNews("zh", FeedTopic.WORLD, "zhongwen/simp", "BBC 中文"),
         bbcNews("en", FeedTopic.WORLD, "news/world", "BBC News: World"),
