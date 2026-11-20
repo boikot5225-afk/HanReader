@@ -20,8 +20,25 @@
   полного имени из списка, источник/обе заметки, повтор и rollback/изоляцию книг.
   Первый прогон: 26/28, две UI-проверки зависли при новом поле поиска в диалоге.
   Поле убрано, окно упрощено до Dialog/Surface с ограниченной высотой LazyColumn.
-  Отдельный прежний UI-тест выбора/редактирования/отвязки прошёл. Финальные проверки
-  выполняются; не увеличивать тайм-аут вместо устранения UI-loop.
+  Отдельный прежний UI-тест выбора/редактирования/отвязки прошёл. Финальный прогон
+  29/29 успешен, включая 7 EntityLinksFlowTest и 8 EntityLinksTest. Снимок
+  app/build/screens/saved-name-picker.png просмотрен: имя и подписи не обрезаны.
+  Не увеличивать тайм-аут вместо устранения UI-loop. Источник 66b0c40002a2cb4c2f4ff3cc9bb9adff48bea724,
+  отправлен в origin/amauta. Полный CI44682997709 / job136110605479 SUCCESS (8m0s):
+  все debug-тесты/сборка и release-тесты/lint/сборка/проверка подписи прошли.
+  Оба APK скачаны; ZIP SHA совпадают с digest артефактов. Debug artifact14605048672,
+  ZIP3c4580ba334b4ee3807d4cd4cf66154fed937681d293cf790b241bd7613b16f9;
+  release artifact14604999134, ZIPedb9a31113e706550a8131fdd91a8670acb31b81e8aba8417583c4f1fb5303f2.
+- APK0.28.1/code81: release52 252 069 байт, SHA41f2c3c52ce01b8094d5a3709be29afdf05847091d3df088cbf6718c67268add;
+  debug61 809 840 байт, SHA22083bedc06c95bced07014e995270ea6b087ce97df010715d5c41291d4d71b9.
+  Прежние сертификаты, manifest/debuggable, zipalign16, DEXlinkSavedEntity и прежние
+  исправления проверены. Только три штатных demo EPUB с исходными байтами, без
+  пользовательских книг, ключей/настроек и серверной озвучки. Файлы и verification JSON
+  в .work/release/0.28.1/, копии /workspace/artifacts/Amauta-Reader-0.28.1-{release,debug}.apk.
+  Во втором Drive(philmarlow1945@gmail.com) загружены оба файла, readback/размеры сверены:
+  release https://drive.google.com/file/d/1INKnY_F5182zSLLxZaRTWdaUMuKrYfRX/view?usp=drivesdk
+  debug https://drive.google.com/file/d/1FTEgFXZA7_WnWpflqlulkPN_yRIqFYKT/view?usp=drivesdk
+  .work/release/0.28.1/drive-delivery.json. Физический телефон не проверен, DeepSeek не вызывали.
   docs/SAVED_ENTITY_NAMES_0.28.1.md.
 - Последние APK0.28.0 по отдельной просьбе пользователя загружены во второй Drive,
   philmarlow1945@gmail.com. Размеры и метаданные прочитаны:
