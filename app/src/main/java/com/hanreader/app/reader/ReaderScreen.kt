@@ -1775,6 +1775,7 @@ internal fun WordSheet(
     var correcting by remember(selection, word) { mutableStateOf(false) }
     var correctingHere by remember(selection, word) { mutableStateOf(false) }
     var details by remember(selection, word) { mutableStateOf(false) }
+    var toolsOpen by remember(selection, word) { mutableStateOf(false) }
     val growLeft = SelectionBounds.neighbour(tokens, selection.first, -1)
     val growRight = SelectionBounds.neighbour(tokens, selection.last, 1)
     val shrinkLeft = SelectionBounds.shrink(tokens, selection.first..selection.last, true)
@@ -1794,8 +1795,8 @@ internal fun WordSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 20.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             // Wraps: a long combination must not squeeze the reading into a column.
             val markFlow = remember(cardWord) { markOf(cardWord) }
@@ -1848,15 +1849,20 @@ internal fun WordSheet(
                 }
             }
             }
-            if (onWikipedia != null) TextButton(onClick = onWikipedia, contentPadding = PaddingValues(0.dp)) { Text("Найти в Википедии") }
-            entityPanel?.invoke()
-            if (canMark && knownReason != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(knownReason.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (mark?.source == ReaderViewModel.UNKNOWN || mark?.source == "manual") {
-                        TextButton(onClick = { onClearKnown(cardWord) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                            Text("Сбросить", style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = { toolsOpen = !toolsOpen }, contentPadding = PaddingValues(0.dp)) {
+                Text(if (toolsOpen) "Скрыть инструменты" else "Инструменты")
+            }
+            if (toolsOpen) {
+                if (onWikipedia != null) TextButton(onClick = onWikipedia, contentPadding = PaddingValues(0.dp)) { Text("Найти в Википедии") }
+                entityPanel?.invoke()
+                if (canMark && knownReason != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(knownReason.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (mark?.source == ReaderViewModel.UNKNOWN || mark?.source == "manual") {
+                            TextButton(onClick = { onClearKnown(cardWord) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                                Text("Сбросить", style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }
@@ -1865,12 +1871,14 @@ internal fun WordSheet(
             idiomKind(entry?.gloss)?.let {
                 Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
-            phrase?.let { (range, phraseWord, meaning) ->
-                Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Выражение: $phraseWord", style = MaterialTheme.typography.titleSmall)
-                        meaning?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                        TextButton(onClick = { changeBounds(range) }) { Text("Выделить выражение") }
+            if (toolsOpen) {
+                phrase?.let { (range, phraseWord, meaning) ->
+                    Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Выражение: $phraseWord", style = MaterialTheme.typography.titleSmall)
+                            meaning?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                            TextButton(onClick = { changeBounds(range) }) { Text("Выделить выражение") }
+                        }
                     }
                 }
             }
@@ -1890,16 +1898,18 @@ internal fun WordSheet(
                 Doubts.correct(context,word,sentence,value,scope)
                 if (value.isNotEmpty()) ReadingChecks.record(context,ReadingChecks.Event.CORRECT)
             } }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(onClick = { growLeft?.let { changeBounds(it..selection.last) } }, enabled = growLeft != null) { Text("← слово") }
-                OutlinedButton(onClick = { growRight?.let { changeBounds(selection.first..it) } }, enabled = growRight != null) { Text("слово →") }
-                if (shrinkLeft != null) OutlinedButton(onClick = { changeBounds(shrinkLeft) }) { Text("Убрать слева") }
-                if (shrinkRight != null) OutlinedButton(onClick = { changeBounds(shrinkRight) }) { Text("Убрать справа") }
+            if (toolsOpen) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(onClick = { growLeft?.let { changeBounds(it..selection.last) } }, enabled = growLeft != null) { Text("← слово") }
+                    OutlinedButton(onClick = { growRight?.let { changeBounds(selection.first..it) } }, enabled = growRight != null) { Text("слово →") }
+                    if (shrinkLeft != null) OutlinedButton(onClick = { changeBounds(shrinkLeft) }) { Text("Убрать слева") }
+                    if (shrinkRight != null) OutlinedButton(onClick = { changeBounds(shrinkRight) }) { Text("Убрать справа") }
+                }
+                TextButton(onClick = { details = !details }, contentPadding = PaddingValues(0.dp)) {
+                    Text(if (details) "Скрыть разбор и словарь" else "Разбор и словарь")
+                }
             }
-            TextButton(onClick = { details = !details }, contentPadding = PaddingValues(0.dp)) {
-                Text(if (details) "Скрыть разбор и словарь" else "Разбор и словарь")
-            }
-            if (details) {
+            if (toolsOpen && details) {
                 (if (zh != null && selectedMeaning != null) "локальное контекстное правило" else zh?.russianSource(word)?.label
                     ?: es.firstOrNull()?.let { it.entry.source ?: if (it.entry.machine) "машинный перевод Викисловаря" else "Викисловарь" })?.let {
                     Text("Русский · $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2011,11 +2021,11 @@ internal fun WordSheet(
             } // Optional dictionary and grammar details.
             // The dictionary glued two words together (把头 «подрядчик» where the text means 把 + 头): split it.
             val oneMultiChar = selection.first == selection.last && word.length >= 2 && word.all { it.isHan() }
-            if (oneMultiChar) {
+            if (toolsOpen && oneMultiChar) {
                 TextButton(onClick = { onSplit(word, true) }, contentPadding = PaddingValues(0.dp)) {
                     Text("Разделить «$word» на отдельные слова")
                 }
-            } else if (word in userSplits) {
+            } else if (toolsOpen && word in userSplits) {
                 TextButton(onClick = { onSplit(word, false) }, contentPadding = PaddingValues(0.dp)) {
                     Text("Соединить «$word» обратно")
                 }
