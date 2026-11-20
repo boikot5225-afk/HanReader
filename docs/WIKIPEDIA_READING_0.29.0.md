@@ -75,7 +75,27 @@ WikipediaLiveTest выполнен отдельно: en/es/zh полные ст�
 380 блоков/117694 знака; es page48625 rev174453349, 66/15484; zh page522832 rev95322496,
 72/6812; ru page649160 rev155250226. Это реальные анонимные обращения Android-клиента
 к Wikimedia. Реальные запросы DeepSeek и физический Android-телефон не проверялись.
-Окончательные результаты lint/регрессий/сборки дополняются после завершения.
+Окончательный локальный прогон: 47 тестов, все прошли, включая прежние имена/заметки,
+полный backup, стабильность подсказок и озвучку. Первый расширенный запуск столкнулся
+с нехваткой места временных файлов Robolectric; после удаления только повторно
+скачиваемых ZIP-кешей CI-артефактов прогон повторён успешно. APK и исходники сохранены.
+`lintRelease`: 0 ошибок, 40 предупреждений, 3 подсказки. Полная [сборка CI44695650667](https://github.com/boikot5225-afk/HanReader/actions/runs/44695650667)
+успешна: debug-тесты/сборка и release-тесты/lint/сборка/подпись. Источник APK —
+`c8f0b370b2dc6c542639de6c4a2b1d67353042b3`, версия 0.29.0/code82.
+
+Оба APK проверены: прежние сертификаты, manifest/debuggable, zipalign16; новые WikiDocuments,
+WikipediaReader/WikipediaLibrary/fullArticle и прежние исправления присутствуют. Внутри
+только три штатных demo EPUB с исходными байтами; пользовательских книг, настроек,
+ключей и серверной TTS нет. SHA-256:
+
+- release, 52 301 220 байт: `251736be90ab71d68ce0b6a48625b8b6ca7de1e9042cf0a58cc227d174a92592`;
+- debug, 61 891 760 байт: `c61cc227cd0bff502c4b1086803f27551134d10b45fb00127bb429624294f182`.
+
+Оба файла загружены во второй разрешённый Drive (`philmarlow1945@gmail.com`), метаданные
+и размеры прочитаны после загрузки:
+[release APK](https://drive.google.com/file/d/1NXKXJXA6RES6cocpZcHv0ixSjwkaYeat/view?usp=drivesdk),
+[debug APK](https://drive.google.com/file/d/1bT21MPkukpayOUPZq0YJAcXXe8MzlplQ/view?usp=drivesdk).
+Копии в `/workspace/artifacts/Amauta-Reader-0.29.0-{release,debug}.apk`.
 
 Основные файлы: wiki/Wikipedia.kt, wiki/WikiDocuments.kt; reader/WikipediaReader.kt,
 WikipediaLibrary.kt, WikipediaSheet.kt; LibraryScreen.kt, ReaderScreen.kt и

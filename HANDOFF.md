@@ -34,15 +34,33 @@
   Новых Room-миграций нет (17), backup7 прежний; pins пока НЕ входят в ручной ZIP,
   предупреждение есть в интерфейсе; фрагменты в заметках попадают в старый backup.
 - Новые WikiDocumentsTest, WikipediaFullTest, WikipediaReaderTest; расширен optional
-  WikipediaLiveTest. После изменений целевой прогон16 тестов успешен; ещё добавлен
-  recovery-test повреждённого pin (финальный прогон нужен). Снимок wiki-full-reader.png
-  просмотрен, затем добавлено скрытие клавиатуры и edge-to-edge safeDrawing и проверка
-  видимости «Назад» в нативном тесте — это тоже проверить финальным прогоном.
+  WikipediaLiveTest. Проверены также восстановление повреждённого pin, скрытие
+  клавиатуры, edge-to-edge safeDrawing, видимость «Назад» и фактическое закрытие окна.
+  Снимок wiki-full-reader.png просмотрен. Окончательные результаты ниже.
 - Реальный Android WikipediaLiveTest выполнен (HANREADER_LIVE_WIKIPEDIA=1), 1/1 PASS:
   en169305/rev1385154554:380блоков117694знака; es48625/rev174453349:66/15484;
   zh522832/rev95322496:72/6812; ru649160/rev155250226 полная связанная статья.
   en/es/zh сохранены и прочитаны offline новым репозиторием без сети. Физический телефон
-  и реальные запросы DeepSeek не использовались. Lint/финальные проверки пока выполняются.
+  и реальные запросы DeepSeek не использовались. Lint:0 errors/40 warnings/3 hints.
+- Финальный расширенный локальный прогон47/47 прошёл. В первом прогоне закончилось
+  место для /tmp/robolectric:4 I/O ошибки и один ранний UI assert; после освобождения
+  675649259 байт (только .work/release/*/{debug,release}.zip, APK сохранены) те же 47 тестов
+  без изменений исходников прошли. Keyboard/edge-to-edge/Back-видимость и фактическое
+  закрытие/повторное открытие Dialog также проверены. Новый снимок просмотрен.
+  Источник c8f0b370b2dc6c542639de6c4a2b1d67353042b3 отправлен в origin/amauta.
+  Полный CI44695650667 / job136151652942 SUCCESS (9m46s): debug все тесты/сборка,
+  release-тесты/lint/сборка/проверка подписи. Оба APK скачаны/проверены, ZIP SHA равны
+  GitHub digest: debug artifact14611025857 be0f869eb6eb678726be91357b268fce0caecde39b1f4006f964a87759a04a98;
+  release artifact14611211188 6bc797060ab948f0ed5f89c0eef00e7db2d20d71a86a784121d2d4ec914e96db.
+- APK0.29.0/code82: release52 301 220 байт SHA251736be90ab71d68ce0b6a48625b8b6ca7de1e9042cf0a58cc227d174a92592;
+  debug61 891 760 байт SHAc61cc227cd0bff502c4b1086803f27551134d10b45fb00127bb429624294f182.
+  Прежние сертификаты, manifest/debuggable, zipalign16, WikiDocuments/Reader/Library/fullArticle
+  и прежние исправления проверены. Только 3 штатных demo EPUB, без пользовательских книг,
+  ключей/настроек и серверной TTS. .work/release/0.29.0/ содержит APK/verification/drive-delivery.json;
+  копии /workspace/artifacts/Amauta-Reader-0.29.0-{release,debug}.apk (SHA сверены).
+  Во втором Drive(philmarlow1945@gmail.com), metadata/readback размеры совпали:
+  release https://drive.google.com/file/d/1NXKXJXA6RES6cocpZcHv0ixSjwkaYeat/view?usp=drivesdk
+  debug https://drive.google.com/file/d/1bT21MPkukpayOUPZq0YJAcXXe8MzlplQ/view?usp=drivesdk
 - Отчёт docs/WIKIPEDIA_READING_0.29.0.md. Сайт/политику не публиковать: чужие WIP
   docs/index.html, docs/privacy.html, tools/build_site.py и два docs/img PNG сохраняются.
   Никаких новых веток; APK в другой Drive уже разрешён пользователем (основной заполнен).
