@@ -771,8 +771,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         if (sel != null && block != null && chapter != null) {
             val selectedText = block.shown.substring(block.tokens[sel.first].start, block.tokens[sel.last].end)
             val local = Highlights.at(highlights, chapter.index, sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end)
-            EntityLinksPanel(bookWide, entityMatch?.entry, selectedText, entityMatch?.automatic == true,
-                onLink = { text, id, done -> vm.linkEntity(text, id, local?.note.orEmpty(), done) }, onUnlink = vm::unlinkEntity,
+            EntityLinksPanel(highlights, entityMatch?.entry, selectedText, entityMatch?.automatic == true,
+                onLink = { text, id, done -> vm.linkEntity(text, id, local?.note.orEmpty(), done) }, onUnlink = vm::unlinkEntity, onUseSaved = vm::linkSavedEntity,
                 canUnlink = entityMatch?.let { EntityLinks.key(it.spelling) == EntityLinks.key(selectedText) } == true)
             val quoteTarget = WikiNoteTarget(book.entity.id, chapter.index, chapter.title, sel.block,
                 block.tokens[sel.first].start, block.tokens[sel.last].end, selectedText,
@@ -841,8 +841,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 if (selectedBlock != null) {
                     val spelling = selectedBlock.tokens.getOrNull(t)?.text.orEmpty()
                     val match = selectedBlock.tokens.getOrNull(t)?.let { EntityLinks.at(bookWide, selectedBlock, it.start, it.end) }
-                    EntityLinksPanel(bookWide, match?.entry ?: h, spelling, match?.automatic == true,
-                        onLink = { text, id, done -> vm.linkEntity(text, id, "", done) }, onUnlink = vm::unlinkEntity,
+                    EntityLinksPanel(highlights, match?.entry ?: h, spelling, match?.automatic == true,
+                        onLink = { text, id, done -> vm.linkEntity(text, id, "", done) }, onUnlink = vm::unlinkEntity, onUseSaved = vm::linkSavedEntity,
                         onChanged = { bookNote = null },
                         canUnlink = match?.let { EntityLinks.key(it.spelling) == EntityLinks.key(spelling) } == true)
                     selectedBlock.tokens.getOrNull(t)?.let { token ->
@@ -853,8 +853,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                             selectedBlock.shown.substring(start, end), ChapterBuilder.sentence(selectedBlock.shown, start, end))
                         EntityQuoteAction(bookWide, match?.entry ?: h) { id -> vm.saveEntityQuote(target, id) }
                     }
-                } else EntityLinksPanel(bookWide, h, h.text, false,
-                    onLink = { text, id, done -> vm.linkEntity(text, id, "", done) }, onUnlink = vm::unlinkEntity,
+                } else EntityLinksPanel(highlights, h, h.text, false,
+                    onLink = { text, id, done -> vm.linkEntity(text, id, "", done) }, onUnlink = vm::unlinkEntity, onUseSaved = vm::linkSavedEntity,
                     onChanged = { bookNote = null })
                 Text(Highlights.BOOK_WIDE_TITLE, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = { bookNote = null; knowledgeEntry = h.id; showKnowledge = true }) { Text("Открыть запись и сохранённые фрагменты") }

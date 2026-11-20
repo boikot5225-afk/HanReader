@@ -133,4 +133,73 @@ class EntityLinksFlowTest {
         await { rows().any { EntityLinks.blocked(it).contains("Cárdenas") } }
         assertFalse(rows().any { EntityLinks.aliases(it).contains("Cárdenas") })
     }
+
+    @Test fun aFullNameSavedLocallyCanBeChosenForASurnameWithoutLosingEitherNote() {
+        val short = create("Cárdenas", "Прежняя заметка фамилии")
+        val c = vm.open.value!!.chapter!!
+        val bi = c.blocks.indexOfFirst { it is ReaderBlock.Text }
+        val b = c.blocks[bi] as ReaderBlock.Text
+        val start = b.shown.indexOf("Osiel Cárdenas")
+        val localId = runBlocking { db.highlightDao().insert(Highlight(bookId = short.bookId, chapterIndex = c.index, blockIndex = bi,
+            startChar = start, endChar = start + 14, color = 1, note = "Заметка полного имени", text = "Osiel Cárdenas", chapterTitle = c.title)) }
+        compose.setContent { LexiconTheme {
+            val all by vm.highlights(short.bookId).collectAsState(initial = emptyList())
+            val wide = all.filter { it.chapterIndex == -1 }
+            val current = wide.firstOrNull { it.id == short.id }?.let { EntityLinks.root(it, wide) }
+            EntityLinksPanel(all, current, "Cárdenas", false,
+                onLink = { text, id, done -> vm.linkEntity(text, id, onDone = done) }, onUnlink = vm::unlinkEntity,
+                onUseSaved = vm::linkSavedEntity)
+        } }
+        compose.onNodeWithText("Это тот же человек или термин…").performClick()
+        compose.onNodeWithText("Сохранённое выделение · станет общей записью").assertExists()
+        val dialogRoot = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+        val picture = android.graphics.Bitmap.createBitmap(dialogRoot.width, dialogRoot.height, android.graphics.Bitmap.Config.ARGB_8888)
+        dialogRoot.draw(android.graphics.Canvas(picture))
+        java.io.File("build/screens").mkdirs()
+        java.io.File("build/screens/saved-name-picker.png").outputStream().use { picture.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        picture.recycle()
+        compose.onNodeWithText("Osiel Cárdenas", substring = false).performClick()
+        await { rows().any { it.chapterIndex == -1 && it.text == "Osiel Cárdenas" } }
+        val root = rows().single { it.chapterIndex == -1 && it.text == "Osiel Cárdenas" }
+        compose.onNodeWithText("Общая запись: Osiel Cárdenas").assertExists()
+        assertEquals(root.id, EntityLinks.root(rows().first { it.id == short.id }, rows().filter { it.chapterIndex == -1 })!!.id)
+        val local = rows().first { it.id == localId }
+        assertEquals("Заметка полного имени", local.note); assertEquals(1, local.color)
+        assertEquals(root.text, local.entityName); assertEquals("Прежняя заметка фамилии", rows().first { it.id == short.id }.note)
+        assertEquals(root, Highlights.bookWideAt(rows().filter { it.chapterIndex == -1 }, b, b.shown.lastIndexOf("Cárdenas"), b.shown.lastIndexOf("Cárdenas") + 8))
+        mutate { vm.linkSavedEntity(localId, "Cárdenas", it) }.getOrThrow()
+        assertEquals(2, rows().count { it.chapterIndex == -1 }) // Idempotent, old surname record retained.
+    }
+
+    @Test fun savedNameLinkIsAtomicAndRejectsForeignRecordsAndConflictingAliases() {
+        val other = create("Otro nombre", "Чужая запись")
+        mutate { vm.linkEntity("Cárdenas", other.id, onDone = it) }.getOrThrow()
+        val source = Highlight(bookId = other.bookId, chapterIndex = 0, blockIndex = 0, startChar = 0, endChar = 14,
+            color = 2, text = "Osiel Cárdenas", note = "Исходная заметка", chapterTitle = "Раздел")
+        val id = runBlocking { db.highlightDao().insert(source) }
+        assertTrue(mutate { vm.linkSavedEntity(id, "Cárdenas", it) }.isFailure)
+        assertFalse(rows().any { it.chapterIndex == -1 && it.text == "Osiel Cárdenas" })
+        assertEquals("", rows().first { it.id == id }.entityName)
+        val foreignBook = runBlocking { db.bookDao().insert(BookEntity(title = "Other", author = "", fileName = "foreign.epub", chapterCount = 1)) }
+        val foreignId = runBlocking { db.highlightDao().insert(source.copy(bookId = foreignBook)) }
+        assertTrue(mutate { vm.linkSavedEntity(foreignId, "New alias", it) }.isFailure)
+        runBlocking { db.highlightDao().delete(id) }
+        assertTrue(mutate { vm.linkSavedEntity(id, "New alias", it) }.isFailure)
+        vm.closeBook()
+        assertTrue(mutate { vm.linkSavedEntity(foreignId, "New alias", it) }.isFailure)
+    }
+
+    @Test fun aNewFullNameCanBeSavedDirectlyWithoutOpeningTheLinkPicker() {
+        val book = vm.open.value!!.entity.id
+        compose.setContent { LexiconTheme {
+            val all by vm.highlights(book).collectAsState(initial = emptyList())
+            val current = all.firstOrNull { it.chapterIndex == -1 && it.text == "Osiel Cárdenas" }
+            EntityLinksPanel(all, current, "Osiel Cárdenas", false,
+                onLink = { text, id, done -> vm.linkEntity(text, id, onDone = done) }, onUnlink = vm::unlinkEntity,
+                onUseSaved = vm::linkSavedEntity)
+        } }
+        compose.onNodeWithText("Создать общую запись для этого названия").performClick()
+        await { rows().any { it.chapterIndex == -1 && it.text == "Osiel Cárdenas" } }
+        compose.onNodeWithText("Общая запись: Osiel Cárdenas").assertExists()
+    }
 }

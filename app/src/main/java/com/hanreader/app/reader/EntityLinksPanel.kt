@@ -1,8 +1,8 @@
 package com.hanreader.app.reader
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -15,14 +15,16 @@ internal fun EntityLinksPanel(
     onLink: (String, Long?, (Result<Unit>) -> Unit) -> Unit,
     onUnlink: (Long, String, (Result<Unit>) -> Unit) -> Unit,
     onChanged: () -> Unit = {},
-    canUnlink: Boolean = true
+    canUnlink: Boolean = true,
+    onUseSaved: ((Long, String, (Result<Unit>) -> Unit) -> Unit)? = null
 ) {
     var choosing by remember(spelling) { mutableStateOf(false) }
     var editing by remember(current?.id) { mutableStateOf(false) }
     var alias by remember(current?.id) { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var message by remember(spelling) { mutableStateOf<String?>(null) }
-    val owner = current?.let { EntityLinks.root(it, entries) }
+    val wide = remember(entries) { entries.filter { it.chapterIndex == Highlights.BOOK_WIDE } }
+    val owner = current?.let { EntityLinks.root(it, wide) }
     val done: (Result<Unit>) -> Unit = { result ->
         busy = false
         message = result.fold(onSuccess = { choosing = false; alias = ""; onChanged(); "Связь сохранена" },
@@ -41,12 +43,11 @@ internal fun EntityLinksPanel(
             }
             TextButton(onClick = { editing = !editing }) { Text(if (editing) "Скрыть варианты имени" else "Варианты имени и названия") }
             if (editing) {
-                entries.filter { it != owner && EntityLinks.root(it, entries) == owner && it.note.isNotBlank() }.forEach { original ->
+                wide.filter { it != owner && EntityLinks.root(it, wide) == owner && it.note.isNotBlank() }.forEach { original ->
                     Text("Сохранённая заметка для «${original.text}»", style = MaterialTheme.typography.labelMedium)
                     Text(original.note, style = MaterialTheme.typography.bodySmall)
                 }
-                val variants = (EntityLinks.aliases(owner) + entries.filter { it != owner && EntityLinks.root(it, entries) == owner }
-                    .flatMap { listOf(it.text) + EntityLinks.aliases(it) }).distinctBy(EntityLinks::key)
+                val variants = EntityLinks.variants(owner, wide)
                 variants.forEach { name ->
                     Row(Modifier.fillMaxWidth()) {
                         Text(name, Modifier.weight(1f).padding(top = 12.dp))
@@ -59,17 +60,36 @@ internal fun EntityLinksPanel(
                 if (EntityLinks.blocked(owner).isNotEmpty()) Text("Автоматически не связывать: ${EntityLinks.blocked(owner).joinToString(", ")}. Для восстановления добавь вариант вручную.", style = MaterialTheme.typography.bodySmall)
             }
         }
+        if (owner == null) TextButton(enabled = !busy, onClick = { busy = true; onLink(spelling, null, done) }) { Text("Создать общую запись для этого названия") }
         TextButton(enabled = !busy, onClick = { choosing = true }) { Text("Это тот же человек или термин…") }
         message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
     }
-    if (choosing) AlertDialog(onDismissRequest = { if (!busy) choosing = false },
-        title = { Text("С чем связать «${spelling.take(70)}»?") },
-        text = { Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
-            Text("Выбранные варианты будут открывать общую заметку во всей книге. Существующие заметки сохранятся.", style = MaterialTheme.typography.bodySmall)
-            EntityLinks.roots(entries).forEach { entry ->
-                TextButton(enabled = !busy, onClick = { busy = true; onLink(spelling, entry.id, done) }) { Text(entry.text) }
+    if (choosing) androidx.compose.ui.window.Dialog(onDismissRequest = { if (!busy) choosing = false }) {
+        Surface(Modifier.fillMaxWidth().heightIn(max = 600.dp), shape = MaterialTheme.shapes.extraLarge, tonalElevation = 6.dp) {
+            Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("С чем связать «${spelling.take(70)}»?", style = MaterialTheme.typography.titleLarge)
+                Text("Выбранные варианты будут открывать общую заметку во всей книге. Существующие заметки сохранятся.", style = MaterialTheme.typography.bodySmall)
+                val choices = remember(entries, onUseSaved != null) { EntityLinks.choices(entries).filter { !it.local || onUseSaved != null } }
+                LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false)) {
+                    items(choices, key = { it.record.id }) { choice ->
+                        TextButton(enabled = !busy, onClick = {
+                            busy = true
+                            if (choice.local) onUseSaved?.invoke(choice.record.id, spelling, done)
+                            else onLink(spelling, choice.record.id, done)
+                        }) {
+                            Column(Modifier.fillMaxWidth()) {
+                                Text(choice.record.text)
+                                if (choice.variants.isNotEmpty()) Text(choice.variants.joinToString(", "), style = MaterialTheme.typography.bodySmall)
+                                if (choice.local) Text("Сохранённое выделение · станет общей записью", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+                if (choices.isEmpty()) Text("Сохранённое название не найдено. Выдели полное имя в тексте и создай для него общую запись.", style = MaterialTheme.typography.bodySmall)
+                TextButton(enabled = !busy, onClick = { busy = true; onLink(spelling, null, done) }) { Text("Создать общую запись для этого названия") }
+                message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                TextButton(enabled = !busy, onClick = { choosing = false }) { Text("Закрыть") }
             }
-            TextButton(enabled = !busy, onClick = { busy = true; onLink(spelling, null, done) }) { Text("Создать общую запись для этого названия") }
-            message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        } }, confirmButton = { TextButton(enabled = !busy, onClick = { choosing = false }) { Text("Закрыть") } })
+        }
+    }
 }

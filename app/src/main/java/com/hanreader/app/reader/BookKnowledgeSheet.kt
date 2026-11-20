@@ -94,8 +94,8 @@ internal fun BookKnowledgeSheet(vm: ReaderViewModel, book: OpenBook, highlights:
                     wiki = WikiNoteTarget(h.bookId, h.chapterIndex, h.chapterTitle, h.blockIndex, h.startChar, h.endChar, h.text,
                         if (entry.shared) "" else BookKnowledge.quote(h))
                 }) { Text("Найти объяснение в Википедии") }
-                if (entry.shared) EntityLinksPanel(wide, entry.record, entry.record.text, false,
-                    onLink = { text, id, done -> vm.linkEntity(text, id, onDone = done) }, onUnlink = vm::unlinkEntity, canUnlink = false)
+                if (entry.shared) EntityLinksPanel(highlights, entry.record, entry.record.text, false,
+                    onLink = { text, id, done -> vm.linkEntity(text, id, onDone = done) }, onUnlink = vm::unlinkEntity, canUnlink = false, onUseSaved = vm::linkSavedEntity)
                 else {
                     TextButton(enabled = !busy && entry.record.text.length <= 200, onClick = { change { selected = vm.promoteKnowledgeNote(entry.record.id) } }) { Text("Сделать общей записью книги") }
                     TextButton(enabled = !busy && EntityLinks.roots(wide).isNotEmpty(), onClick = { attach = !attach }) { Text("Прикрепить к общей записи…") }

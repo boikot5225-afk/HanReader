@@ -30,6 +30,27 @@ class EntityLinksTest {
         assertEquals(person, at(listOf(person), b, "Osiel Cárdenas")!!.entry)
         assertNull(at(listOf(person), block("Cárdenas volvió."), "Cárdenas"))
     }
+    @Test fun linkingPickerIncludesFullNamesSavedAsLocalHighlightsAndWikiNotes() {
+        val short = entry("Zedillo")
+        val full = short.copy(id = 2, chapterIndex = 3, blockIndex = 4, startChar = 10, endChar = 25,
+            text = "Ernesto Zedillo", note = "Моя заметка", aliasesJson = "[]")
+        val duplicate = full.copy(id = 3, note = "Источник: Википедия — Ernesto Zedillo")
+        val choices = EntityLinks.choices(listOf(short, full, duplicate))
+        assertEquals(2, choices.size)
+        assertEquals(full.id, choices.single { it.local }.record.id)
+        assertEquals(listOf(short), EntityLinks.choices(listOf(short, full.copy(text = "x".repeat(201)))).map { it.record })
+        assertTrue(EntityLinks.choices(listOf(full.copy(entityName = "Some person"))).isEmpty())
+    }
+
+    @Test fun pickerExposesAliasesAndOriginalNamesWithoutDuplicatingLocalNotes() {
+        val root = entry("Zedillo", aliases = listOf("Ernesto Zedillo"))
+        val original = entry("Ernesto Zedillo", 2, aliases = listOf("Ernesto Zedillo Ponce"))
+        val local = original.copy(id = 3, chapterIndex = 0, startChar = 1, endChar = 16, aliasesJson = "[]")
+        val result = EntityLinks.choices(listOf(root, original, local))
+        assertEquals(1, result.size); assertEquals(root, result.single().record); assertFalse(result.single().local)
+        assertTrue(result.single().variants.contains("Ernesto Zedillo"))
+        assertTrue(result.single().variants.contains("Ernesto Zedillo Ponce"))
+    }
     @Test fun manualVariantsWorkEverywhereAndCaseChangesButNeverInsideOtherWords() {
         val person = entry("Osiel Cárdenas", aliases = listOf("Cárdenas", "Osiel Cárdenas Guillén"))
         assertEquals(person, at(listOf(person), block("Cárdenas llegó."), "Cárdenas")!!.entry)

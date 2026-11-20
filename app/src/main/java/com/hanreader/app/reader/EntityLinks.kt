@@ -61,6 +61,22 @@ object EntityLinks {
      * because highlight IDs are regenerated when a backup is restored. */
     fun root(h: Highlight, entries: List<Highlight>): Highlight? = index(entries).root(h)
     fun roots(entries: List<Highlight>) = entries.mapNotNull { root(it, entries) }.distinct()
+
+    fun variants(owner: Highlight, entries: List<Highlight>): List<String> =
+        (aliases(owner) + entries.filter { it != owner && root(it, entries) == owner }
+            .flatMap { listOf(it.text) + aliases(it) }).distinctBy(::key)
+
+    data class Choice(val record: Highlight, val local: Boolean, val variants: List<String>)
+    /** The linking picker must also find names saved as ordinary highlights or local Wiki notes. */
+    fun choices(entries: List<Highlight>): List<Choice> {
+        val wide = entries.filter { it.chapterIndex == Highlights.BOOK_WIDE }
+        val common = roots(wide).map { Choice(it, false, variants(it, wide)) }
+        val known = wide.flatMap { h -> (listOf(h.text) + aliases(h)).map { h.bookId to key(it) } }.toSet()
+        val local = entries.filter { it.chapterIndex >= 0 && it.entityName.isEmpty() && it.text.length in 1..200 && (it.bookId to key(it.text)) !in known &&
+            runCatching { encode(listOf(it.text)) }.isSuccess }
+            .distinctBy { it.bookId to key(it.text) }.map { Choice(it, true, emptyList()) }
+        return (common + local).sortedBy { key(it.record.text) }
+    }
     fun validate(entries: List<Highlight>) {
         val claims = entries.flatMap { h -> parse(h.aliasesJson).map { (h.bookId to key(it)) } }
         require(claims.distinct().size == claims.size)
