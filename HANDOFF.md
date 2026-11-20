@@ -1,6 +1,41 @@
 # Amauta Reader (HanReader) — передача дел следующей сессии
 
-Состояние на 20 ноября 2026, исходники **0.29.0** (versionCode 82), ветка **`amauta`**.
+Состояние на 20 ноября 2026, исходники **0.30.0** (versionCode 83), ветка **`amauta`**.
+
+## Общая читалка и иллюстрации Википедии — 0.30.0
+
+- Запрос: те же настройки/незнакомые слова, что в книгах, плюс картинки в статьях.
+- WikiReading — display-only BookSource/OpenBook адаптер без Room-книги. Прежние
+  PagedChapter/Paginator/RubyParagraph/AppearanceSheet, общие AppearanceStore и Room
+  «Знаю / Не знаю» через VM текущего языка. Подсказки/рекомендации/пиньинь, страницы
+  и прокрутка; исходная книга не получает позицию/статистику статьи.
+- PagedChapter VM nullable + callbacks позиции/изображений с прежними book defaults.
+  Исправлен общий ReaderKeys.turns: неактивный reader не потребляет события статьи;
+  отдельный native regression проверяет два одновременно скомпонованных pager.
+- WikiDocument v2: прежние текстовые блоки/ключи v1 сохранены, изображения отдельно
+  с beforeBlock; позиция source paragraph + UTF-16 char, layout ↔ source mapping.
+  Старый снимок можно дополнить через «Об источнике → Загрузить иллюстрации»;
+  абзацы pinned revision обязательно совпадают, удалять статью не требуется.
+- WikiImages/WikiImageStore: metadata MediaWiki imageinfo, растровые миниатюры только
+  с upload.wikimedia.org и thumb.wikimedia.org; реальные ответы API теперь добавляют
+  utm_* и используют thumb host, метки удаляются, неизвестные query/hosts запрещены.
+  40 картинок/статья, 3 МиБ/картинка, bounds/MIME/downsample, без HTML/SVG/редиректов.
+  Одна очередь/dedup; временные 20 МиБ noBackup, pins 80 МиБ рядом со снимками;
+  атомарный JSON с метаданными/байтами/контрольной суммой, общие картинки не удаляются
+  до удаления последней ссылающейся статьи. Подпись + автор/лицензия + File page.
+- Офлайн сначала сохраняет текст, затем картинки, показывает реальные N/M и разрешает
+  ручной повтор. Отведённая высота авторства исключает скачок текста после загрузки.
+- 58 уникальных локальных сценариев пройдены (57 общий запуск, +1 legacy upgrade;
+  повторные 11/11 WikiFull/Reader после добавления upgrade). Реальный API test 1/1:
+  en/es/zh full text, ru link, en 4 images (первая 526843 bytes Public domain), es 1
+  (116699 bytes Public domain), реальная загрузка и pin/readback с сетью, отключённой
+  в source. В zh-статье подходящих картинок нет. Физического телефона нет.
+- lintDebug 0 errors / 41 warnings / 3 hints; окончательная release lint — CI.
+- Полный отчёт: docs/WIKIPEDIA_READER_0.30.0.md. Snapshot/image pins по-прежнему вне
+  ручного ZIP-бэкапа; DeepSeek/SRS-карточки из wiki не добавлялись.
+- Сборка 0.30.0 отправляется в прежний CI; результаты/доставка будут дописаны.
+- Чужой WIP сайта (docs/index.html, docs/privacy.html, tools/build_site.py,
+  docs/img/amauta-icon.png, docs/img/es-reader.png) не включать в коммит/публикацию.
 
 ## Полные статьи Википедии — 0.29.0
 

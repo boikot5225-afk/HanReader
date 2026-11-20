@@ -51,8 +51,11 @@ internal fun BookKnowledgeSheet(vm: ReaderViewModel, book: OpenBook, highlights:
         val engine by vm.engine.collectAsState()
         val known by vm.knownWords.collectAsState()
         val meanings by vm.userMeanings.collectAsState()
+        val studying by vm.studyingWords.collectAsState()
+        val levelMark by vm.levelMark.collectAsState()
+        val pinyinMode by vm.pinyinMode.collectAsState()
         WikipediaSheet(target, com.hanreader.app.lang.Languages.current.tag, vm.wikipedia,
-            engine = engine, known = known, meanings = meanings,
+            engine = engine, known = known, meanings = meanings, onKnown = vm::setKnown, studying = studying, levelMark = levelMark, pinyinMode = pinyinMode, onPinyinMode = vm::setPinyinMode,
             onSave = { article, definition -> check(id != null); vm.saveKnowledgeWikipedia(id, article, definition) },
             onDismiss = { wiki = null })
         return

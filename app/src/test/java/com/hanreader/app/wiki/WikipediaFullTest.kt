@@ -62,4 +62,22 @@ class WikipediaFullTest {
         repo.saveArticle(recovered)
         assertEquals(listOf(article), repo.savedArticles())
     }
+    @Test fun legacyTextSnapshotCanGainIllustrationsWithoutChangingItsAddressesOrRequiringDeletion() = runBlocking {
+        val url = "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Photo.png/330px-Photo.png"
+        val illustrated = html.replace("<h2>", "<figure><img src='$url?utm_source=en.wikipedia.org' width='330' height='200'/></figure><h2>")
+        val repo = WikipediaRepository(app, { illustrated }, { 1234 })
+        val fresh = repo.fullArticle(article)
+        val legacy = fresh.copy(images = emptyList())
+        repo.saveArticle(legacy)
+        val stored = File(app.filesDir, "wikipedia-reading-v1/en-42-321.json")
+        stored.writeText(org.json.JSONObject(stored.readText()).put("version", 1).apply { remove("images") }.toString())
+        assertTrue(repo.fullArticle(article).images.isEmpty())
+        val updated = repo.withIllustrations(repo.fullArticle(article))
+        assertEquals(legacy.blocks, updated.blocks); assertEquals(legacy.key, updated.key)
+        assertEquals(1, updated.images.size)
+        repo.saveArticle(updated)
+        assertEquals(updated, WikipediaRepository(app, { error("offline") }).fullArticle(article))
+        assertTrue(runCatching { repo.withIllustrations(legacy.copy(blocks = listOf(WikiBlock("Different text")))) }.isFailure)
+    }
+
 }

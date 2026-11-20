@@ -41,4 +41,28 @@ class WikiDocumentsTest {
         assertEquals(text, document.blocks.joinToString(" ") { it.text })
         assertNotEquals(document.key, document.copy(article = article.copy(revision = 322)).key)
     }
+    @Test fun imagesKeepTheirParagraphAnchorsAndRejectTrackersIconsAndMath() {
+        val url = "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Example.svg/330px-Example.svg.png"
+        val html = """<p>Primero.</p><figure><img src="${url.removePrefix("https:")}?utm_source=en.wikipedia.org&amp;utm_campaign=parser" width="330" height="200" alt="Ejemplo"/><figcaption>Una ilustración.</figcaption></figure>
+            <p>Segundo.</p><img src="https://evil.example/pixel.png" width="400" height="300"/>
+            <img src="$url" width="16" height="16"/><span class="mwe-math-element"><img src="$url" width="100" height="80"/></span>"""
+        val doc = WikiDocuments.parse(article, response(html))
+        assertEquals(listOf("Primero.", "Segundo."), doc.blocks.map { it.text })
+        assertEquals(listOf(WikiImage(url, "File:Example.svg", "Una ilustración.", 330, 200, 1)), doc.images)
+        assertEquals(doc, WikiDocuments.decode(WikiDocuments.encode(doc)))
+        assertEquals(doc.key, doc.copy(images = emptyList()).key)
+        val legacy = JSONObject(WikiDocuments.encode(doc.copy(images = emptyList()))).put("version", 1).apply { remove("images") }
+        assertEquals(doc.copy(images = emptyList()), WikiDocuments.decode(legacy.toString()))
+    }
+    @Test fun onlyOfficialWikimediaImagePathsCanBeUsed() {
+        listOf("http://upload.wikimedia.org/wikipedia/a.png", "https://upload.wikimedia.org.evil.org/wikipedia/a.png",
+            "https://user@upload.wikimedia.org/wikipedia/a.png", "https://upload.wikimedia.org:443/wikipedia/a.png",
+            "https://upload.wikimedia.org/wikipedia/../a.png", "https://upload.wikimedia.org/wikipedia/%2e%2e/a.png",
+            "https://upload.wikimedia.org/wikipedia/a.png?tracker=x", "file:///etc/passwd").forEach { assertFalse(it, WikiImages.trusted(it)) }
+        assertNull(WikiImages.normalize("https://evil.example/wikipedia/photo.png?utm_source=x"))
+        assertNull(WikiImages.normalize("https://thumb.wikimedia.org/wikipedia/photo.png?redirect=https://evil.example"))
+        assertEquals("https://thumb.wikimedia.org/wikipedia/photo.png", WikiImages.normalize("//thumb.wikimedia.org/wikipedia/photo.png?utm_source=en.wikipedia.org&utm_content=thumbnail"))
+        assertEquals("File:A+B.jpg", WikiImages.fileTitle("https://upload.wikimedia.org/wikipedia/commons/a/ab/A+B.jpg"))
+    }
+
 }

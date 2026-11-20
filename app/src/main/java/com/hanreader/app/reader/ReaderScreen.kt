@@ -794,7 +794,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     }
     wikiTarget?.let { target ->
         WikipediaSheet(target, com.hanreader.app.lang.Languages.current.tag, vm.wikipedia,
-            engine = eng, known = known, meanings = userMeanings,
+            engine = eng, known = known, meanings = userMeanings, onKnown = vm::setKnown, studying = studying, levelMark = levelMark, pinyinMode = pinyinMode, onPinyinMode = vm::setPinyinMode,
             onSave = { article, definition -> vm.saveWikipediaNote(target, article, definition) },
             onDismiss = { wikiTarget = null })
     }
@@ -1107,7 +1107,7 @@ private fun RunningFooter(left: String, right: String) {
 /** Page mode: the chapter split into screens, turned by swipe, side taps or the volume keys. */
 @Composable
 internal fun PagedChapter(
-    vm: ReaderViewModel,
+    vm: ReaderViewModel?,
     book: OpenBook,
     chapter: ChapterContent,
     metrics: RubyMetrics,
@@ -1129,7 +1129,10 @@ internal fun PagedChapter(
     registerBlockJump: (((Int, Int) -> Unit)?) -> Unit,
     bookmarkedBlocks: Set<Int>,
     onCancelLoading: (() -> Unit)? = null,
-    onSaveLoadingReport: ((ReaderLoadState) -> Unit)? = null
+    onSaveLoadingReport: ((ReaderLoadState) -> Unit)? = null,
+    onPosition: ((Int, Int, Int) -> Unit)? = null,
+    imageAspect: (suspend (String) -> Float?)? = null,
+    imageContent: (@Composable (String) -> Unit)? = null
 ) {
     val density = LocalDensity.current
     val saveReport = onSaveLoadingReport ?: rememberReaderReportSaver()
@@ -1169,7 +1172,7 @@ internal fun PagedChapter(
         val pages by produceState<Pair<Any, Result<List<Page>>>?>(null, requestKey) {
             val result = try {
                 Result.success(kotlinx.coroutines.withTimeout(READER_LOAD_TIMEOUT_MS) {
-                    Paginator.paginate(chapter, metrics, pageSpec) { vm.imageAspect(it) }
+                    Paginator.paginate(chapter, metrics, pageSpec) { path -> imageAspect?.invoke(path) ?: vm?.imageAspect(path) }
                 })
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) { Result.failure(e) }
             catch (e: kotlinx.coroutines.CancellationException) { throw e }
@@ -1191,7 +1194,7 @@ internal fun PagedChapter(
                 pageExpired || error is kotlinx.coroutines.TimeoutCancellationException -> ReaderLoadFailure.TIMEOUT
                 error != null -> ReaderLoadFailure.PAGES
                 else -> null
-            }), onCancel = onCancelLoading ?: vm::closeBook,
+            }), onCancel = onCancelLoading ?: { vm?.closeBook(); Unit },
                 onRetry = { retry++ }, onScroll = { AppearanceStore.update { it.copy(mode = ReadingMode.SCROLL) } },
                 onSaveReport = saveReport)
             return@BoxWithConstraints
@@ -1225,23 +1228,25 @@ internal fun PagedChapter(
                 ReaderKeys.active = keysEnabled
                 onDispose { ReaderKeys.active = false }
             }
-            LaunchedEffect(pager) { ReaderKeys.turns.collect { turn(it) } }
+            // A nested article reader must never turn the suspended book's pages too.
+            LaunchedEffect(pager, keysEnabled) { if (keysEnabled) ReaderKeys.turns.collect { turn(it) } }
             LaunchedEffect(pager, speed) {
                 var shownAt = System.currentTimeMillis()
                 var shownChars = 0
                 snapshotFlow { pager.settledPage }.collect { p ->
                     val now = System.currentTimeMillis()
-                    vm.recordPage(shownChars, now - shownAt)
+                    vm?.recordPage(shownChars, now - shownAt)
                     shownAt = now
                     when {
-                        p < lead -> vm.goToChapter(chapter.index - 1, atEnd = true)
-                        p >= lead + list.size -> vm.goToChapter(chapter.index + 1)
+                        p < lead -> vm?.goToChapter(chapter.index - 1, atEnd = true)
+                        p >= lead + list.size -> vm?.goToChapter(chapter.index + 1)
                         else -> {
                             val page = list[p - lead]
                             shownChars = page.chars
                             if (Paginator.pageFor(list, saved[0], saved[1]) != p - lead) {
                                 saved[0] = page.firstBlock; saved[1] = page.firstChar
-                                vm.savePosition(chapter.index, page.firstBlock, page.firstChar)
+                                if (onPosition != null) onPosition(chapter.index, page.firstBlock, page.firstChar)
+                                else vm?.savePosition(chapter.index, page.firstBlock, page.firstChar)
                             }
                             val left = list.subList(p - lead, list.size).sumOf { it.chars }
                             val blocks = page.items.filter { it !is PageItem.Banner }.map { it.block }
@@ -1307,7 +1312,9 @@ internal fun PagedChapter(
                                         val img = chapter.blocks.getOrNull(item.block) as? ReaderBlock.Image
                                         if (img != null) {
                                             if (item.spacingBefore) Spacer(Modifier.height(with(density) { item.spacingBeforePx.toDp() }))
-                                            Box(Modifier.fillMaxWidth().height(with(density) { item.heightPx.toDp() })) { BookImage(vm, img.path) }
+                                            Box(Modifier.fillMaxWidth().height(with(density) { item.heightPx.toDp() })) {
+                                                if (imageContent != null) imageContent(img.path) else if (vm != null) BookImage(vm, img.path)
+                                            }
                                         }
                                     }
                                 }

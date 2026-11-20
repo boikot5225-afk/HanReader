@@ -67,4 +67,35 @@ class EqualChapterPaginationTest {
         assertEquals("Chapter metadata recreated the pager", originalRegistrations, registrations)
         source.close()
     }
+    @Test fun volumeKeysTurnOnlyTheActiveReader() {
+        Languages.current = Languages.SPANISH
+        val source = TxtBook("Una pista.".toByteArray(), "Fixture")
+        val text = (1..600).joinToString(" ") { "palabra$it" }
+        val p = plainWikiText(text)
+        val chapter = ChapterContent(0, "Article", listOf(ReaderBlock.Text(text, false, p.tokens)), 0, text.length)
+        val entity = BookEntity(id = -42, title = "Article", author = "", fileName = "wiki", chapterCount = 1)
+        val book = OpenBook(entity, source, chapter, false)
+        var parentPage = -1; var articlePage = -1
+        compose.setContent { LexiconTheme {
+            val appearance = Appearance(mode = ReadingMode.PAGES)
+            val theme = LocalThemeSpec.current
+            val metrics = rememberRubyMetrics(rememberTextMeasurer(cacheSize = 0), appearance, theme, WordFont)
+            androidx.compose.foundation.layout.Box {
+                for (active in listOf(false, true)) {
+                    PagedChapter(null, book, chapter, metrics, rubyColors(appearance, theme), appearance,
+                        showPinyin = false, hidePinyinFor = null, showBanner = false, glossFor = null,
+                        banner = {}, paragraph = { _, _, _ -> }, bars = PaddingValues(), speed = 200f,
+                        keysEnabled = active, onTapCenter = {}, onAnyTap = { false },
+                        onProgress = { if (active) articlePage = it.position else parentPage = it.position },
+                        registerJump = {}, registerBlockJump = {}, bookmarkedBlocks = emptySet())
+                }
+            }
+        } }
+        compose.waitUntil(20_000) { parentPage == 0 && articlePage == 0 }
+        compose.runOnIdle { ReaderKeys.turns.tryEmit(1) }
+        compose.waitUntil(20_000) { articlePage == 1 }
+        assertEquals("A suspended book consumed the article's volume key", 0, parentPage)
+        source.close()
+    }
+
 }

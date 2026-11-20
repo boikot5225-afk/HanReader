@@ -20,7 +20,9 @@ import kotlinx.coroutines.launch
 internal fun WikipediaSheet(target: WikiNoteTarget, bookLanguage: String, source: WikipediaSource,
     onSave: suspend (WikiArticle, String) -> Unit, onDismiss: () -> Unit,
     engine: com.hanreader.app.lang.LanguageModule? = null, known: Set<String> = emptySet(), notesEnabled: Boolean = true,
-    meanings: Map<String, String> = emptyMap()) {
+    meanings: Map<String, String> = emptyMap(), onKnown: ((String, Boolean) -> Unit)? = null,
+    studying: Set<String> = emptySet(), levelMark: LevelMark = LevelMark(HskSystem.HSK3, 0), pinyinMode: PinyinMode = PinyinMode.UNKNOWN,
+    onPinyinMode: ((PinyinMode) -> Unit)? = null) {
     var query by remember(target) { mutableStateOf(target.lookupTerm.take(200)) }
     var language by remember(target) { mutableStateOf("ru") }
     var hits by remember(target) { mutableStateOf<List<WikiHit>?>(null) }
@@ -47,14 +49,14 @@ internal fun WikipediaSheet(target: WikiNoteTarget, bookLanguage: String, source
     fun show(value: WikiArticle) { article = value; definition = value.extract; hits = null }
     reading?.let { document ->
         WikipediaReader(document, source, engine, known, onDismiss = { reading = null },
-            onSaveExcerpt = if (notesEnabled) onSave else null, meanings = meanings)
+            onSaveExcerpt = if (notesEnabled) onSave else null, meanings = meanings, onKnown = onKnown, studying = studying, levelMark = levelMark, pinyinMode = pinyinMode, onPinyinMode = onPinyinMode)
         return
     }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp)
             .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Википедия", style = MaterialTheme.typography.headlineSmall)
-            Text("Передаётся только поисковый запрос. Остальной текст книги не отправляется.", style = MaterialTheme.typography.bodySmall)
+            Text("Википедия получает поисковый запрос и запросы на выбранные статьи. Иллюстрации загружаются с Wikimedia. Текст книги не отправляется.", style = MaterialTheme.typography.bodySmall)
             OutlinedTextField(query, { if (it.length <= 200) query = it }, modifier = Modifier.fillMaxWidth(),
                 label = { Text("Термин или выражение") }, enabled = !busy, maxLines = 3)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

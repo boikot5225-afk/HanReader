@@ -30,16 +30,26 @@ interface WikipediaSource {
     suspend fun savedArticles(): List<WikiArticle> = emptyList()
     suspend fun saveArticle(document: WikiDocument) { error("Offline storage unavailable") }
     suspend fun removeSavedArticle(article: WikiArticle) { error("Offline storage unavailable") }
+    suspend fun image(article: WikiArticle, image: WikiImage): WikiImageAsset = error("Images unavailable")
+    suspend fun withIllustrations(document: WikiDocument): WikiDocument = document
+    suspend fun saveImages(document: WikiDocument): WikiImageSaveResult = WikiImageSaveResult(0, document.images.size)
 }
 
 /** Only the selected/editable query is sent. No book text, cookies or API key. */
 class WikipediaRepository(context: Context,
     private val fetch: suspend (String) -> String = { download(it) },
-    private val now: () -> Long = System::currentTimeMillis
+    private val now: () -> Long = System::currentTimeMillis,
+    fetchImage: suspend (String) -> ByteArray = WikiImages::download
 ) : WikipediaSource {
     private val directory = File(context.noBackupFilesDir, "wikipedia-v1")
     private val savedDirectory = File(context.filesDir, "wikipedia-reading-v1")
     private val mutex = Mutex()
+    private val imageOperations = Mutex()
+    private val images = WikiImageStore(File(context.noBackupFilesDir, "wikipedia-images-v1"), File(savedDirectory, "images"), { language, image ->
+        cached("image-v1:$language:${image.title}", WikiImages::metadata) {
+            request(language, mapOf("titles" to image.title, "prop" to "imageinfo", "iiprop" to "url|extmetadata", "iiurlwidth" to "800"))
+        }
+    }, fetchImage)
     companion object {
         val languages = mapOf("ru" to "Русский", "es" to "Испанский", "en" to "Английский", "zh" to "Китайский")
         private suspend fun download(url: String): String = withContext(Dispatchers.IO) {
@@ -152,10 +162,21 @@ class WikipediaRepository(context: Context,
             }.getOrNull() }
         } }
         if (saved != null) return saved
-        return cached("full-v1:${article.language}:${article.id}:${article.revision}", { json ->
+        return revision(article)
+    }
+
+    private suspend fun revision(article: WikiArticle): WikiDocument =
+        cached("full-v1:${article.language}:${article.id}:${article.revision}", { json ->
             WikiDocuments.parse(article, json)
         }) { request(article.language, mapOf("action" to "parse", "oldid" to article.revision.toString(),
             "prop" to "text|revid", "disableeditsection" to "1", "disabletoc" to "1", "disablelimitreport" to "1")) }
+
+    override suspend fun withIllustrations(document: WikiDocument): WikiDocument {
+        WikiDocuments.validate(document)
+        val fresh = revision(document.article)
+        // Updating old snapshots must never invalidate existing paragraph/word addresses.
+        check(fresh.blocks == document.blocks)
+        return document.copy(images = fresh.images)
     }
 
     override suspend fun savedArticles(): List<WikiArticle> = withContext(Dispatchers.IO) { mutex.withLock {
@@ -180,12 +201,34 @@ class WikipediaRepository(context: Context,
         Unit
     } }
 
-    override suspend fun removeSavedArticle(article: WikiArticle) = withContext(Dispatchers.IO) { mutex.withLock {
-        val stored = savedFile(article)
-        check(!stored.exists() || stored.delete())
-        // Remove the disposable snapshot too: deleting a saved article frees its cached text.
-        val cache = file("full-v1:${article.language}:${article.id}:${article.revision}")
-        if (cache.exists()) check(cache.delete())
-        Unit
+    override suspend fun image(article: WikiArticle, image: WikiImage): WikiImageAsset {
+        WikiDocuments.validateArticle(article)
+        return images.load(article.language, image)
+    }
+
+    override suspend fun saveImages(document: WikiDocument): WikiImageSaveResult = imageOperations.withLock {
+        WikiDocuments.validate(document)
+        withContext(Dispatchers.IO) { mutex.withLock { check(savedFile(document.article).isFile) } }
+        var saved = 0
+        for (image in document.images) {
+            try { images.pin(document.article.language, image); saved++ }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { /* Text is already safely pinned; report partial success. */ }
+        }
+        WikiImageSaveResult(saved, document.images.size)
+    }
+
+    override suspend fun removeSavedArticle(article: WikiArticle) = imageOperations.withLock { withContext(Dispatchers.IO) {
+        val retained = mutex.withLock {
+            val stored = savedFile(article)
+            check(!stored.exists() || stored.delete())
+            // Remove the disposable snapshot too: deleting a saved article frees its cached text.
+            val cache = file("full-v1:${article.language}:${article.id}:${article.revision}")
+            if (cache.exists()) check(cache.delete())
+            savedDirectory.listFiles().orEmpty().filter { it.extension == "json" }.flatMap { entry ->
+                runCatching { require(entry.length() <= WikiDocuments.MAX_FILE_BYTES); WikiDocuments.decode(entry.readText()).images.map { it.url } }.getOrDefault(emptyList())
+            }.toSet()
+        }
+        images.prune(retained)
     } }
 }

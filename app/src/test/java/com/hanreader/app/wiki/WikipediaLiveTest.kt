@@ -14,6 +14,7 @@ import java.io.File
 /** Optional real, anonymous requests; never depends on an API key or private book text. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
+@org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
 class WikipediaLiveTest {
     @Test fun officialApiSearchIntroAndRussianLanguageLink() = runBlocking {
         assumeTrue(System.getenv("HANREADER_LIVE_WIKIPEDIA") == "1")
@@ -30,8 +31,18 @@ class WikipediaLiveTest {
             println("WIKIPEDIA_LIVE $language ${article.id} ${article.title} revision=${article.revision}")
             val document = repo.fullArticle(article)
             assertTrue(document.blocks.size > 5)
+            if (language == "en") assertTrue("Illustrated live article lost all images", document.images.isNotEmpty())
             assertTrue(document.blocks.any { it.heading > 0 })
             repo.saveArticle(document)
+            document.images.firstOrNull()?.let { image ->
+                val asset = repo.image(article, image)
+                assertTrue(asset.bytes.isNotEmpty()); assertTrue(asset.info.page.startsWith("https://"))
+                assertEquals(WikiImageSaveResult(1, 1), repo.saveImages(document.copy(images = listOf(image))))
+                File(app.noBackupFilesDir, "wikipedia-images-v1").deleteRecursively()
+                val offlineImages = WikipediaRepository(app, { error("Offline") }, fetchImage = { error("Offline") })
+                assertEquals(asset.info, offlineImages.image(article, image).info)
+                println("WIKIPEDIA_IMAGE_LIVE $language images=${document.images.size} bytes=${asset.bytes.size} license=${asset.info.license} offline=true")
+            }
             val offline = WikipediaRepository(app, { error("Offline") })
             assertEquals(document, offline.fullArticle(document.article))
             println("WIKIPEDIA_FULL_LIVE $language blocks=${document.blocks.size} chars=${document.blocks.sumOf { it.text.length }} revision=${document.article.revision}")
