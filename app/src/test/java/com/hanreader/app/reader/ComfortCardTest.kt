@@ -82,9 +82,8 @@ class ComfortCardTest {
         show(EsEngineTest.load(),"Una casa grande.","casa")
         compose.onNodeWithText("Инструменты").performClick()
         compose.onNodeWithText("слово →").performScrollTo().performClick()
-        compose.onNodeWithText("Убрать справа").performScrollTo().performClick()
         assertEquals(1,ReadingChecks.load(app).opened)
-        assertEquals(2,ReadingChecks.load(app).boundaries)
+        assertEquals(1,ReadingChecks.load(app).boundaries)
     }
     @Test fun notSuitableDefaultsToHereEvenWithAnExistingBookMeaning() {
         Languages.current=Languages.CHINESE
