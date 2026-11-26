@@ -77,6 +77,7 @@ class AiUiTest {
 
     @Test fun cardUsesAiMeaningAndShowsOriginalWithUndo() {
         show()
+        openAiDetails()
         compose.onNodeWithText("Исходная подсказка: дорожка").performScrollTo().assertExists()
         compose.onNodeWithText("Отменить исправление ИИ").performScrollTo().performClick()
         compose.runOnIdle { assertTrue(undone) }
@@ -92,6 +93,7 @@ class AiUiTest {
 
     @Test fun manualMeaningRemainsTheSavedMeaningWhenAiExists() {
         show(manual = true)
+        openAiDetails()
         compose.onNodeWithText("Используется твоё значение. ИИ его не заменяет.").performScrollTo().assertExists()
         compose.onNodeWithText("Сохранить в карточки").performScrollTo().performClick()
         compose.runOnIdle { assertEquals("pista" to "мой перевод", saved) }
@@ -105,10 +107,15 @@ class AiUiTest {
 
     @Test fun missingDictionaryWordShowsContextualMeaningAndSavesItToCards() {
         show(english = true, missing = true)
+        openAiDetails()
         compose.onNodeWithText("Исходное значение: в словаре отсутствует").performScrollTo().assertExists()
         compose.onNodeWithText("По контексту").performScrollTo().assertExists()
         compose.onNodeWithText("Сохранить в карточки").performScrollTo().performClick()
         compose.runOnIdle { assertEquals("globally-admired" to "всемирно признанный", saved) }
+    }
+
+    private fun openAiDetails() {
+        compose.onNodeWithText("DeepSeek · перевод по контексту").performScrollTo().performClick()
     }
 
     @Test fun chineseConstructionWithoutSpacesSavesTheWholeSpanAndPreservesPinyin() {
