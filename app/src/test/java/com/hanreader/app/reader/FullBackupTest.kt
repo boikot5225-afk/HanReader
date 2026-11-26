@@ -66,6 +66,9 @@ class FullBackupTest {
         db.bookDao().deleteAll()
         db.cardDao().replaceAll(emptyList(), emptyList())
         db.statsDao().clearDays()
+        db.wordHistoryDao().clearAll()
+        app.getSharedPreferences("word-history", 0).edit().clear().commit()
+        Unit
     }
 
     @Test
@@ -99,6 +102,17 @@ class FullBackupTest {
 
         // Export.
         val lexicon = LexiconViewModel(app)
+        val historySpans = chapter.blocks.mapIndexedNotNull { index, b ->
+            (b as? ReaderBlock.Text)?.let { WikiVisibleSpan(index, 0, it.text.length) }
+        }
+        val historyBatch = WordHistory.batch(EncounterSource("book:$bookId", "雨夜", bookId), chapter, historySpans, reader.engine.value!!)
+        runBlocking {
+            db.wordHistoryDao().record(historyBatch, lookup = true)
+            db.wordHistoryDao().record(WordHistory.batch(EncounterSource("wiki:zh:42", "Статья"), chapter, historySpans, reader.engine.value!!))
+        }
+        app.getSharedPreferences("word-history", 0).edit().putBoolean("enabled", false).commit()
+        val historyBefore = runBlocking { db.wordHistoryDao().snapshot() }
+        assertTrue(historyBefore.words.isNotEmpty())
         val out = File(app.cacheDir, "copy.zip")
         var exported: Result<Int>? = null
         lexicon.exportBackup(Uri.fromFile(out)) { exported = it }
@@ -109,6 +123,8 @@ class FullBackupTest {
         // Lose everything: the book (with its bookmarks and highlights), the marks.
         val fileName = runBlocking { db.bookDao().get(bookId)!!.fileName }
         runBlocking { db.bookDao().delete(bookId); db.knownWordDao().removeAll(); db.statsDao().clearDays() }
+        runBlocking { db.wordHistoryDao().clearAll() }
+        app.getSharedPreferences("word-history", 0).edit().putBoolean("enabled", true).commit()
         File(app.filesDir, "books/$fileName").delete()
 
         // Restore.
@@ -117,10 +133,15 @@ class FullBackupTest {
         waitFor { read != null }
         val backup = read!!.getOrThrow()
         assertEquals(1, backup.library!!.books.size)
+        assertEquals(historyBefore.copy(enabled = false), backup.wordHistory)
         var restored: Result<Unit>? = null
         lexicon.restoreBackup(backup) { restored = it }
         waitFor { restored != null }
         restored!!.getOrThrow()
+        assertEquals(historyBefore, runBlocking { db.wordHistoryDao().snapshot() })
+        assertEquals(false, app.getSharedPreferences("word-history", 0).getBoolean("enabled", true))
+        runBlocking { db.wordHistoryDao().record(historyBatch) }
+        assertEquals(historyBefore, runBlocking { db.wordHistoryDao().snapshot() })
 
         val book = runBlocking { db.bookDao().get(bookId) }!!
         assertEquals(listOf(0, 2, 5), listOf(book.chapterIndex, book.blockIndex, book.charOffset))

@@ -95,10 +95,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -370,6 +375,12 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     var progress by remember { mutableStateOf(ReadingProgress()) }
     val scope = rememberCoroutineScope()
     val aiLifecycle by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    val encounterSource = remember(book.entity.id, book.entity.title) { EncounterSource("book:${book.entity.id}", book.entity.title, book.entity.id) }
+    val encounterViewport = remember(chapter) { EncounterViewport() }
+    val encounterSpans by remember(encounterViewport) { derivedStateOf { encounterViewport.visible() } }
+    TrackWordEncounters(encounterSource, chapter, engine, encounterSpans,
+        !sheetOpen && !chrome && bookNote == null && noteText == null &&
+            aiLifecycle.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))
     var automaticAiJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     DisposableEffect(book.entity.id, chapter, aiConfig.enabled, aiConfig.automatic, aiConfig.hasKey,
         aiConfig.consent, aiConfig.model, appearance.esVariant, aiLifecycle) {
@@ -436,9 +447,18 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         )
     }
     val paragraph: @Composable (ReaderBlock.Text, Int, IntRange?) -> Unit = { block, i, lines ->
+        val boundsKey = "$i:${lines?.first}:${lines?.last}"
+        DisposableEffect(encounterViewport, boundsKey) { onDispose {
+            encounterViewport.bounds.remove(boundsKey); encounterViewport.lines.remove(boundsKey)
+        } }
         val (hlMarked, hlNoted) = remember(block, highlightsHere[i]) { Highlights.tokens(block, highlightsHere[i]) }
         val dashed = remember(block, bookWide) { Highlights.bookTokens(block, bookWide) }
         RubyParagraph(
+            modifier = Modifier.onGloballyPositioned { coordinates ->
+                val bounds = i to androidx.compose.ui.geometry.Rect(coordinates.positionInWindow(), coordinates.size.toSize())
+                if (encounterViewport.bounds[boundsKey] != bounds) encounterViewport.bounds[boundsKey] = bounds
+            },
+            onLines = { ranges -> if (encounterViewport.lines[boundsKey] != ranges) encounterViewport.lines[boundsKey] = ranges },
             dashed = dashed,
             onNote = { noteText = it; chrome = false },
             marked = hlMarked,
@@ -518,7 +538,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val chapterBookmarks = bookmarks.filter { it.chapterIndex == chapter?.index }
     val pageBookmark = chapterBookmarks.firstOrNull { it.blockIndex in progress.firstBlock..progress.lastBlock }
 
-    Box(Modifier.fillMaxSize().background(scheme.background)) {
+    Box(Modifier.fillMaxSize().background(scheme.background).onGloballyPositioned { encounterViewport.viewport = it.boundsInWindow() }) {
         when {
             book.error != null || chapter == null || book.loading && loadingState?.keepContent != true -> {
                 val initial = remember(book.entity.id) { ReaderLoadState(ReaderLoadStage.CHAPTER) }
@@ -693,7 +713,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     }
     val prepEngine = engine
     if (showPrepare && chapter != null && prepEngine != null) {
-        PrepareChapterSheet(vm, book, chapter, prepEngine, onDismiss = { showPrepare = false })
+        PrepareChapterSheet(vm, book, chapter, prepEngine, names = names, onDismiss = { showPrepare = false })
     }
 
     if (showAppearance) {
@@ -878,6 +898,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         }
     }
     if (sel != null && block != null && eng != null && chapter != null && (!sel.phrase || asWord)) {
+        RecordWordLookup(encounterSource, chapter, eng,
+            WikiVisibleSpan(sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end))
         WordSheet(
             onWikipedia = openWikipedia,
             entityPanel = entityControls,
@@ -1881,6 +1903,7 @@ internal fun WordSheet(
             MeaningSummary(primaryMeaning, russian,
                 aiTranslation != null || selectedMeaning != null || es.firstOrNull()?.entry?.contextMeaning != null,
                 own?.first, userMeaning != null || aiTranslation != null || nameInRussian != null || russian.isNotEmpty())
+            WordHistoryPanel(engine.info.tag, if (selection.first == selection.last) engine.lemma(word) else word.lowercase())
             DoubtRow(word, cardWord, primaryMeaning, sentence, doubtSource) { correctingHere = true; correcting = true }
             key(selection) { OwnMeaning(word, own, editing = correcting, startHere = correctingHere, onEditingChange = { open -> if (open) correctingHere = false; correcting = open }, suggestions = remember(word, russian, es) {
                 (russian + es.drop(1).flatMap { it.entry.ru.take(2) }).distinct().take(8)

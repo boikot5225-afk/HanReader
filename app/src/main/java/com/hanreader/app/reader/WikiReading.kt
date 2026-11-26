@@ -10,7 +10,7 @@ import com.hanreader.app.zh.TokenKind
 import kotlinx.coroutines.ensureActive
 import kotlin.coroutines.coroutineContext
 
-/** Display-only adapter: no synthetic Room book, reading history or source-book mutations. */
+/** Display-only adapter: no synthetic Room book or source-book progress mutations. */
 internal class WikiReading(val document: WikiDocument, val chapter: ChapterContent,
     val sourceBlocks: List<Int>, val layoutBlocks: List<Int>) : BookSource {
     val textChapter = chapter.copy(blocks = layoutBlocks.map { chapter.blocks[it] })

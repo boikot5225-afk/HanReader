@@ -28,7 +28,9 @@ data class Backup(
     /** Book files unpacked from the archive (file name -> temporary file); not part of the JSON. */
     val bookFiles: Map<String, java.io.File> = emptyMap(),
     /** Context checks accompany the library with its original book ids. Never contains the API key. */
-    val aiChecks: List<AiCheck>? = null
+    val aiChecks: List<AiCheck>? = null,
+    /** Null in older copies: do not replace article history. Book rows follow library cascades. */
+    val wordHistory: WordHistoryBackup? = null
 )
 
 /** Books with their reading positions, bookmarks, highlights and «Не учить» marks. */
@@ -55,10 +57,12 @@ object BackupFormat {
     /** 3 (0.24.2): known words, names and meanings carry their language. */
     /** 4: context corrections, paid checks and rejections (book ids and hashes stay unchanged). */
     /** 5: explicit missing dictionary base. 6: aliases and rejected automatic name links. */
-    const val VERSION = 7
+    /** 8: reading encounters, shared source contexts and the history collection preference. */
+    const val VERSION = 8
 
     fun encode(backup: Backup): String {
         validateAi(backup.aiChecks, backup.library)
+        WordHistoryBackupFormat.validate(backup.wordHistory, backup.library)
         val root = JSONObject()
         root.put("format", FORMAT)
         root.put("version", VERSION)
@@ -201,6 +205,7 @@ object BackupFormat {
                 }) }
             })
         }
+        backup.wordHistory?.let { root.put("wordHistory", WordHistoryBackupFormat.encode(it)) }
         return root.toString(2)
     }
 
@@ -324,8 +329,10 @@ object BackupFormat {
                 }
             } else null
             validateAi(checks, library)
+            val history = if (root.has("wordHistory")) WordHistoryBackupFormat.decode(root.getJSONObject("wordHistory")) else null
+            WordHistoryBackupFormat.validate(history, library)
             return Backup(root.optLong("exportedAt", 0L), cards, examples, settings, known, names, sources, library, meanings, splits, activity,
-                aiChecks = checks)
+                aiChecks = checks, wordHistory = history)
         } catch (e: JSONException) {
             throw BackupFormatException("Файл копии повреждён: " + (e.message ?: "неверная структура"))
         }

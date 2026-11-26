@@ -16,8 +16,8 @@ android {
         buildConfigField("String", "APP_NAME", "\"$appName\"")
         minSdk = 26
         targetSdk = 36
-        versionCode = 84
-        versionName = "0.31.0"
+        versionCode = 85
+        versionName = "0.32.0"
         // The first language remains the default; English is the third reader module.
         buildConfigField("String", "LANGUAGES", "\"es,zh,en\"")
         // Instrumented tests (app/src/androidTest) on emulators in CI.

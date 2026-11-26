@@ -37,6 +37,11 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
     val cards: StateFlow<List<WordCard>> = selection.flatMapLatest {
         dao.observeByLanguage(it)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val readingExamples = ReadingExamplesRepository(LexiconDatabase.get(app))
+    internal fun readingContexts(card: WordCard) = readingExamples.observe(card)
+    internal fun addReadingExample(card: WordCard, encounterId: String, onDone: (Result<Boolean>) -> Unit) {
+        viewModelScope.launch { onDone(runCatching { readingExamples.add(card, encounterId) }) }
+    }
 
     fun selectLanguage(value: String) {
         if (languages.any { it.tag == value }) {
@@ -143,7 +148,8 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                     userMeanings = db.userMeaningDao().all(),
                     userSplits = db.userSplitDao().all().map { it.word },
                     activity = db.statsDao().allDays(),
-                    aiChecks = db.aiCheckDao().forBackup()
+                    aiChecks = db.aiCheckDao().forBackup(),
+                    wordHistory = db.wordHistoryDao().snapshot().copy(enabled = app.getSharedPreferences("word-history", 0).getBoolean("enabled", true))
                 ) }
                 withContext(Dispatchers.IO) {
                     val stream = app.contentResolver.openOutputStream(uri, "wt")
@@ -174,6 +180,7 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             onDone(runCatching {
                 val db = LexiconDatabase.get(getApplication())
+                withContext(Dispatchers.Default) { WordHistoryBackupFormat.validate(backup.wordHistory, backup.library) }
                 // Book files first, under their own names (a book restored onto the same phone is the same file).
                 backup.library?.let { _ ->
                     withContext(Dispatchers.IO) {
@@ -212,6 +219,7 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         // ids/hashes so reopening the same context never spends tokens again.
                         backup.aiChecks?.let { db.aiCheckDao().restore(it) }
                     }
+                    backup.wordHistory?.let { db.wordHistoryDao().replaceAll(it) }
                     backup.userSplits?.let { list ->
                         db.userSplitDao().removeAll()
                         db.userSplitDao().putAll(list.map { com.hanreader.app.UserSplit(it) })
@@ -240,6 +248,7 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         File(getApplication<Application>().cacheDir, "restore").deleteRecursively()
                     }
                 }
+                backup.wordHistory?.let { getApplication<Application>().getSharedPreferences("word-history", 0).edit().putBoolean("enabled", it.enabled).apply() }
                 backup.settings
                     .filter { s -> com.hanreader.app.lang.Languages.ALL.any { it.tag == s.language } }
                     .forEach { settingsStore.save(it) }

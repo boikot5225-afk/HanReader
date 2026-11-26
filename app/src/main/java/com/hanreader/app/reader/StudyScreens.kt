@@ -66,7 +66,7 @@ private val SIZES = listOf(10, 20, 30)
  * be marked «Знаю» (known everywhere) or «Не учить» (hidden in this book).
  */
 @Composable
-private fun CandidatePicker(
+internal fun CandidatePicker(
     candidates: List<StudyCandidate>,
     countLabel: String,
     busy: Boolean,
@@ -74,7 +74,10 @@ private fun CandidatePicker(
     onKnown: (StudyCandidate) -> Unit,
     onIgnore: (StudyCandidate) -> Unit,
     onAdd: (List<StudyCandidate>) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    preview: @Composable (List<StudyCandidate>) -> Unit = {},
+    sentenceFor: (StudyCandidate) -> String? = { null },
+    loading: Boolean = false
 ) {
     var size by remember { mutableStateOf(10) }
     var unchecked by remember { mutableStateOf(setOf<String>()) }
@@ -87,7 +90,9 @@ private fun CandidatePicker(
                 FilterChip(selected = size == n, onClick = { size = n }, label = { Text("$n") })
             }
         }
-        if (shown.isEmpty()) {
+        preview(chosen)
+        if (loading) CircularProgressIndicator()
+        if (shown.isEmpty() && !loading) {
             Text(
                 "Незнакомых слов для изучения не осталось.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -101,7 +106,8 @@ private fun CandidatePicker(
                 checked = c.word !in unchecked,
                 onCheck = { on -> unchecked = if (on) unchecked - c.word else unchecked + c.word },
                 onKnown = { onKnown(c) },
-                onIgnore = { onIgnore(c) }
+                onIgnore = { onIgnore(c) },
+                sentence = sentenceFor(c)
             )
         }
         Spacer(Modifier.height(4.dp))
@@ -136,7 +142,8 @@ private fun CandidateRow(
     checked: Boolean,
     onCheck: (Boolean) -> Unit,
     onKnown: () -> Unit,
-    onIgnore: () -> Unit
+    onIgnore: () -> Unit,
+    sentence: String? = null
 ) {
     Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
         Row(Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -149,6 +156,8 @@ private fun CandidateRow(
                 }
                 Text(c.gloss, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text("$countLabel: ${c.count}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (!sentence.isNullOrBlank()) Text(sentence, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
             Column(horizontalAlignment = Alignment.End) {
                 TextButton(onClick = onKnown) { Text("Знаю") }
@@ -161,14 +170,22 @@ private fun CandidateRow(
 /** «Подготовиться к разделу»: the chapter's most frequent unknown words. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PrepareChapterSheet(vm: ReaderViewModel, book: OpenBook, chapter: ChapterContent, engine: com.hanreader.app.lang.LanguageModule, onDismiss: () -> Unit) {
+fun PrepareChapterSheet(vm: ReaderViewModel, book: OpenBook, chapter: ChapterContent, engine: com.hanreader.app.lang.LanguageModule,
+    names: Set<String> = emptySet(), onDismiss: () -> Unit) {
     val known by vm.knownWords.collectAsState()
     val saved by vm.savedWords.collectAsState()
     val bookWordsFlow = remember(book.entity.id) { vm.bookWords(book.entity.id) }
     val bookWords by bookWordsFlow.collectAsState(initial = emptyList())
-    val ignored = remember(bookWords) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word } }
-    val candidates by produceState(emptyList<StudyCandidate>(), chapter, known, saved, ignored) {
-        value = withContext(Dispatchers.Default) { VocabularyStats.chapter(chapter, known, saved, ignored, engine) }
+    val ignored = remember(bookWords, names) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word }.apply { addAll(names) } }
+    // Drop the previous snapshot immediately when the source/marks change; never mix chapters.
+    val snapshot by androidx.compose.runtime.key(chapter, known, saved, ignored, engine) {
+        produceState<PreparationSnapshot?>(null) {
+            value = withContext(Dispatchers.Default) {
+                val candidates = VocabularyStats.chapter(chapter, known, saved, ignored, engine)
+                PreparationSnapshot(candidates, ChapterPreparation.of(chapter, known, ignored, engine),
+                    candidates.associate { it.word to VocabularyStats.firstSentence(chapter, it.word, engine) })
+            }
+        }
     }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
@@ -184,13 +201,17 @@ fun PrepareChapterSheet(vm: ReaderViewModel, book: OpenBook, chapter: ChapterCon
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(12.dp))
+                val prepared = snapshot
                 CandidatePicker(
-                    candidates = candidates,
+                    candidates = prepared?.candidates.orEmpty(),
+                    loading = prepared == null,
                     countLabel = "В разделе",
                     busy = busy,
                     status = status,
                     onKnown = { vm.setKnown(it.word, true) },
                     onIgnore = { vm.setIgnored(book.entity.id, it.word, true) },
+                    preview = { chosen -> prepared?.let { PreparationForecast(it.plan, chosen) } },
+                    sentenceFor = { prepared?.sentences?.get(it.word) },
                     onAdd = { list ->
                         busy = true
                         vm.addCandidates(book.entity, list, chapter) { r ->
@@ -201,6 +222,28 @@ fun PrepareChapterSheet(vm: ReaderViewModel, book: OpenBook, chapter: ChapterCon
                 )
             }
         }
+    }
+}
+
+private data class PreparationSnapshot(val candidates: List<StudyCandidate>, val plan: ChapterPreparation,
+    val sentences: Map<String, String?>)
+
+@Composable
+internal fun PreparationForecast(plan: ChapterPreparation, chosen: List<StudyCandidate>) {
+    val selected = chosen.map { it.word }.toSet()
+    val forecast by androidx.compose.runtime.key(plan, selected) {
+        produceState<KnownCoverage?>(null) {
+            value = withContext(Dispatchers.Default) { plan.afterLearning(selected) }
+        }
+    }
+    val after = forecast
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Знакомо сейчас: ${plan.coverage.percent}% слов раздела", style = MaterialTheme.typography.bodyMedium)
+        Text("Если выучить выбранные слова (${chosen.size}): " + (after?.let { "${it.percent}%" } ?: "считаю…"),
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        Text((after?.let { "Дополнительно знакомых вхождений: ${it.known - plan.coverage.known}. " } ?: "") +
+            "Учитываются повторы и словоформы. Это прогноз: добавление в карточки не отмечает слова как знакомые.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

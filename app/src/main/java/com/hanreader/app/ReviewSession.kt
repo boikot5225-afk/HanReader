@@ -77,7 +77,8 @@ fun ReviewSession(
     val plan = ReviewQueue.build(cards, mode, now, dailyLimit = settings.dailyNewWords)
     val due = plan.due
     val current = due.firstOrNull()
-    val activeExample = current?.let { ExampleSelection.choose(it, mode, examples) }
+    // Adding a reading example after revealing the answer must not replace the current question.
+    val activeExample = current?.let { remember(it.id, language, mode) { ExampleSelection.choose(it, mode, examples) } }
     var done by rememberSaveable(mode, language) { mutableIntStateOf(0) }
 
     // Answer state resets for each next card.
@@ -259,6 +260,9 @@ fun ReviewSession(
                         onSpeakWord = { speaker.speak(current.word, language) },
                         onSpeakExample = { speaker.speak(exampleText, language) }
                     )
+                }
+                if ((writingMode && checked || !writingMode && revealed) && !submitted) {
+                    ReadingExamplesPanel(current, examples, vm)
                 }
             }
 

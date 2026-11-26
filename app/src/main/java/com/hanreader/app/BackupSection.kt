@@ -82,7 +82,7 @@ fun BackupSection(vm: LexiconViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Overline("Резервная копия")
         Text(
-            "Всё в одном файле: книги и место чтения, слова и прогресс, закладки, заметки, свои переводы, ИИ-исправления и выполненные проверки. Ключ DeepSeek в копию не входит. Сохраняй копию перед переустановкой или сменой телефона.",
+            "Всё в одном файле: книги и место чтения, слова и прогресс, история встреч, закладки, заметки, свои переводы, ИИ-исправления и выполненные проверки. Ключ DeepSeek в копию не входит. Сохраняй копию перед переустановкой или сменой телефона.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall
         )
@@ -119,7 +119,9 @@ fun BackupSection(vm: LexiconViewModel) {
                                 ", ${lib.highlights.size} " + RussianText.plural(lib.highlights.size, "выделение", "выделения", "выделений")
                         } ?: "") +
                         ". Всё, что сейчас есть в приложении" + (if (backup.library != null) ", включая книги," else "") +
-                        " будет заменено данными из копии."
+                        " будет заменено данными из копии." +
+                        (backup.wordHistory?.let { " История слов: ${it.words.size} сохранённых встреч; она тоже будет заменена данными из копии." }
+                            ?: if (backup.library != null) " В этой копии нет истории слов. История текущих книг будет удалена вместе с библиотекой." else "")
                 )
             },
             confirmButton = {

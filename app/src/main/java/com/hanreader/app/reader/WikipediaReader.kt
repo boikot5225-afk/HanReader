@@ -68,15 +68,16 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
     var viewport by remember { mutableStateOf(Rect.Zero) }
     val paragraphBounds = remember(document.key) { mutableStateMapOf<String, Pair<Int, Rect>>() }
     val lineRanges = remember(document.key) { mutableStateMapOf<String, List<ReaderLineRange>>() }
-    val visible by remember(paragraphBounds, lineRanges) { derivedStateOf {
+    val historyVisible by remember(paragraphBounds, lineRanges) { derivedStateOf {
         paragraphBounds.entries.mapNotNull { (key, source) ->
             val (block, rect) = source
             if (!rect.overlaps(viewport)) null else {
                 val lines = lineRanges[key].orEmpty().filter { rect.top + it.bottom > viewport.top && rect.top + it.top < viewport.bottom }
                 if (lines.isEmpty()) null else WikiVisibleSpan(block, lines.minOf { it.start }, lines.maxOf { it.end })
             }
-        }.groupBy { it.block }.map { (block, spans) -> WikiVisibleSpan(block, spans.minOf { it.start }, spans.maxOf { it.end }) }.sortedBy { it.block }.take(3)
+        }.groupBy { it.block }.map { (block, spans) -> WikiVisibleSpan(block, spans.minOf { it.start }, spans.maxOf { it.end }) }.sortedBy { it.block }
     } }
+    val visible = historyVisible.take(3)
 
     val dictionary = engine?.takeIf { it.info.tag.substringBefore('-') == document.article.language }
     val globalMeanings = remember(meanings, dictionary) { if (dictionary == null) emptyMap() else meanings.filterKeys { !ContextMeanings.isScoped(it) } }
@@ -121,6 +122,13 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
         catch (_: Exception) { preparationFailed = true }
     }
     val ready = reading
+    val encounterSource = remember(document.article.language, document.article.id, document.article.title) {
+        EncounterSource("wiki:${document.article.language}:${document.article.id}", document.article.title)
+    }
+    val historyLifecycle by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    TrackWordEncounters(encounterSource, ready?.textChapter, dictionary, historyVisible,
+        selected == null && !settings && !contents && !sourceDetails && !aiSettings &&
+            historyLifecycle.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))
     val learning by produceState(WikiLearning(), ready, dictionary, known, globalMeanings, appearance, studying, levelMark, pinyinMode) {
         value = if (ready == null) WikiLearning() else withContext(Dispatchers.Default) {
             wikiLearning(ready, dictionary, known, globalMeanings, appearance, studying, levelMark, pinyinMode)
@@ -272,6 +280,8 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                         .sortedBy { if (it.state == "accepted") 0 else 1 }.firstOrNull()
                     val selectedToken = ready?.textChapter?.blocks?.getOrNull(selection.first)?.let { it as? ReaderBlock.Text }
                         ?.tokens?.firstOrNull { it.start == selection.second && it.end == selection.third }
+                    if (dictionary != null && ready != null) RecordWordLookup(encounterSource, ready.textChapter, dictionary,
+                        WikiVisibleSpan(selection.first, selection.second, selection.third))
                     val manual = dictionary?.let { e -> globalMeanings[text] ?: globalMeanings[e.lemma(text)] ?: selectedToken?.let { globalMeanings[ContextMeanings.keyOf(it, e)] } }
                     val translation by produceState<String?>(null, document.key, dictionary, text, globalMeanings, row, selectedToken) {
                         value = withContext(Dispatchers.Default) { manual ?: row?.takeIf { it.state == "accepted" }?.translation
@@ -292,6 +302,11 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                             if (dictionary != null && text.length <= 180) AiWordControls(row, wikiAi.enabled, wikiAi.busy, wikiAi.message,
                                 manual != null, onCheck = { wikiAi.check(selection.first, selection.second until selection.third) },
                                 onState = wikiAi.state)
+                            val historyText = (ready?.textChapter?.blocks?.getOrNull(selection.first) as? ReaderBlock.Text)
+                                ?.text?.takeIf { selection.second >= 0 && selection.third <= it.length }
+                                ?.substring(selection.second, selection.third) ?: text
+                            if (dictionary != null && historyText.length <= 180) WordHistoryPanel(dictionary.info.tag,
+                                if (selectedToken != null) dictionary.lemma(selectedToken.text) else historyText.lowercase())
                             FlowRow {
                                 TextButton(onClick = { selected = Triple(selection.first, 0, block.text.length) }) { Text("Весь абзац") }
                                 if (onSaveExcerpt != null) TextButton(enabled = !busy && text.length <= 12_000, onClick = {

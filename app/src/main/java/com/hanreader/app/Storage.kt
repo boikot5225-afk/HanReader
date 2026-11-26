@@ -560,6 +560,10 @@ data class ImportStats(
 
 @Dao
 interface CardDao {
+    @Query("SELECT * FROM cards WHERE id = :id")
+    suspend fun getById(id: Long): WordCard?
+    @Query("SELECT * FROM card_examples WHERE cardId = :id ORDER BY id")
+    suspend fun examplesFor(id: Long): List<CardExample>
     @Query("SELECT * FROM cards WHERE language = :language ORDER BY createdAt DESC, id DESC")
     fun observeByLanguage(language: String): Flow<List<WordCard>>
 
@@ -765,13 +769,15 @@ interface CardDao {
 // Version 7 (0.7.0): bookmarks. Version 8 (0.9.2): user_names. Version 9 (0.9.9): books.charOffset. Version 10 (0.10.0): highlights. Version 11 (0.13.0): daily_activity, book_progress. Version 12 (0.15.0): user_meanings. Version 13 (0.17.1): user_splits. Version 14 (0.24.2): language of known_words, user_names, user_meanings.
 @Database(
     entities = [
+        com.hanreader.app.reader.ReadingFragment::class, com.hanreader.app.reader.WordEncounter::class,
         WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
         Bookmark::class, UserName::class, Highlight::class, DailyActivity::class, BookProgress::class, UserMeaning::class, UserSplit::class, com.hanreader.app.ai.AiCheck::class, com.hanreader.app.ai.AiArticle::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
+    abstract fun wordHistoryDao(): com.hanreader.app.reader.WordHistoryDao
     abstract fun cardDao(): CardDao
     abstract fun bookDao(): BookDao
     abstract fun knownWordDao(): KnownWordDao
@@ -1003,7 +1009,16 @@ abstract class LexiconDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `reading_fragments` (`id` TEXT NOT NULL, `sourceKey` TEXT NOT NULL, `bookId` INTEGER, `title` TEXT NOT NULL, `chapterTitle` TEXT NOT NULL, `chapter` INTEGER NOT NULL, `block` INTEGER NOT NULL, `textStart` INTEGER NOT NULL, `text` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`bookId`) REFERENCES `books`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)")
+                db.execSQL("CREATE INDEX `index_reading_fragments_bookId` ON `reading_fragments` (`bookId`)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `word_encounters` (`id` TEXT NOT NULL, `fragmentId` TEXT NOT NULL, `language` TEXT NOT NULL, `lemma` TEXT NOT NULL, `original` TEXT NOT NULL, `start` INTEGER NOT NULL, `end` INTEGER NOT NULL, `firstSeen` INTEGER NOT NULL, `lookups` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`fragmentId`) REFERENCES `reading_fragments`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)")
+                db.execSQL("CREATE INDEX `index_word_encounters_fragmentId` ON `word_encounters` (`fragmentId`)")
+                db.execSQL("CREATE INDEX `index_word_encounters_language_lemma` ON `word_encounters` (`language`, `lemma`)")
+            }
+        }
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {
