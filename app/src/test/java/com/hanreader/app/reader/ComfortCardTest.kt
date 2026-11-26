@@ -50,7 +50,7 @@ class ComfortCardTest {
             WordSheet(selection,block,engine,emptySet(),emptySet(),{false},{flowOf(null)},speaker,
                 onKnown={_,_->},onClearKnown={},highlight=null,onHighlight={_,_,_->},onNote={_,_->},onRemoveHighlight={},
                 aiCheck = aiCheck, aiAvailable = aiCheck != null, aiEnabled = aiCheck != null,
-                aiMessage = aiCheck?.let { AI_UNCHANGED_MESSAGE }, onWikipedia = onWikipedia,
+                onWikipedia = onWikipedia,
                 userMeanings=meanings,meaningKey={scope,key->"${scope.name}:$key"},onUserMeaning={key,value->meanings=if (value.isBlank()) meanings-key else meanings+(key to value);observedMeanings=meanings},
                 onChange={selection=it},onDismiss={},onSave={_,_,meaning,_,done->savedMeaning=meaning;done(Result.success(true))},doubtSource="Свой пример")
         }
@@ -94,7 +94,7 @@ class ComfortCardTest {
         assertEquals(2,ReadingChecks.load(app).boundaries)
     }
 
-    @Test fun translationIsVisibleWhileAiAndWikipediaDetailsOpenOnDemand() {
+    @Test fun translationAndAiStatusStayVisibleWhileDetailsOpenOnDemand() {
         Languages.current = Languages.CHINESE
         var wikiOpened = false
         val row = AiCheck("check", 1L, 0, 0, "context", 0, 2, 0, 2,
@@ -102,8 +102,10 @@ class ComfortCardTest {
         show(ZhContextRegressionTest.engine, "海边有礁石。", "礁石", aiCheck = row, onWikipedia = { wikiOpened = true })
         compose.onNodeWithText("риф", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Найти в Википедии").assertDoesNotExist()
-        compose.onNodeWithText(AI_UNCHANGED_MESSAGE).assertDoesNotExist()
-        compose.onNodeWithText("DeepSeek · проверено").performScrollTo().performClick()
+        compose.onNodeWithText(AI_UNCHANGED_MESSAGE).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Уточнить с DeepSeek").assertDoesNotExist()
+        compose.onNodeWithText("DeepSeek").performScrollTo().performClick()
+        compose.onNodeWithText("Уточнить с DeepSeek").assertExists()
         compose.onAllNodesWithText(AI_UNCHANGED_MESSAGE).assertCountEquals(1)
         compose.onNodeWithText("Заметки и Википедия").performScrollTo().performClick()
         compose.onNodeWithText("Найти в Википедии").performScrollTo().performClick()

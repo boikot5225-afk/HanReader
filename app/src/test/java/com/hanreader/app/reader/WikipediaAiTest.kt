@@ -106,7 +106,7 @@ class WikipediaAiTest {
         compose.onNodeWithText("← Назад").performClick()
         compose.runOnIdle { showing=true }
         choose(); compose.onNodeWithText("Уточнить с DeepSeek").performScrollTo().performClick()
-        await { compose.onAllNodesWithText("Исправление отклонено; повторно автоматически не применяется.").fetchSemanticsNodes().isNotEmpty() }
+        await { compose.onAllNodesWithText("Исправление отклонено.").fetchSemanticsNodes().isNotEmpty() }
         assertEquals(1,calls.get())
     }
     @Test fun automaticChecksOnlyTheVisibleParagraphAndReusesItsCacheAfterFontChangeAndReopen() {
