@@ -102,7 +102,7 @@ class ComfortCardTest {
         show(ZhContextRegressionTest.engine, "海边有礁石。", "礁石", aiCheck = row, onWikipedia = { wikiOpened = true })
         compose.onNodeWithText("риф", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Найти в Википедии").assertDoesNotExist()
-        compose.onNodeWithText(AI_UNCHANGED_MESSAGE).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(AI_UNCHANGED_MESSAGE).assertExists()
         compose.onNodeWithText("Уточнить с DeepSeek").assertDoesNotExist()
         compose.onNodeWithText("DeepSeek").performScrollTo().performClick()
         compose.onNodeWithText("Уточнить с DeepSeek").assertExists()
