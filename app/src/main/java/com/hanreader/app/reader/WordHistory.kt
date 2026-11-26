@@ -19,7 +19,8 @@ data class ReadingFragment(@PrimaryKey val id: String, val sourceKey: String, va
     parentColumns = ["id"], childColumns = ["fragmentId"], onDelete = ForeignKey.CASCADE)],
     indices = [Index("fragmentId"), Index(value = ["language", "lemma"])])
 data class WordEncounter(@PrimaryKey val id: String, val fragmentId: String, val language: String,
-    val lemma: String, val original: String, val start: Int, val end: Int, val firstSeen: Long, val lookups: Int = 0)
+    val lemma: String, val original: String, val start: Int, val end: Int, val firstSeen: Long, val lookups: Int = 0,
+    val firstWithoutHint: Long? = null)
 
 data class WordHistoryStats(val encounters: Int, val lookups: Int, val sources: Int)
 data class WordHistoryContext(val original: String, val start: Int, val end: Int, val firstSeen: Long,
@@ -29,7 +30,8 @@ data class WordHistoryContext(val original: String, val start: Int, val end: Int
 abstract class WordHistoryDao {
     @Query("""
         SELECT lemma, COUNT(*) AS encounters, COALESCE(SUM(lookups), 0) AS lookups,
-            COUNT(DISTINCT date(firstSeen / 1000, 'unixepoch', 'localtime')) AS days
+            COUNT(CASE WHEN lookups = 0 THEN firstWithoutHint END) AS unassisted,
+            COUNT(DISTINCT CASE WHEN lookups = 0 THEN date(firstWithoutHint / 1000, 'unixepoch', 'localtime') END) AS unassistedDays
         FROM word_encounters
         WHERE language = :language AND lemma IN (:lemmas)
         GROUP BY lemma
@@ -53,12 +55,17 @@ abstract class WordHistoryDao {
         history.words.chunked(2000).forEach { restoreWords(it) }
     }
     @Insert(onConflict = OnConflictStrategy.IGNORE) abstract suspend fun insertFragments(rows: List<ReadingFragment>)
-    @Insert(onConflict = OnConflictStrategy.IGNORE) abstract suspend fun insertEncounters(rows: List<WordEncounter>)
+    @Insert(onConflict = OnConflictStrategy.IGNORE) abstract suspend fun insertEncounters(rows: List<WordEncounter>): List<Long>
     @Query("UPDATE word_encounters SET lookups = lookups + 1 WHERE id = :id") abstract suspend fun incrementLookup(id: String)
+    @Query("UPDATE word_encounters SET firstWithoutHint = :at WHERE id = :id AND firstWithoutHint IS NULL AND lookups = 0")
+    abstract suspend fun markWithoutHint(id: String, at: Long)
     @Transaction open suspend fun record(batch: EncounterBatch, lookup: Boolean = false) {
         insertFragments(batch.fragments)
-        insertEncounters(batch.words)
+        val inserted = insertEncounters(batch.words)
         if (lookup) batch.words.forEach { incrementLookup(it.id) }
+        else batch.words.forEachIndexed { index, word ->
+            if (inserted[index] == -1L) word.firstWithoutHint?.let { markWithoutHint(word.id, it) }
+        }
     }
     @Query("SELECT COUNT(*) AS encounters, COALESCE(SUM(w.lookups), 0) AS lookups, COUNT(DISTINCT f.sourceKey) AS sources FROM word_encounters w JOIN reading_fragments f ON f.id = w.fragmentId WHERE w.language = :language AND w.lemma = :lemma")
     abstract fun stats(language: String, lemma: String): Flow<WordHistoryStats>
@@ -81,7 +88,8 @@ internal object WordHistory {
     fun batch(source: EncounterSource, chapter: ChapterContent, spans: List<WikiVisibleSpan>,
         engine: LanguageModule, now: Long = System.currentTimeMillis(), selection: Boolean = false,
         textHashes: MutableMap<Int, String>? = null,
-        skip: (Int, Int, Int) -> Boolean = { _, _, _ -> false }): EncounterBatch {
+        withoutHint: (Int, Int) -> Boolean = { _, _ -> false },
+        skip: (Int, Int, Int, Boolean) -> Boolean = { _, _, _, _ -> false }): EncounterBatch {
         val fragments = LinkedHashMap<String, ReadingFragment>()
         val words = LinkedHashMap<String, WordEncounter>()
         for (span in spans) {
@@ -96,18 +104,19 @@ internal object WordHistory {
                 val mid = (lo + hi) ushr 1
                 if (block.tokens[mid].end <= span.start) lo = mid + 1 else hi = mid
             }
-            val candidates = ArrayList<RToken>()
+            val candidates = ArrayList<Int>()
             var index = lo
             while (index < block.tokens.size) {
-                val token = block.tokens[index++]
+                val tokenIndex = index++
+                val token = block.tokens[tokenIndex]
                 if (token.start >= span.end) break
                 if (token.kind == TokenKind.HAN && token.start >= span.start && token.end <= span.end &&
-                    (selection || !skip(span.block, token.start, token.end))) candidates += token
+                    (selection || !skip(span.block, token.start, token.end, withoutHint(span.block, tokenIndex)))) candidates += tokenIndex
             }
             if (candidates.isEmpty()) continue
             val textHash = textHashes?.getOrPut(span.block) { hash(block.text) } ?: hash(block.text)
             val fragmentKeys = HashMap<Int, String>()
-            fun add(original: String, lemma: String, start: Int, end: Int) {
+            fun add(original: String, lemma: String, start: Int, end: Int, firstWithoutHint: Long? = null) {
                 if (lemma.isBlank() || lemma.length > 180 || end <= start) return
                 val chunk = start / 8000 * 8000
                 val id = fragmentKeys.getOrPut(chunk) { hash("v1\u0000${source.key}\u0000${engine.info.tag}\u0000${chapter.index}\u0000${span.block}\u0000$textHash\u0000$chunk") }
@@ -115,16 +124,19 @@ internal object WordHistory {
                     chapter.title, chapter.index, span.block, chunk,
                     block.text.substring(chunk, minOf(block.text.length, maxOf(chunk + 8200, end)))) }
                 val wordId = wordId(id, start, end, lemma)
-                words[wordId] = WordEncounter(wordId, id, engine.info.tag, lemma, original, start, end, now)
+                words[wordId] = WordEncounter(wordId, id, engine.info.tag, lemma, original, start, end, now,
+                    firstWithoutHint = firstWithoutHint)
             }
             if (selection) {
-                val tokens = candidates
+                val tokens = candidates.map { block.tokens[it] }
                 if (tokens.isEmpty() || tokens.size > 6 || tokens.first().start != span.start || tokens.last().end != span.end) continue
                 val original = block.text.substring(span.start, span.end)
                 if (original.length > 180) continue
                 add(original, if (tokens.size == 1) engine.lemma(original) else original.lowercase(), span.start, span.end)
-            } else for (token in candidates) {
-                add(token.text, engine.lemma(token.text), token.start, token.end)
+            } else for (tokenIndex in candidates) {
+                val token = block.tokens[tokenIndex]
+                val firstWithoutHint = now.takeIf { withoutHint(span.block, tokenIndex) }
+                add(token.text, engine.lemma(token.text), token.start, token.end, firstWithoutHint)
             }
         }
         return EncounterBatch(fragments.values.toList(), words.values.toList())
@@ -136,16 +148,20 @@ internal class WordHistorySession(private val source: EncounterSource, private v
     private val engine: LanguageModule) {
     private val mutex = Mutex()
     private val hashes = HashMap<Int, String>()
-    private val seen = HashMap<Int, MutableSet<Long>>()
+    private val seen = HashMap<Int, MutableMap<Long, Boolean>>()
     private fun position(start: Int, end: Int) = (start.toLong() shl 32) or (end.toLong() and 0xffffffffL)
-    suspend fun record(spans: List<WikiVisibleSpan>, dao: WordHistoryDao): Int = mutex.withLock {
-        val batch = WordHistory.batch(source, chapter, spans, engine, textHashes = hashes,
-            skip = { block, start, end -> seen[block]?.contains(position(start, end)) == true })
+    suspend fun record(spans: List<WikiVisibleSpan>, dao: WordHistoryDao,
+        withoutHint: (Int, Int) -> Boolean = { _, _ -> false }): Int = mutex.withLock {
+        val batch = WordHistory.batch(source, chapter, spans, engine, textHashes = hashes, withoutHint = withoutHint,
+            skip = { block, start, end, unassisted ->
+                val recorded = seen[block]?.get(position(start, end))
+                recorded == true || (recorded == false && !unassisted)
+            })
         if (batch.words.isEmpty()) return@withLock 0
         dao.record(batch)
         val blocks = batch.fragments.associate { it.id to it.block }
-        for (word in batch.words) seen.getOrPut(blocks.getValue(word.fragmentId)) { HashSet() }
-            .add(position(word.start, word.end))
+        for (word in batch.words) seen.getOrPut(blocks.getValue(word.fragmentId)) { HashMap() }[
+            position(word.start, word.end)] = word.firstWithoutHint != null
         batch.words.size
     }
 }

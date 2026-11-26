@@ -13,7 +13,8 @@ class WordHistoryBackupTest {
         WordHistory.wordId(f.id, start, end, "hablar"), f.id, "es-ES", "hablar",
         f.text.substring(start, end), start, end, 123, 4)
     private val wiki = fragment.copy(id = "b".repeat(64), sourceKey = "wiki:es:42", bookId = null, title = "Статья")
-    private val history = WordHistoryBackup(listOf(fragment, wiki), listOf(word(fragment, 0, 5), word(wiki, 8, 16)), false)
+    private val history = WordHistoryBackup(listOf(fragment, wiki),
+        listOf(word(fragment, 0, 5).copy(firstWithoutHint = 456L), word(wiki, 8, 16)), false)
     private val library = LibraryBackup(listOf(BookEntity(1, "Книга", "", "book.txt", 1)), emptyList(), emptyList(), emptyList())
     private fun backup() = Backup(100, emptyList(), emptyList(), emptyList(), library = library, wordHistory = history)
 
@@ -44,7 +45,8 @@ class WordHistoryBackupTest {
         val mutations: List<(JSONObject) -> Unit> = listOf(
             { it.put("fragmentId", "c".repeat(64)) }, { it.put("lookups", -1) },
             { it.put("lookups", "4") }, { it.put("start", 0.5) }, { it.put("end", 999999) },
-            { it.put("firstSeen", -1) }, { it.put("language", "bogus") }, { it.put("original", "wrong") },
+            { it.put("firstSeen", -1) }, { it.put("firstWithoutHint", -1) },
+            { it.put("language", "bogus") }, { it.put("original", "wrong") },
             { it.put("lemma", "changed") }, { it.put("id", "c".repeat(64)) }
         )
         for (mutate in mutations) {

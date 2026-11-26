@@ -58,15 +58,45 @@ class WordHistoryTest {
         assertEquals(FamiliarityLevel.NEW, stats().level)
         dao.record(words.copy(words = occurrences.take(7)))
         assertEquals(FamiliarityLevel.REPEATED, stats().level)
-        assertEquals(1, stats().days)
         dao.record(words.copy(words = listOf(occurrences.last().copy(firstSeen = 2 * 86_400_000L))))
-        assertEquals(WordFamiliarity("hablar", 8, 0, 2), stats())
+        assertEquals(WordFamiliarity("hablar", 8, 0, 0, 0), stats())
+        assertEquals(FamiliarityLevel.REPEATED, stats().level)
+        dao.record(words.copy(words = occurrences.take(3).map { it.copy(firstWithoutHint = 100L) }))
+        assertEquals(FamiliarityLevel.REPEATED, stats().level)
+        dao.record(words.copy(words = listOf(occurrences.last().copy(firstWithoutHint = 2 * 86_400_000L))))
+        assertEquals(WordFamiliarity("hablar", 8, 0, 4, 2), stats())
         assertEquals(FamiliarityLevel.FAMILIAR, stats().level)
+        dao.record(words.copy(words = listOf(occurrences.last())), lookup = true)
+        assertEquals(WordFamiliarity("hablar", 8, 1, 3, 1), stats())
+        assertEquals(FamiliarityLevel.REPEATED, stats().level)
         repeat(4) { dao.record(words.copy(words = listOf(occurrences.first())), lookup = true) }
         assertEquals(8L, stats().encounters)
-        assertEquals(4L, stats().lookups)
+        assertEquals(5L, stats().lookups)
         assertEquals(FamiliarityLevel.LOOKED_UP, stats().level)
         assertTrue(dao.familiarity("en-US", listOf("hablar")).first().isEmpty())
+    }
+
+    @Test fun fadedHintCanQualifyTheSamePlaceOnce() = runBlocking {
+        val text = "Hablo y hablamos."
+        val ch = chapter(text)
+        val dao = db.wordHistoryDao()
+        val session = WordHistorySession(source, ch, engine)
+        val span = listOf(WikiVisibleSpan(0, 0, text.length))
+        val block = ch.blocks.first() as ReaderBlock.Text
+        val target = block.tokens.indexOfFirst { it.text == "Hablo" }
+        assertTrue(target >= 0)
+        val token = block.tokens[target]
+        val hints = mapOf("Hablo" to "говорю")
+        assertFalse(HistoryHints(hints).isUnassisted(0, target, token))
+        assertFalse(HistoryHints(hints + ("@0:${token.start}" to "говорю"), emptyMap()).isUnassisted(0, target, token))
+        assertFalse(HistoryHints(hints + ("@0:${token.start}" to ""), emptyMap()).isUnassisted(0, target, token))
+        session.record(span, dao)
+        val faded = HistoryHints(hints, emptyMap())
+        assertEquals(1, session.record(span, dao) { bi, ti -> ti == target && faded.isUnassisted(bi, ti, token) })
+        assertEquals(0, session.record(span, dao) { _, ti -> ti == target })
+        val stats = dao.familiarity(engine.info.tag, listOf("hablar")).first().single()
+        assertEquals(2L, stats.encounters)
+        assertEquals(1L, stats.unassisted)
     }
     @Test fun lookupsAreIndependentAndAtomicAcrossConcurrentRequests() = runBlocking {
         val ch = chapter("Hablo y hablamos.")

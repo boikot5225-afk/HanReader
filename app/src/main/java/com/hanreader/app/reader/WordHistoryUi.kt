@@ -47,18 +47,31 @@ internal fun historyEnabled(): Boolean {
     return enabled
 }
 
+/** A null snapshot means translations are still being prepared. A ready snapshot can have hints off. */
+internal data class HistoryHints(val glosses: Map<String, String>?, val kept: Map<Int, Set<Int>>? = null) {
+    fun isUnassisted(block: Int, index: Int, token: RToken): Boolean {
+        val hints = glosses ?: return true
+        // A multiword hint can be shown over a different token in the same expression.
+        if (token.pinyin == com.hanreader.app.lang.IN_PHRASE || hints["@$block:${token.start}"] == "") return false
+        val allowed = kept == null || kept[block]?.contains(index) == true
+        return visibleGloss(hints, token, block, allowed) == null
+    }
+}
+
 @Composable
 internal fun TrackWordEncounters(source: EncounterSource, chapter: ChapterContent?, engine: LanguageModule?,
-    visible: List<WikiVisibleSpan>, active: Boolean, daoOverride: WordHistoryDao? = null) {
+    visible: List<WikiVisibleSpan>, active: Boolean, daoOverride: WordHistoryDao? = null, hints: HistoryHints? = null) {
     val context = LocalContext.current
     val enabled = historyEnabled()
     val session = remember(source, chapter, engine) { if (chapter != null && engine != null) WordHistorySession(source, chapter, engine) else null }
-    LaunchedEffect(source, chapter, engine, visible, active, enabled) {
+    LaunchedEffect(source, chapter, engine, visible, active, enabled, hints) {
         if (!enabled || !active || chapter == null || engine == null || visible.isEmpty()) return@LaunchedEffect
         delay(700) // Passing pages and scroll flings do not count as reading.
         try {
             withContext(Dispatchers.Default) {
-                session?.record(visible, daoOverride ?: LexiconDatabase.get(context).wordHistoryDao())
+                session?.record(visible, daoOverride ?: LexiconDatabase.get(context).wordHistoryDao()) { block, token ->
+                    hints?.isUnassisted(block, token, (chapter.blocks[block] as ReaderBlock.Text).tokens[token]) == true
+                }
             }
         } catch (e: CancellationException) { throw e }
         catch (_: Exception) { historyError.value = "Не удалось сохранить историю. Проверь свободное место." }

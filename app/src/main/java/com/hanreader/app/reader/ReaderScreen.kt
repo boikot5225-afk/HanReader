@@ -380,9 +380,14 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val encounterSpans by remember(encounterViewport) { derivedStateOf { encounterViewport.visible() } }
     val familiarity = rememberWordFamiliarity(appearance.markUnknown && appearance.colorUnknownByHistory,
         chapter, engine, encounterSpans, unknownSet)
+    val historyHints = when {
+        appearance.gloss == GlossMode.OFF -> HistoryHints(null)
+        readyGlosses == null || (appearance.glossFade && glossTokens == null) -> null
+        else -> HistoryHints(readyGlosses, glossTokens.takeIf { appearance.glossFade })
+    }
     TrackWordEncounters(encounterSource, chapter, engine, encounterSpans,
         !sheetOpen && !chrome && bookNote == null && noteText == null &&
-            aiLifecycle.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))
+            aiLifecycle.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED), hints = historyHints)
     var automaticAiJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     DisposableEffect(book.entity.id, chapter, aiConfig.enabled, aiConfig.automatic, aiConfig.hasKey,
         aiConfig.consent, aiConfig.model, appearance.esVariant, aiLifecycle) {
@@ -1870,7 +1875,8 @@ internal fun WordSheet(
                 aiTranslation != null || selectedMeaning != null || es.firstOrNull()?.entry?.contextMeaning != null,
                 own?.first, userMeaning != null || aiTranslation != null || nameInRussian != null || russian.isNotEmpty())
             if (!knownNow && wordFamiliarity != null) {
-                Text("${wordFamiliarity.level.label} · Встреч: ${wordFamiliarity.encounters} · Обращений к словарю: ${wordFamiliarity.lookups}",
+                Text("${wordFamiliarity.level.label} · Встреч: ${wordFamiliarity.encounters} · " +
+                    "Без подсказки и словаря: ${wordFamiliarity.unassisted} · Обращений: ${wordFamiliarity.lookups}",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             DoubtRow(word, cardWord, primaryMeaning, sentence, doubtSource) { correctingHere = true; correcting = true }

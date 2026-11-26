@@ -311,6 +311,9 @@ internal fun glossOf(glossFor: Map<String, String>, t: RToken, block: Int = -1):
     return glossFor[t.text]
 }
 
+internal fun visibleGloss(glosses: Map<String, String>, token: RToken, block: Int, allowed: Boolean): String? =
+    if (allowed || block >= 0 && "@$block:${token.start}" in glosses) glossOf(glosses, token, block) else null
+
 private fun placeGlosses(
     items: List<Placed>,
     tokens: List<RToken>,
@@ -323,8 +326,10 @@ private fun placeGlosses(
     if (glossFor.isEmpty()) return emptyList()
     val out = ArrayList<GlossPlaced>()
     // A word broken across lines gets its translation once, over its first part.
-    val byLine = items.distinctBy { it.token }.filter { tokens[it.token].kind == TokenKind.HAN && (only == null || it.token in only || block >= 0 && "@$block:${tokens[it.token].start}" in glossFor) &&
-        glossOf(glossFor, tokens[it.token], block) != null }
+    val byLine = items.distinctBy { it.token }.filter {
+        tokens[it.token].kind == TokenKind.HAN &&
+            visibleGloss(glossFor, tokens[it.token], block, only == null || it.token in only) != null
+    }
         .groupBy { it.lineTop }
     val pad = metrics.emWidth * 0.15f
     for ((top, line) in byLine) {

@@ -30,6 +30,7 @@ internal object WordHistoryBackupFormat {
             put("id", w.id); put("fragmentId", w.fragmentId); put("language", w.language); put("lemma", w.lemma)
             put("original", w.original); put("start", w.start); put("end", w.end)
             put("firstSeen", w.firstSeen); put("lookups", w.lookups)
+            w.firstWithoutHint?.let { put("firstWithoutHint", it) }
         }) } })
     }
 
@@ -43,7 +44,8 @@ internal object WordHistoryBackupFormat {
                 text("title"), text("chapterTitle"), int("chapter"), int("block"), int("textStart"), text("text"))
         } }, (0 until words.length()).map { i -> words.getJSONObject(i).run {
             WordEncounter(text("id"), text("fragmentId"), text("language"), text("lemma"), text("original"),
-                int("start"), int("end"), long("firstSeen"), int("lookups"))
+                int("start"), int("end"), long("firstSeen"), int("lookups"),
+                if (isNull("firstWithoutHint")) null else long("firstWithoutHint"))
         } }, enabled)
     }
 
@@ -72,7 +74,8 @@ internal object WordHistoryBackupFormat {
             val end = w.end.toLong() - f.textStart
             if (!hash.matches(w.id) || !ids.add(w.id) || w.language !in languages ||
                 w.lemma.isBlank() || w.lemma.length > 180 || w.original.isBlank() || w.original.length > 180 ||
-                start < 0 || end <= start || end > f.text.length || w.firstSeen < 0 || w.lookups < 0) invalid()
+                start < 0 || end <= start || end > f.text.length || w.firstSeen < 0 || w.lookups < 0 ||
+                (w.firstWithoutHint != null && w.firstWithoutHint < 0)) invalid()
             if (f.bookId == null && f.sourceKey.split(':')[1] != w.language.substringBefore('-')) invalid()
             if (f.text.substring(start.toInt(), end.toInt()) != w.original ||
                 w.id != WordHistory.wordId(w.fragmentId, w.start, w.end, w.lemma)) invalid()

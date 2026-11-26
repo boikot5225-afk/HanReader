@@ -18,14 +18,14 @@ import kotlinx.coroutines.withContext
 enum class FamiliarityLevel(val label: String) {
     NEW("Мало встреч"),
     REPEATED("Уже встречалось"),
-    FAMILIAR("Часто встречалось"),
+    FAMILIAR("Встречалось без подсказки"),
     LOOKED_UP("Часто смотришь перевод")
 }
 
-data class WordFamiliarity(val lemma: String, val encounters: Long, val lookups: Long, val days: Int) {
+data class WordFamiliarity(val lemma: String, val encounters: Long, val lookups: Long, val unassisted: Long, val unassistedDays: Int) {
     val level: FamiliarityLevel get() = when {
         lookups >= 2 && lookups >= encounters - encounters / 2 -> FamiliarityLevel.LOOKED_UP
-        encounters >= 8 && days >= 2 && lookups <= encounters / 4 -> FamiliarityLevel.FAMILIAR
+        unassisted >= 3 && unassistedDays >= 2 -> FamiliarityLevel.FAMILIAR
         encounters >= 3 -> FamiliarityLevel.REPEATED
         else -> FamiliarityLevel.NEW
     }

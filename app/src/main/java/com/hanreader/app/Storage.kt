@@ -773,7 +773,7 @@ interface CardDao {
         WordCard::class, CardExample::class, BookEntity::class, WordSource::class, KnownWord::class, BookWord::class,
         Bookmark::class, UserName::class, Highlight::class, DailyActivity::class, BookProgress::class, UserMeaning::class, UserSplit::class, com.hanreader.app.ai.AiCheck::class, com.hanreader.app.ai.AiArticle::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = true
 )
 abstract class LexiconDatabase : RoomDatabase() {
@@ -1018,7 +1018,12 @@ abstract class LexiconDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX `index_word_encounters_language_lemma` ON `word_encounters` (`language`, `lemma`)")
             }
         }
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19)
+        val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE word_encounters ADD COLUMN firstWithoutHint INTEGER")
+            }
+        }
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
 
         fun get(context: Context): LexiconDatabase =
             instance ?: synchronized(this) {

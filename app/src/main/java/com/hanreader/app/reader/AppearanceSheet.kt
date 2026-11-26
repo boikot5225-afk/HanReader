@@ -148,7 +148,7 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null, showChapte
                 val colors = rubyColors(a, spec)
                 LineSample(colors.unknownLine, "красная — мало встреч или часто смотришь перевод")
                 LineSample(colors.repeatedLine, "оранжевая — уже встречалось")
-                LineSample(colors.familiarLine, "приглушённая — встречалось в разные дни, перевод открывался редко")
+                LineSample(colors.familiarLine, "приглушённая — три встречи без подсказки и словаря хотя бы за два дня")
             } else {
                 LineSample(spec.unknownLine, "красная линия — слово ещё не знакомо")
             }
