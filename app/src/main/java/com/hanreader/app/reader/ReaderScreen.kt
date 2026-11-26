@@ -233,21 +233,26 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val aiFlow = remember(book.entity.id, chapter?.index) { ai.repository.observeChapter(book.entity.id, chapter?.index ?: -1) }
     val aiRows by aiFlow.collectAsState(initial = emptyList())
     val aiBusy by ai.repository.busy.collectAsState()
-    val aiMessage by ai.repository.message.collectAsState()
     val supportedAi = AiContext.supports(com.hanreader.app.lang.Languages.current.tag)
     val aiReady by vm.aiReady.collectAsState()
     val aiEngine = engine
     val aiResource = book.epub.chapters.getOrNull(chapter?.index ?: -1)?.path.orEmpty()
-    val validAiRows = readerWork(emptyList<AiCheck>(), aiRows, chapter, engine, userMeanings, aiConfig, appearance.esVariant, aiResource) {
-        if (!supportedAi || !aiConfig.enabled || chapter == null || aiEngine == null) emptyList()
-        else aiRows.filter { it.chapter == chapter.index }.groupBy { it.block }.flatMap { (bi, rows) ->
-            val fragment = AiContext.build(book.entity.id, chapter, bi, aiResource, aiEngine, userMeanings, appearance.esVariant.name,
-                includeMissing = true)
-            if (fragment == null) emptyList() else AiContext.applicable(fragment, rows, aiConfig.model).filter { row ->
-                fragment.protected.none { it.first < row.end && it.last >= row.start }
+    val validAiRows by key(book.entity.id, chapter, engine, userMeanings, aiConfig.enabled, aiConfig.model, appearance.esVariant, aiResource) {
+        produceState(emptyList<AiCheck>(), aiRows) {
+            value = if (!supportedAi || !aiConfig.enabled || chapter == null || aiEngine == null) emptyList()
+            else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                aiRows.filter { it.chapter == chapter.index }.groupBy { it.block }.flatMap { (bi, rows) ->
+                    val fragment = AiContext.build(book.entity.id, chapter, bi, aiResource, aiEngine, userMeanings,
+                        appearance.esVariant.name, includeMissing = true)
+                    if (fragment == null) emptyList() else AiContext.applicable(fragment, rows, aiConfig.model).filter { row ->
+                        fragment.protected.none { it.first < row.end && it.last >= row.start }
+                    }
+                }
             }
         }
     }
+    val pinyinRows = remember(validAiRows) { validAiRows.filter { it.state == "accepted" && it.pinyin != null } }
+    val displayChapter = remember(chapter, pinyinRows) { chapter?.let { AiPinyin.chapter(it, pinyinRows) } }
     val userSplits by vm.userSplits.collectAsState()
     // Names of this book (found or «Не учить») and the reader's own «Это имя».
     // Names of this chapter: a word written with a capital inside a sentence and never in lower case here
@@ -389,25 +394,36 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         !sheetOpen && !chrome && bookNote == null && noteText == null &&
             aiLifecycle.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED), hints = historyHints)
     var automaticAiJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val currentAiSpans by androidx.compose.runtime.rememberUpdatedState(encounterSpans)
+    val aiObscured = sheetOpen || chrome || bookNote != null || noteText != null
+    val currentAiObscured by androidx.compose.runtime.rememberUpdatedState(aiObscured)
     DisposableEffect(book.entity.id, chapter, aiConfig.enabled, aiConfig.automatic, aiConfig.hasKey,
         aiConfig.consent, aiConfig.model, appearance.esVariant, aiLifecycle) {
         onDispose { automaticAiJob?.cancel(); automaticAiJob = null }
     }
-    LaunchedEffect(book.entity.id, chapter, progress.firstBlock, progress.lastBlock, baseGlossFor, aiConfig,
-        userMeanings, appearance.esVariant, aiLifecycle, sheetOpen, aiReady) {
+    LaunchedEffect(book.entity.id, chapter, encounterSpans, matcher, saved, names, aiConfig,
+        userMeanings, appearance.esVariant, aiLifecycle, aiObscured, aiReady) {
         if (!supportedAi || !aiConfig.enabled || !aiConfig.automatic || !aiConfig.hasKey || !aiReady ||
-            chapter == null || aiEngine == null || baseGlossFor == null || sheetOpen ||
+            chapter == null || aiEngine == null || aiObscured ||
             !aiLifecycle.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return@LaunchedEffect
         kotlinx.coroutines.delay(1200)
-        // Bound the queue to at most three visible source paragraphs; no prefetch of the book.
-        for (bi in progress.firstBlock..minOf(progress.lastBlock, progress.firstBlock + 2)) {
+        // One bounded packet per visible paragraph, sequenced without prefetching the book.
+        for (span in encounterSpans) {
             // Scrolling cancels this waiter, not a paid request already running in the same chapter.
             automaticAiJob?.join()
             val fragment = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                AiContext.build(book.entity.id, chapter, bi, aiResource, aiEngine, userMeanings,
-                    appearance.esVariant.name, baseGlossFor)
+                AiContext.build(book.entity.id, chapter, span.block, aiResource, aiEngine, userMeanings,
+                    appearance.esVariant.name, includeMissing = true)?.let { built ->
+                    AiContext.visibleTerms(built, span.start until span.end) { term ->
+                        term.lemma !in saved && term.original !in names && term.lemma !in names &&
+                            !matcher.isKnown(term.original) && !matcher.isKnown(term.lemma) &&
+                            !aiEngine.isName(term.original)
+                    }
+                }
             } ?: continue
-            val request = scope.launch { vm.checkAi(fragment, automatic = true) }
+            val request = scope.launch {
+                vm.checkAi(fragment, automatic = true) { !currentAiObscured && span in currentAiSpans }
+            }
             automaticAiJob = request
             request.join()
         }
@@ -428,7 +444,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                         appearance.esVariant.name, range = start until end)
                 }
                 if (fragment != null) vm.checkAi(fragment, automatic = false)
-                else ai.repository.notice(when {
+                else ai.repository.noticeWord(
+                    AiWordLocation.book(book.entity.id, chapter.index, target.block, start, end, aiConfig.model), when {
                     paragraph.text.length > AiContext.MAX_PARAGRAPH -> "Абзац слишком длинный для контекстной проверки (более ${AiContext.MAX_PARAGRAPH} символов)."
                     paragraph.heading -> "Проверка доступна для слов в тексте главы, кроме заголовков."
                     else -> "Не удалось подготовить выделение для проверки. Выбери слово или выражение без своего перевода."
@@ -493,7 +510,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             glossOnly = glossTokens?.let { it[i] ?: emptySet() },
             blockIndex = i,
             unknownMarks = if (appearance.markUnknown) unknownSet else null,
-            familiarity = familiarity,
+            familiarity = familiarity.takeIf { appearance.colorUnknownByHistory },
             noMarks = remember(block, names, engine) { engine?.let { VocabularyStats.nameTokens(block, names, it) } ?: emptySet() },
             recommendedMarks = if (appearance.markRecommended) recommendedSet else null,
             highlight = highlight?.takeIf { it.chapter == chapter?.index && it.block == i }?.let { h ->
@@ -556,7 +573,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             appearance.mode == ReadingMode.PAGES -> PagedChapter(
                 vm = vm,
                 book = book,
-                chapter = chapter,
+                chapter = displayChapter ?: chapter,
                 metrics = metrics,
                 colors = colors,
                 appearance = appearance,
@@ -584,7 +601,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             else -> ScrollChapter(
                 vm = vm,
                 book = book,
-                chapter = chapter,
+                chapter = displayChapter ?: chapter,
                 appearance = appearance,
                 emPx = metrics.emWidth.toFloat(),
                 paragraph = paragraph,
@@ -707,12 +724,15 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val sumEngine = engine
     val sumItems = summaryOpen
     if (sumItems != null && chapter != null && sumEngine != null) {
+        val summaryChapter = displayChapter ?: chapter
         ChapterSummarySheet(
-            chapter = chapter, items = sumItems, engine = sumEngine, percent = coverage?.takeIf { it.total > 0 }?.percent,
+            chapter = summaryChapter, items = sumItems, engine = sumEngine, percent = coverage?.takeIf { it.total > 0 }?.percent,
             onKnown = vm::setKnown,
             onSave = { item, translation, sentence ->
+                val token = (summaryChapter.blocks[item.block] as? ReaderBlock.Text)?.tokens?.getOrNull(item.token)
+                val pinyin = token?.pinyin?.takeIf { sumEngine is ZhEngine && it.isNotBlank() }
                 vm.saveWord(ReaderSave(
-                    word = item.key, reading = sumEngine.reading(item.key).orEmpty(), translation = translation, sentence = sentence,
+                    word = item.key, reading = pinyin ?: sumEngine.reading(item.key).orEmpty(), translation = translation, sentence = sentence,
                     bookId = book.entity.id, bookTitle = book.entity.title, chapterIndex = chapter.index, chapterTitle = chapter.title
                 )) {}
             },
@@ -906,8 +926,13 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         }
     }
     if (sel != null && block != null && eng != null && chapter != null && (!sel.phrase || asWord)) {
+        val start = block.tokens[sel.first].start
+        val end = block.tokens[sel.last].end
+        val wordLocation = AiWordLocation.book(book.entity.id, chapter.index, sel.block, start, end, aiConfig.model)
+        val feedback by ai.repository.wordFeedback.collectAsState()
+        val usage by ai.repository.usage.collectAsState()
         RecordWordLookup(encounterSource, chapter, eng,
-            WikiVisibleSpan(sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end))
+            WikiVisibleSpan(sel.block, start, end))
         WordSheet(
             onWikipedia = openWikipedia,
             entityPanel = entityControls,
@@ -933,12 +958,15 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onHighlightWholeBook = { h, on -> moveHighlight(vm, h, on, chapter, sel.block, block.tokens[sel.first].start, block.tokens[sel.last].end) },
             onNote = { h, note -> vm.updateHighlight(h.copy(note = note)) },
             onRemoveHighlight = { vm.removeHighlight(it.id) },
-            aiCheck = validAiRows.firstOrNull { it.block == sel.block && it.start <= block.tokens[sel.first].start && it.end >= block.tokens[sel.last].end && it.state != "checked" }
-                ?: validAiRows.firstOrNull { it.block == sel.block && it.termStart == block.tokens[sel.first].start },
+            aiCheck = validAiRows.firstOrNull { it.block == sel.block && it.start <= start && it.end >= end && it.state != "checked" }
+                ?: validAiRows.firstOrNull { it.block == sel.block && it.termStart == start && it.termEnd >= end },
             aiAvailable = supportedAi,
-            aiEnabled = aiConfig.enabled && aiConfig.hasKey,
+            aiEnabled = aiConfig.enabled && aiConfig.consent && aiConfig.hasKey,
             aiBusy = aiBusy || manualAiJob != null || !aiReady,
-            aiMessage = aiMessage,
+            aiChecking = feedback.isChecking(wordLocation),
+            aiMessage = feedback.error(wordLocation),
+            aiAutomatic = aiConfig.automatic,
+            aiLimitReached = usage.requests >= aiConfig.limit,
             onAiCheck = { checkManualAi(sel) },
             onAiState = { row, state -> scope.launch { ai.repository.setState(row.cacheKey, state) } },
             userMeanings = userMeanings,
@@ -1714,7 +1742,10 @@ internal fun WordSheet(
     aiAvailable: Boolean = false,
     aiEnabled: Boolean = false,
     aiBusy: Boolean = false,
+    aiChecking: Boolean = false,
     aiMessage: String? = null,
+    aiAutomatic: Boolean = false,
+    aiLimitReached: Boolean = false,
     onAiCheck: () -> Unit = {},
     onAiState: (AiCheck, String) -> Unit = { _, _ -> },
     userMeanings: Map<String, String> = emptyMap(),
@@ -1755,7 +1786,9 @@ internal fun WordSheet(
     // The word cards and «Знаю» are about: Spanish hablo → hablar; Chinese: the word itself.
     val cardWord = remember(word, esLemma, engine) { if (zh != null) word else esLemma ?: engine.lemma(word) }
     // One token: its reading in context (慢慢地 de, not the dictionary's dì).
-    val reading = if (zh == null) "" else if (selection.first == selection.last && first.pinyin.isNotEmpty()) first.pinyin
+    val contextualPinyin = remember(first, aiCheck) { AiPinyin.apply(first, aiCheck).pinyin }
+    val reading = if (zh == null) "" else if (selection.first == selection.last && contextualPinyin.isNotEmpty())
+        contextualPinyin
         else entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
     // A single token keeps the meanings of its reading on the page (得 de, 重重 zhòng zhòng).
     val pageReading = if (zh != null && selection.first == selection.last) first.pinyin.takeIf { it.isNotEmpty() } else null
@@ -1935,14 +1968,9 @@ internal fun WordSheet(
             }
             WordHistoryPanel(engine.info.tag, if (selection.first == selection.last) engine.lemma(word) else word.lowercase())
             if (aiAvailable) {
-                val aiLabel = when (aiCheck?.state) {
-                    "proposed" -> "DeepSeek · есть предложение"
-                    "accepted" -> "DeepSeek · перевод по контексту"
-                    "checked" -> "DeepSeek · проверено"
-                    else -> "DeepSeek"
-                }
-                WordSheetSection(aiLabel) {
-                    AiWordControls(aiCheck, aiEnabled, aiBusy, aiMessage, userMeaning != null, onAiCheck, onAiState)
+                val status = aiWordStatus(aiCheck, aiEnabled, aiChecking, aiMessage, aiAutomatic, aiLimitReached, userMeaning != null)
+                WordSheetSection("DeepSeek", subtitle = status) {
+                    AiWordControls(aiCheck, aiEnabled, aiBusy || aiChecking, aiLimitReached, userMeaning != null, onAiCheck, onAiState)
                 }
             }
             TextButton(onClick = { details = !details }, contentPadding = PaddingValues(0.dp)) {
@@ -2134,11 +2162,14 @@ internal fun WordSheet(
 }
 
 @Composable
-private fun WordSheetSection(title: String, content: @Composable () -> Unit) {
+private fun WordSheetSection(title: String, subtitle: String? = null, content: @Composable () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     TextButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, Modifier.weight(1f))
+            Column(Modifier.weight(1f)) {
+                Text(title)
+                subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
             Text(if (expanded) "−" else "+")
         }
     }

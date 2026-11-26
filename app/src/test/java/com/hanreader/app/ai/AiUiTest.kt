@@ -77,6 +77,7 @@ class AiUiTest {
 
     @Test fun cardUsesAiMeaningAndShowsOriginalWithUndo() {
         show()
+        compose.onNodeWithText("Исправление применено здесь.").performScrollTo().assertExists()
         openAiDetails()
         compose.onNodeWithText("Исходная подсказка: дорожка").performScrollTo().assertExists()
         compose.onNodeWithText("Отменить исправление ИИ").performScrollTo().performClick()
@@ -115,7 +116,7 @@ class AiUiTest {
     }
 
     private fun openAiDetails() {
-        compose.onNodeWithText("DeepSeek · перевод по контексту").performScrollTo().performClick()
+        compose.onNodeWithText("DeepSeek").performScrollTo().performClick()
     }
 
     @Test fun chineseConstructionWithoutSpacesSavesTheWholeSpanAndPreservesPinyin() {

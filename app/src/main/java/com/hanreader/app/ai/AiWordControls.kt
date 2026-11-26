@@ -9,30 +9,41 @@ import androidx.compose.ui.unit.dp
 internal const val AI_UNCHANGED_MESSAGE = "Проверено: перевод сохранён без изменений."
 internal const val AI_UNKNOWN_CHECKED_MESSAGE = "Проверено: надёжного значения для неизвестного слова не найдено."
 
+internal fun aiWordStatus(row: AiCheck?, enabled: Boolean, checking: Boolean, message: String?,
+    automatic: Boolean, limitReached: Boolean, manual: Boolean): String? = when {
+    manual -> "Используется твоё значение. ИИ его не заменяет."
+    enabled && checking -> "DeepSeek проверяет это слово…"
+    enabled && message != null -> message
+    row?.state == "checked" -> if (row.base.isBlank()) AI_UNKNOWN_CHECKED_MESSAGE else AI_UNCHANGED_MESSAGE
+    row?.state == "rejected" -> "Исправление отклонено."
+    row?.state == "proposed" -> "Есть предложение DeepSeek."
+    row?.state == "accepted" -> "Исправление применено здесь."
+    !enabled -> null
+    limitReached -> "Достигнут лимит запросов за сеанс. Его можно изменить в настройках."
+    automatic -> "Это слово ещё не проверено."
+    else -> "Автопроверка выключена."
+}
+
 @Composable
-fun AiWordControls(row: AiCheck?, enabled: Boolean, busy: Boolean, message: String?, manual: Boolean,
-                   onCheck: () -> Unit, onState: (AiCheck, String) -> Unit) {
+internal fun AiWordControls(row: AiCheck?, enabled: Boolean, busy: Boolean, limitReached: Boolean, manual: Boolean,
+    onCheck: () -> Unit, onState: (AiCheck, String) -> Unit, status: String? = null) {
     var settings by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (row != null) {
-            Text("DeepSeek · ${row.original}", style = MaterialTheme.typography.labelMedium)
-            Text(if (row.base.isBlank()) "Исходное значение: в словаре отсутствует" else "Исходная подсказка: ${row.base}", style = MaterialTheme.typography.bodySmall)
-            row.translation?.let { Text((if (row.state == "accepted" && !manual) "В этом контексте: " else "Предложение: ") + it) }
-            row.explanation?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            if (row.state == "checked") Text(
-                if (row.base.isBlank()) AI_UNKNOWN_CHECKED_MESSAGE else AI_UNCHANGED_MESSAGE,
-                style = MaterialTheme.typography.bodySmall
-            )
-            if (row.state == "rejected") Text("Исправление отклонено; повторно автоматически не применяется.", style = MaterialTheme.typography.bodySmall)
+            if (row.state in setOf("accepted", "proposed")) {
+                Text(if (row.base.isBlank()) "Исходное значение: в словаре отсутствует" else "Исходная подсказка: ${row.base}", style = MaterialTheme.typography.bodySmall)
+                row.translation?.let { Text((if (row.state == "accepted" && !manual) "В этом контексте: " else "Предложение: ") + it) }
+                row.pinyin?.let {
+                    Text(if (row.state == "accepted") "Чтение по контексту: $it" else "Предложенное чтение: $it")
+                }
+            }
+            if (row.state != "rejected") row.explanation?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             if (row.state == "proposed" && !manual) TextButton(onClick = { onState(row, "accepted") }) { Text("Применить здесь") }
             if (row.state in setOf("accepted", "proposed")) TextButton(onClick = { onState(row, "rejected") }) { Text("Отменить исправление ИИ") }
         }
-        if (manual) Text("Используется твоё значение. ИИ его не заменяет.", style = MaterialTheme.typography.bodySmall)
-        else if (enabled) TextButton(onClick = onCheck, enabled = !busy) { Text(if (busy) "Проверяю…" else "Уточнить с DeepSeek") }
-        else TextButton(onClick = { settings = true }) { Text("Настроить DeepSeek") }
-        val repeatsCheck = row?.state == "checked" &&
-            message == if (row.base.isBlank()) AI_UNKNOWN_CHECKED_MESSAGE else AI_UNCHANGED_MESSAGE
-        if (enabled && message != null && !repeatsCheck) Text(message, style = MaterialTheme.typography.bodySmall)
+        status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        if (!manual && enabled) TextButton(onClick = onCheck, enabled = !busy && (!limitReached || row != null)) { Text("Уточнить с DeepSeek") }
+        else if (!manual) TextButton(onClick = { settings = true }) { Text("Настроить DeepSeek") }
     }
     if (settings) AiSettingsDialog { settings = false }
 }

@@ -249,6 +249,24 @@ class ContextAiTest {
         assertEquals(1, calls); assertTrue(repo.message.value!!.contains("лимит"))
     }
 
+    @Test fun connectionErrorBelongsOnlyToWordsInTheFailedCheck() = runBlocking {
+        val f = fragment()
+        val term = f.terms.first()
+        val target = f.copy(terms = listOf(term))
+        val selected = AiWordLocation.book(f.book, f.chapter, f.block, term.start, term.end, config.model)
+        reply = { throw AiFailure("Нет связи с DeepSeek.") }
+        assertTrue(repo.checkVisible(target, canStart = { true }) { true }.isEmpty())
+        val feedback = repo.wordFeedback.value
+        assertFalse(feedback.isChecking(selected))
+        assertEquals("Нет связи с DeepSeek.", feedback.error(selected))
+        assertNull(feedback.error(selected.copy(block = selected.block + 1)))
+        assertNull(feedback.error(selected.copy(start = term.end, end = term.end + 1)))
+        assertNull(feedback.error(selected.copy(model = "different")))
+        reply = ::fakeReply
+        assertTrue(repo.check(target, automatic = false) { true }.isNotEmpty())
+        assertNull(repo.wordFeedback.value.error(selected))
+    }
+
     @Test fun bookDeletionAndContextChangeWhileWaitingPreventSaving() = runBlocking {
         var valid = true
         reply = { payload -> valid = false; fakeReply(payload) }

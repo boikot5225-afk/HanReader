@@ -182,7 +182,7 @@ class WikiAiTest {
         old.execSQL("INSERT INTO ai_checks VALUES (?,42,0,0,?,0,5,0,5,'pista','дорожка','улика',NULL,'high','accepted',1)", arrayOf("a".repeat(64), "b".repeat(64)))
         old.version = 17; old.close()
         db = open(); repo = repository()
-        assertEquals(20, db.openHelper.readableDatabase.version)
+        assertEquals(21, db.openHelper.readableDatabase.version)
         val original = db.aiCheckDao().all().single()
         assertEquals(42L, original.bookId); assertNull(original.articleKey); assertEquals("accepted",original.state)
         val f = fragment(reading()); repo.attachArticle(f.articleKey!!); repo.check(f,false) { true }

@@ -304,9 +304,10 @@ internal fun glossOf(glossFor: Map<String, String>, t: RToken, block: Int = -1):
     // The reader's meaning for this very place (ContextMeanings) wins.
     if (block >= 0) glossFor["@$block:${t.start}"]?.let { return it.ifEmpty { null } }
     // An empty hint for a reading: no hint at all (a word inside a phrase whose first word carries it).
-    if (t.pinyin.isNotEmpty()) {
+    val reading = t.glossReading ?: t.pinyin
+    if (reading.isNotEmpty()) {
         glossFor[t.glossKey]?.let { return it.ifEmpty { null } }
-        if (t.contextMeaning != null) glossFor[t.text + "|" + t.pinyin]?.let { return it.ifEmpty { null } }
+        if (t.contextMeaning != null) glossFor[t.text + "|" + reading]?.let { return it.ifEmpty { null } }
     }
     return glossFor[t.text]
 }
@@ -390,7 +391,7 @@ fun RubyParagraph(
     highlight: IntRange? = null,
     /** Words to underline in red (not known yet) and in blue (recommended); null: no marks. */
     unknownMarks: Set<String>? = null,
-    familiarity: Map<String, WordFamiliarity> = emptyMap(),
+    familiarity: Map<String, WordFamiliarity>? = null,
     recommendedMarks: Set<String>? = null,
     /** Token indices never marked (characters of a name). */
     noMarks: Set<Int> = emptySet(),
@@ -546,16 +547,19 @@ fun RubyParagraph(
                     val c = marked[p.token] ?: colors.saved
                     drawCircle(c, radius = 5f, center = Offset(p.x + p.width - 1f, p.lineTop + laid.hanTop + 3f))
                 }
+                val hasHistoryLine = familiarity != null && !isSaved && p.token !in noMarks &&
+                    recommendedMarks?.contains(t.text) != true && unknownMarks?.contains(t.text) == true
                 val lineColor = when {
                     t.kind != TokenKind.HAN -> null
                     isSaved -> colors.saved
                     p.token in noMarks -> null
                     recommendedMarks != null && t.text in recommendedMarks -> colors.recommendedLine
-                    unknownMarks != null && t.text in unknownMarks -> when (familiarity[t.text]?.level) {
+                    hasHistoryLine -> when (familiarity?.get(t.text)?.level) {
                         FamiliarityLevel.REPEATED -> colors.repeatedLine
                         FamiliarityLevel.FAMILIAR -> colors.familiarLine
-                        else -> colors.unknownLine
+                        else -> colors.newHistoryLine
                     }
+                    unknownMarks != null && t.text in unknownMarks -> colors.unknownLine
                     else -> null
                 }
                 // A word highlighted in the whole book: a dashed line under it, below the line of unknown words.
@@ -572,7 +576,7 @@ fun RubyParagraph(
                         lineColor,
                         Offset(p.x + (inner - hanW) / 2f, yLine),
                         Offset(p.x + (inner + hanW) / 2f, yLine),
-                        strokeWidth = 3f
+                        strokeWidth = if (hasHistoryLine) maxOf(3f, 2.dp.toPx()) else 3f
                     )
                 }
             }
@@ -600,8 +604,9 @@ data class RubyColors(
     val unknownLine: Color = Color(0xFFC62828),
     val recommendedLine: Color = Color(0xFF1E5BB8),
     val gloss: Color = Color(0xFF6B6459),
-    val repeatedLine: Color = Color(0xFFAD5700),
-    val familiarLine: Color = Color(0xFF8B7565)
+    val newHistoryLine: Color = Color(0xFFD02039),
+    val repeatedLine: Color = Color(0xFFB66A00),
+    val familiarLine: Color = Color(0xFF18812A)
 ) {
     /**
      * The colour of a footnote mark: the theme's accent, or the colour of the underline of unknown
@@ -645,8 +650,9 @@ fun rubyColors(a: Appearance, spec: ThemeSpec) = RubyColors(
     unknownLine = spec.unknownLine,
     recommendedLine = spec.recommendedLine,
     gloss = spec.muted,
-    repeatedLine = if (spec.dark) Color(0xFFFFAB53) else Color(0xFFAD5700),
-    familiarLine = if (spec.dark) Color(0xFFA09388) else Color(0xFF8B7565)
+    newHistoryLine = if (spec.dark) Color(0xFFFF607A) else Color(0xFFD02039),
+    repeatedLine = if (spec.dark) Color(0xFFFFC15A) else Color(0xFFB66A00),
+    familiarLine = if (spec.dark) Color(0xFF72DC70) else Color(0xFF18812A)
 )
 
 /** Tone of a pinyin syllable from its mark (ā á ǎ à); 5 = neutral. */

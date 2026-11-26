@@ -76,11 +76,11 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
     private val booksDir = File(app.filesDir, "books").apply { mkdirs() }
     val contextAi by lazy { aiOverride ?: com.hanreader.app.ai.ContextAi.get(app) }
 
-    suspend fun checkAi(fragment: com.hanreader.app.ai.AiFragment, automatic: Boolean) {
-        try { contextAi.repository.check(fragment, automatic) {
+    suspend fun checkAi(fragment: com.hanreader.app.ai.AiFragment, automatic: Boolean, visible: (() -> Boolean)? = null) {
+        suspend fun stillValid(): Boolean {
             val open = _open.value
             val chapter = open?.chapter
-            if (open == null || chapter == null || open.loading || open.entity.id != fragment.book || chapter.index != fragment.chapter) false
+            return if (open == null || chapter == null || open.loading || open.entity.id != fragment.book || chapter.index != fragment.chapter) false
             else {
                 val engine = engineDeferred.await()
                 val meanings = db.userMeaningDao().all().filter { it.language.isEmpty() || it.language == lang }.associate { it.word to it.meaning }
@@ -94,7 +94,11 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
                     }
                 }
             }
-        } } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        }
+        try {
+            if (automatic && visible != null) contextAi.repository.checkVisible(fragment, visible, allowMissing = true, stillValid = ::stillValid)
+            else contextAi.repository.check(fragment, automatic, ::stillValid)
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
         catch (_: Exception) { contextAi.repository.notice("Не удалось прочитать или сохранить данные проверки. Обычный словарь доступен.") }
     }
 

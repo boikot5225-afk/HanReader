@@ -142,6 +142,8 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
     } }
     val wikiAi = rememberWikipediaAi(contextAi, ready, dictionary, globalMeanings, appearance, visible,
         settings || aiSettings || contents || pinyinSettings || selected != null, learning.glosses)
+    val pinyinRows = remember(wikiAi.rows) { wikiAi.rows.filter { it.state == "accepted" && it.pinyin != null } }
+    val displayChapter = remember(ready, pinyinRows) { ready?.let { AiPinyin.chapter(it.chapter, pinyinRows, it::source) } }
     val overlayKey = remember(ready, learning.glosses, wikiAi.rows, aiConfig.indicators) { Any() }
     val overlay by produceState<Pair<Any, Map<String, String>>?>(null, overlayKey) {
         value = overlayKey to withContext(Dispatchers.Default) {
@@ -241,7 +243,7 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                     if (preparationFailed) TextButton(onClick = { retry++ }) { Text("Повторить подготовку статьи") } else CircularProgressIndicator()
                 }
                 else if (appearance.mode == ReadingMode.PAGES) Box(Modifier.weight(1f).fillMaxWidth().testTag("wiki-pages").onGloballyPositioned { viewport = it.boundsInWindow() }) {
-                    PagedChapter(null, ready.book(position.first, position.second), ready.chapter, metrics, colors, appearance,
+                    PagedChapter(null, ready.book(position.first, position.second), displayChapter ?: ready.chapter, metrics, colors, appearance,
                         showPinyin, hidePinyinFor, false, glosses, banner = {}, paragraph = paragraph, bars = PaddingValues(0.dp), speed = 600f,
                         keysEnabled = appearance.volumeKeys && !settings && !aiSettings && !pinyinSettings && selected == null,
                         onTapCenter = { contents = !contents }, onAnyTap = { if (selected != null) { selected = null; true } else false },
@@ -264,7 +266,7 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                         Column {
                             document.images.filter { it.beforeBlock == index }.forEach { WikipediaImage(document, it, source) }
                             val layout = ready.layoutBlocks[index]
-                            paragraph(ready.chapter.blocks[layout] as ReaderBlock.Text, layout, null)
+                            paragraph((displayChapter ?: ready.chapter).blocks[layout] as ReaderBlock.Text, layout, null)
                         }
                     }
                     item(key = "attribution") {
@@ -276,7 +278,7 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                 selected?.let { selection ->
                     val block = document.blocks[selection.first]
                     val text = block.text.substring(selection.second, selection.third)
-                    val row = wikiAi.rows.filter { it.block == selection.first && it.start < selection.third && it.end > selection.second }
+                    val row = wikiAi.rows.filter { it.block == selection.first && it.start <= selection.second && it.end >= selection.third }
                         .sortedBy { if (it.state == "accepted") 0 else 1 }.firstOrNull()
                     val selectedToken = ready?.textChapter?.blocks?.getOrNull(selection.first)?.let { it as? ReaderBlock.Text }
                         ?.tokens?.firstOrNull { it.start == selection.second && it.end == selection.third }
@@ -290,6 +292,10 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                     Surface(tonalElevation = 8.dp) {
                         Column(Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(text.take(400), maxLines = 3, style = MaterialTheme.typography.titleMedium)
+                            if (dictionary is ZhEngine && selectedToken != null) {
+                                val pinyin = remember(selectedToken, row) { AiPinyin.apply(selectedToken, row).pinyin }
+                                if (pinyin.isNotBlank()) Text(pinyin, color = MaterialTheme.colorScheme.primary)
+                            }
                             if (dictionary != null && (translation != null || text.none(Char::isWhitespace))) Text(translation ?: "Словарного значения нет", maxLines = 3)
                             if (dictionary != null && onKnown != null && text.length <= 200) {
                                 val token = ready?.chapter?.blocks?.get(ready.layoutBlocks[selection.first])?.let { it as? ReaderBlock.Text }?.tokens
@@ -298,10 +304,18 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                                 val isKnown = remember(known, key, dictionary) { KnownMatcher(known, dictionary).isKnown(key) }
                                 if (token != null) KnownToggle(isKnown, { value -> onKnown(key, value) })
                             }
-                            if (aiConfig.enabled && !wikiAi.enabled) wikiAi.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                            if (dictionary != null && text.length <= 180) AiWordControls(row, wikiAi.enabled, wikiAi.busy, wikiAi.message,
-                                manual != null, onCheck = { wikiAi.check(selection.first, selection.second until selection.third) },
-                                onState = wikiAi.state)
+                            if (dictionary != null && text.length <= 180) {
+                                val location = AiWordLocation(document.key, selection.first, selection.second, selection.third, aiConfig.model)
+                                val feedback by contextAi.repository.wordFeedback.collectAsState()
+                                val usage by contextAi.repository.usage.collectAsState()
+                                val checking = feedback.isChecking(location)
+                                val limitReached = usage.requests >= aiConfig.limit
+                                val status = aiWordStatus(row, wikiAi.enabled, checking, feedback.error(location),
+                                    aiConfig.automatic, limitReached, manual != null)
+                                AiWordControls(row, wikiAi.enabled, wikiAi.busy || checking, limitReached, manual != null,
+                                    onCheck = { wikiAi.check(selection.first, selection.second until selection.third) },
+                                    onState = wikiAi.state, status = status)
+                            }
                             val historyText = (ready?.textChapter?.blocks?.getOrNull(selection.first) as? ReaderBlock.Text)
                                 ?.text?.takeIf { selection.second >= 0 && selection.third <= it.length }
                                 ?.substring(selection.second, selection.third) ?: text

@@ -20,7 +20,7 @@ class WordHistoryBackupTest {
 
     @Test fun roundTripKeepsEverySourceIdCounterDateAndCollectionPreference() {
         val encoded = BackupFormat.encode(backup())
-        assertEquals(8, JSONObject(encoded).getInt("version"))
+        assertEquals(9, JSONObject(encoded).getInt("version"))
         assertEquals(history, BackupFormat.decode(encoded).wordHistory)
         assertFalse(encoded.contains("apiKey"))
     }
@@ -35,7 +35,7 @@ class WordHistoryBackupTest {
         } finally { dir.deleteRecursively() }
     }
     @Test fun everyPreviousBackupVersionStillLoadsWithoutHistory() {
-        for (version in 1..7) {
+        for (version in 1..8) {
             val root = JSONObject(BackupFormat.encode(backup()))
             root.remove("wordHistory"); root.put("version", version)
             assertNull(BackupFormat.decode(root.toString()).wordHistory)

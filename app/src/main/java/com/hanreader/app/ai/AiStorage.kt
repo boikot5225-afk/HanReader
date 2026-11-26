@@ -30,7 +30,8 @@ data class AiCheck(
     /** checked, proposed, accepted, rejected */
     val state: String,
     val createdAt: Long = System.currentTimeMillis(),
-    val articleKey: String? = null
+    val articleKey: String? = null,
+    val pinyin: String? = null
 ) {
     init { require((bookId != null) != (articleKey != null)) }
 }
@@ -65,10 +66,10 @@ interface AiCheckDao {
     suspend fun put(rows: List<AiCheck>)
     @Query("UPDATE ai_checks SET state = :state WHERE cacheKey = :key")
     suspend fun state(key: String, state: String)
-    @Query("UPDATE ai_checks SET state = :state WHERE (bookId = :book OR articleKey = :article) AND contextHash = :context AND start = :start AND end = :end AND translation IS NOT NULL")
+    @Query("UPDATE ai_checks SET state = :state WHERE (bookId = :book OR articleKey = :article) AND contextHash = :context AND start = :start AND end = :end AND (translation IS NOT NULL OR pinyin IS NOT NULL)")
     suspend fun stateSpan(book: Long?, context: String, start: Int, end: Int, state: String, article: String? = null)
-    @Query("UPDATE ai_checks SET state = CASE WHEN translation = :translation THEN 'accepted' ELSE 'rejected' END WHERE (bookId = :book OR articleKey = :article) AND contextHash = :context AND start = :start AND end = :end AND translation IS NOT NULL")
-    suspend fun acceptSpan(book: Long?, context: String, start: Int, end: Int, translation: String, article: String? = null)
+    @Query("UPDATE ai_checks SET state = CASE WHEN translation IS :translation AND pinyin IS :pinyin THEN 'accepted' ELSE 'rejected' END WHERE (bookId = :book OR articleKey = :article) AND contextHash = :context AND start = :start AND end = :end AND (translation IS NOT NULL OR pinyin IS NOT NULL)")
+    suspend fun acceptSpan(book: Long?, context: String, start: Int, end: Int, translation: String?, article: String? = null, pinyin: String? = null)
     @Query("UPDATE ai_checks SET state = 'rejected' WHERE (bookId = :book OR articleKey = :article) AND contextHash = :context AND state = 'accepted' AND start < :end AND end > :start AND NOT (start = :start AND end = :end)")
     suspend fun rejectOverlaps(book: Long?, context: String, start: Int, end: Int, article: String? = null)
     /** Accepted corrections and explicit rejections survive clearing the check cache. */

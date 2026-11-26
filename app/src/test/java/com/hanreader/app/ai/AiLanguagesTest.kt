@@ -92,6 +92,66 @@ class AiLanguagesTest {
         assertEquals(originalTokens, b.tokens); assertEquals(text, b.shown)
     }
 
+    @Test fun readingOnlyCorrectionUpdatesToneColorsAndCanBeUndoneWithoutReplacingTheGloss() = runBlocking {
+        val text = "他站在銀行門口。"
+        val sourceChapter = chapter(text, zh)
+        val sourceBlock = sourceChapter.blocks.first() as ReaderBlock.Text
+        val block = sourceBlock.copy(tokens = sourceBlock.tokens.map {
+            if (it.text == "银行") it.copy(pinyin = "yínxíng", syllables = listOf("yín", "xíng")) else it
+        })
+        val original = sourceChapter.copy(blocks = listOf(block))
+        val word = block.tokens.single { it.text == "银行" }
+        val f = AiContext.build(1, original, 0, "chapter.xhtml", zh, emptyMap(), "ANY")!!
+            .let { built -> built.copy(terms = built.terms.filter { it.original == "銀行" }) }
+        val term = f.terms.single()
+        val answer = JSONObject(response(f, "", "")).apply {
+            getJSONArray("results").getJSONObject(0).put("suggested_pinyin", "yín háng").put("confidence", "medium")
+        }
+        val config = AiConfig(enabled = true, automatic = true, consent = true, hasKey = true)
+        val repo = AiRepository(db, AiClient { _, _, _ -> AiReply(answer.toString(), 10, true) }, { config }, { "test-key" })
+        val proposal = repo.check(f, false) { true }.single()
+        assertNull(proposal.translation)
+        assertEquals("proposed", proposal.state)
+        assertEquals(original, AiPinyin.chapter(original, listOf(proposal)))
+        repo.setState(proposal.cacheKey, "accepted")
+        val accepted = db.aiCheckDao().all().single()
+        val revised = (AiPinyin.chapter(original, listOf(accepted)).blocks.first() as ReaderBlock.Text)
+            .tokens.single { it.text == word.text }
+        assertEquals(listOf("yín", "háng"), revised.syllables)
+        assertEquals("yínháng", revised.pinyin)
+        assertEquals("банк", glossOf(mapOf(word.glossKey to "банк"), revised, 0))
+        assertEquals(word.display, revised.display)
+        assertEquals(word.start, revised.start)
+        val backup = Backup(1, emptyList(), emptyList(), emptyList(),
+            library = LibraryBackup(db.bookDao().all(), emptyList(), emptyList(), emptyList()), aiChecks = listOf(accepted))
+        assertEquals(listOf(accepted), BackupFormat.decode(BackupFormat.encode(backup)).aiChecks)
+        repo.setState(accepted.cacheKey, "rejected")
+        assertEquals(original, AiPinyin.chapter(original, db.aiCheckDao().all()))
+        assertEquals(term.original, accepted.original)
+    }
+
+    @Test fun visibleBookChecksCanIncludeUnknownWordsAndExcludeOffscreenTerms() = runBlocking {
+        val text = "The globally-admired writer arrived."
+        val ch = chapter(text, en)
+        val block = ch.blocks.single() as ReaderBlock.Text
+        val token = block.tokens.single { it.text == "globally-admired" }
+        val built = AiContext.build(1, ch, 0, "chapter.xhtml", en, emptyMap(), "ANY", includeMissing = true)!!
+        val f = AiContext.visibleTerms(built, token.start until token.end) { true }!!
+        assertEquals(listOf("globally-admired"), f.terms.map { it.original })
+        var calls = 0
+        val config = AiConfig(enabled = true, automatic = true, consent = true, hasKey = true)
+        val repo = AiRepository(db, AiClient { _, _, payload ->
+            calls++
+            assertEquals(1, payload.getJSONArray("terms").length())
+            AiReply(response(f, "globally-admired", "всемирно признанный"), 10, true)
+        }, { config }, { "test-key" })
+        assertTrue(repo.checkVisible(f, canStart = { false }, allowMissing = true) { true }.isEmpty())
+        assertEquals("всемирно признанный",
+            repo.checkVisible(f, canStart = { true }, allowMissing = true) { true }.single().translation)
+        repo.checkVisible(f, canStart = { true }, allowMissing = true) { true }
+        assertEquals(1, calls)
+    }
+
     @Test fun chineseConstructionWithoutSpacesGetsOneHintAndCannotOverwriteManualPhrase() {
         val f = fragment("他终于回来了。", zh)
         val rows = AiContext.validate(response(f, "回来", "вернулся", "回来了"), f, "deepseek-flash")

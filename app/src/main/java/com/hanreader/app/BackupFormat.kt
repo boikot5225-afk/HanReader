@@ -58,7 +58,8 @@ object BackupFormat {
     /** 4: context corrections, paid checks and rejections (book ids and hashes stay unchanged). */
     /** 5: explicit missing dictionary base. 6: aliases and rejected automatic name links. */
     /** 8: reading encounters, shared source contexts and the history collection preference. */
-    const val VERSION = 8
+    /** 9: context-specific Chinese readings, including corrections without a translation. */
+    const val VERSION = 9
 
     fun encode(backup: Backup): String {
         validateAi(backup.aiChecks, backup.library)
@@ -200,6 +201,7 @@ object BackupFormat {
                     put("termStart", c.termStart); put("termEnd", c.termEnd)
                     put("start", c.start); put("end", c.end); put("original", c.original); put("base", c.base)
                     put("translation", c.translation ?: JSONObject.NULL)
+                    c.pinyin?.let { put("pinyin", it) }
                     put("explanation", c.explanation ?: JSONObject.NULL)
                     put("confidence", c.confidence); put("state", c.state); put("createdAt", c.createdAt)
                 }) }
@@ -325,7 +327,9 @@ object BackupFormat {
                         c.getInt("start"), c.getInt("end"), c.getString("original"), c.getString("base"),
                         if (c.isNull("translation")) null else c.getString("translation"),
                         if (c.isNull("explanation")) null else c.getString("explanation"),
-                        c.getString("confidence"), c.getString("state"), c.getLong("createdAt"))
+                        c.getString("confidence"), c.getString("state"), c.getLong("createdAt"),
+                        pinyin = if (c.isNull("pinyin")) null else c.get("pinyin") as? String
+                            ?: throw BackupFormatException("Файл копии повреждён: неверный пиньинь"))
                 }
             } else null
             validateAi(checks, library)
@@ -352,7 +356,9 @@ object BackupFormat {
                 c.confidence !in setOf("high", "medium", "low") ||
                 c.state !in setOf("checked", "accepted", "proposed", "rejected") ||
                 (c.translation != null && c.translation.isBlank()) ||
-                (c.state in setOf("accepted", "proposed", "rejected") && c.translation == null)) {
+                (c.pinyin != null && (c.start != c.termStart || c.end != c.termEnd ||
+                    com.hanreader.app.ai.AiPinyin.parse(c.pinyin, c.original) == null)) ||
+                (c.state in setOf("accepted", "proposed", "rejected") && c.translation == null && c.pinyin == null)) {
                 throw BackupFormatException("Файл копии повреждён: некорректная проверка ИИ")
             }
         }

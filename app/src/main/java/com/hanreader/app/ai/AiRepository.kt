@@ -12,6 +12,32 @@ import org.json.JSONObject
 
 data class AiUsage(val requests: Int = 0, val tokens: Long = 0, val unknown: Int = 0)
 
+internal data class AiWordLocation(
+    val source: String, val block: Int, val start: Int, val end: Int, val model: String
+) {
+    fun covers(word: AiWordLocation): Boolean =
+        source == word.source && block == word.block && model == word.model && start <= word.start && end >= word.end
+
+    companion object {
+        fun book(id: Long, chapter: Int, block: Int, start: Int, end: Int, model: String) =
+            AiWordLocation("book:$id:$chapter", block, start, end, model)
+    }
+}
+
+private fun AiFragment.wordLocations(model: String) = terms.map { term ->
+    val article = articleKey
+    if (article != null) AiWordLocation(article, block, term.start, term.end, model)
+    else AiWordLocation.book(book, chapter, block, term.start, term.end, model)
+}
+
+internal data class AiWordFeedback(
+    val checking: List<AiWordLocation> = emptyList(),
+    val failures: Map<AiWordLocation, String> = emptyMap()
+) {
+    fun isChecking(word: AiWordLocation) = checking.any { it.covers(word) }
+    fun error(word: AiWordLocation) = failures[word] ?: failures.entries.lastOrNull { it.key.covers(word) }?.value
+}
+
 /** One process session, one paid request at a time, also shared by connection tests. */
 class AiRepository(
     private val db: LexiconDatabase,
@@ -27,7 +53,21 @@ class AiRepository(
     val message = _message.asStateFlow()
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
+    private val _wordFeedback = MutableStateFlow(AiWordFeedback())
+    internal val wordFeedback = _wordFeedback.asStateFlow()
     fun notice(message: String) { _message.value = message }
+    internal fun noticeWord(word: AiWordLocation, message: String) = noticeWords(listOf(word), message)
+    private fun noticeWords(words: List<AiWordLocation>, message: String) {
+        _wordFeedback.update { current ->
+            val failures = LinkedHashMap(current.failures)
+            for (word in words) {
+                failures.remove(word)
+                failures[word] = message
+            }
+            current.copy(failures = failures.entries.toList().takeLast(200).associate { it.key to it.value })
+        }
+        notice(message)
+    }
     private val dao = db.aiCheckDao()
     fun observeArticle(key: String) = dao.observeArticle(key)
     suspend fun attachArticle(key: String) {
@@ -63,21 +103,31 @@ class AiRepository(
         checkInternal(fragment, automatic, stillValid, stillValid)
 
     /** Recheck viewport eligibility after waiting for another paid request, before billing. */
-    suspend fun checkVisible(fragment: AiFragment, canStart: suspend () -> Boolean, stillValid: suspend () -> Boolean): List<AiCheck> =
-        checkInternal(fragment, true, canStart, stillValid)
+    suspend fun checkVisible(fragment: AiFragment, canStart: suspend () -> Boolean, allowMissing: Boolean = false,
+        stillValid: suspend () -> Boolean): List<AiCheck> =
+        checkInternal(fragment, true, canStart, stillValid, allowMissing)
 
     private suspend fun checkInternal(fragment: AiFragment, automatic: Boolean, canStart: suspend () -> Boolean,
-        stillValid: suspend () -> Boolean): List<AiCheck> = mutex.withLock {
+        stillValid: suspend () -> Boolean, allowMissing: Boolean = false): List<AiCheck> = mutex.withLock {
         fragment.articleKey?.let {
             require(fragment.book == 0L && it.split(':').getOrNull(1) == fragment.language.substringBefore('-') && fragment.resource.startsWith("wikipedia:$it:"))
         }
         val c = config()
         if (!exists(fragment)) return@withLock emptyList()
         if (!c.enabled || !c.consent || !c.hasKey || automatic && !c.automatic) return@withLock emptyList()
-        val existing = fragment.terms.mapNotNull { dao.get(fragment.key(it, c.model)) }
-        val cached = existing.mapTo(HashSet()) { it.cacheKey }
-        val pending = fragment.terms.filter { (!automatic || it.base.isNotBlank()) && fragment.key(it, c.model) !in cached &&
+        val cached = fragment.terms.mapNotNull { term ->
+            val key = fragment.key(term, c.model)
+            val legacy = fragment.key(term, c.model, legacy = true)
+            val row = dao.get(key) ?: if (legacy != key) dao.get(legacy)?.takeIf { it.state != "checked" } else null
+            row?.let { key to it }
+        }.toMap()
+        val existing = cached.values
+        val uncached = fragment.terms.filter { fragment.key(it, c.model) !in cached &&
             (!automatic || fragment.key(it, c.model) !in attempts) }
+        val pending = if (automatic && allowMissing) {
+            val missing = uncached.filter { it.base.isBlank() }.take(4)
+            uncached.filter { it.base.isNotBlank() }.take(AiContext.BATCH - missing.size) + missing
+        } else uncached.filter { !automatic || it.base.isNotBlank() }
         if (pending.isEmpty() && existing.isNotEmpty() && !automatic) _message.value = "Показан сохранённый результат. Новый запрос не нужен."
         if (pending.isNotEmpty()) _message.value = null
         val out = existing.toMutableList()
@@ -86,6 +136,8 @@ class AiRepository(
             if (!exists(fragment) || !canStart() || !stillValid()) break
             val sub = fragment.copy(terms = batch)
             attempts += batch.map { sub.key(it, c.model) }
+            val locations = sub.wordLocations(c.model)
+            _wordFeedback.update { it.copy(checking = locations, failures = it.failures - locations.toSet()) }
             try {
                 val reply = request(sub.json(), c)
                 if (!reply.finished) throw AiFailure("Ответ DeepSeek обрезан. Переводы не сохранены.")
@@ -101,11 +153,12 @@ class AiRepository(
                     if (exists(fragment) && stillValid()) {
                         val prior = dao.context(fragment.book.takeIf { fragment.articleKey == null }, fragment.contextHash, fragment.articleKey)
                         rows = rows.map { row ->
-                            if (row.translation == null) row else {
+                            if (row.translation == null && row.pinyin == null) row else {
                                 val overlaps = prior.filter { it.start < row.end && it.end > row.start }
                                 when {
                                     overlaps.any { it.state == "rejected" } -> row.copy(state = "rejected")
-                                    overlaps.any { it.state == "accepted" && (it.start != row.start || it.end != row.end || it.translation != row.translation) } -> row.copy(state = "proposed")
+                                    overlaps.any { it.state == "accepted" && (it.start != row.start || it.end != row.end ||
+                                        it.translation != row.translation || it.pinyin != row.pinyin) } -> row.copy(state = "proposed")
                                     else -> row
                                 }
                             }
@@ -115,14 +168,18 @@ class AiRepository(
                 }
                 if (!saved) break
                 out += rows
-                _message.value = if (rows.any { it.state == "accepted" }) "Контекстные значения сохранены."
+                _message.value = if (rows.any { it.state == "accepted" && it.pinyin != null }) "Контекстное чтение сохранено."
+                    else if (rows.any { it.state == "accepted" }) "Контекстные значения сохранены."
                     else if (rows.any { it.state == "proposed" }) "Есть предложение ИИ — открой карточку слова."
                     else if (rows.any { it.base.isEmpty() }) AI_UNKNOWN_CHECKED_MESSAGE
                     else AI_UNCHANGED_MESSAGE
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
-                _message.value = (e as? AiFailure)?.userMessage ?: "Не удалось проверить или сохранить значения. Исходный словарь сохранён."
+                noticeWords(locations, (e as? AiFailure)?.userMessage
+                    ?: "Не удалось проверить или сохранить значения. Исходный словарь сохранён.")
                 break // No automatic retry, including after uncertain network failures.
+            } finally {
+                _wordFeedback.update { it.copy(checking = emptyList()) }
             }
         }
         out
@@ -141,9 +198,9 @@ class AiRepository(
     suspend fun setState(key: String, state: String) {
         require(state in setOf("accepted", "rejected"))
         try { db.withTransaction { dao.get(key)?.let {
-            if (state == "accepted" && it.translation != null) {
+            if (state == "accepted" && (it.translation != null || it.pinyin != null)) {
                 dao.rejectOverlaps(it.bookId, it.contextHash, it.start, it.end, it.articleKey)
-                dao.acceptSpan(it.bookId, it.contextHash, it.start, it.end, it.translation, it.articleKey)
+                dao.acceptSpan(it.bookId, it.contextHash, it.start, it.end, it.translation, it.articleKey, it.pinyin)
             } else dao.stateSpan(it.bookId, it.contextHash, it.start, it.end, state, it.articleKey)
         } } }
         catch (e: CancellationException) { throw e }
@@ -152,6 +209,7 @@ class AiRepository(
     suspend fun clear(all: Boolean) = mutex.withLock {
         if (all) dao.clearAll() else dao.clearCache()
         attempts.clear()
+        _wordFeedback.value = AiWordFeedback()
     }
 }
 

@@ -84,9 +84,8 @@ fun AiSettingsDialog(onClose: () -> Unit) {
                 Spacer(Modifier.width(8.dp))
                 FilterChip(c.automatic, { ai.settings.update(c.copy(automatic = true)) }, label = { Text("Автоматически") })
             }
-            Text("В автоматическом режиме проверяются показанные подсказки читаемого абзаца пакетами. Книга или статья целиком не отправляется. Уверенные исправления применяются здесь; сомнительные остаются предложениями.", style = MaterialTheme.typography.bodySmall)
+            Text("В книгах проверяются видимые незнакомые слова, даже если переводы над строками выключены. В запрос может войти до четырёх слов без словарного значения. В Википедии проверяются видимые подсказки. Уверенные исправления применяются в этом месте, сомнительные можно принять вручную.", style = MaterialTheme.typography.bodySmall)
             if (appearance.gloss == com.hanreader.app.GlossMode.OFF) {
-                Text("Переводы над словами сейчас выключены: автоматических запросов при чтении не будет.", style = MaterialTheme.typography.bodySmall)
                 TextButton(onClick = { com.hanreader.app.AppearanceStore.update { it.copy(gloss = com.hanreader.app.GlossMode.UNKNOWN) } }) { Text("Показать переводы над незнакомыми словами") }
             }
             OutlinedTextField(model, { model = it }, label = { Text("Модель") }, singleLine = true)

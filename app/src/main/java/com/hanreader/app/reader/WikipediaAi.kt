@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.catch
 
 internal data class WikiVisibleSpan(val block: Int, val start: Int, val end: Int)
 
-internal class WikiAiState(val rows: List<AiCheck>, val enabled: Boolean, val busy: Boolean, val message: String?,
+internal class WikiAiState(val rows: List<AiCheck>, val enabled: Boolean, val busy: Boolean,
     val check: (Int, IntRange) -> Unit, val state: (AiCheck, String) -> Unit)
 
 @Composable
@@ -29,7 +29,6 @@ internal fun rememberWikipediaAi(ai: ContextAi, reading: WikiReading?, engine: L
         }
     }.collectAsState(initial = emptyList())
     val busy by repo.busy.collectAsState()
-    val message by repo.message.collectAsState()
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
     val scope = rememberCoroutineScope()
     var attached by remember(repo, sourceKey) { mutableStateOf(false) }
@@ -81,15 +80,16 @@ internal fun rememberWikipediaAi(ai: ContextAi, reading: WikiReading?, engine: L
             automaticJob = request; request.join()
         }
     }
-    return WikiAiState(valid, enabled && attached, busy, message,
+    return WikiAiState(valid, enabled && attached, busy,
         check = { block, range ->
             if (enabled && attached && reading != null && engine != null && manualJob?.isActive != true) {
+                val word = AiWordLocation(reading.document.key, block, range.first, range.last + 1, config.model)
                 manualJob = scope.launch { try {
                     val fragment = withContext(Dispatchers.Default) { WikiAiContext.build(reading, block, engine, meanings, appearance, range = range) }
-                    if (fragment == null) repo.notice("Выделение защищено своим переводом или не подходит для контекстной проверки.")
+                    if (fragment == null) repo.noticeWord(word, "Выделение защищено своим переводом или не подходит для контекстной проверки.")
                     else repo.check(fragment, automatic = false) { stillValid(reading, meanings, appearance, fragment) }
                 } catch (e: CancellationException) { throw e }
-                catch (_: Exception) { repo.notice("Не удалось проверить или сохранить значение. Исходный словарь сохранён.") }
+                catch (_: Exception) { repo.noticeWord(word, "Не удалось проверить или сохранить значение. Исходный словарь сохранён.") }
                 }
             }
         }, state = { row, state -> scope.launch { repo.setState(row.cacheKey, state) } })

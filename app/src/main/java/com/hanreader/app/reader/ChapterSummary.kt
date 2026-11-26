@@ -222,7 +222,7 @@ private fun SummaryRow(
     val t = block.tokens[item.token]
     val pinyin = if (engine is ZhEngine) t.pinyin.ifBlank { engine.reading(item.key).orEmpty() } else ""
     val translation = remember(item.key, t, engine) {
-        (if (engine is ZhEngine) engine.cardTranslation(t.text, t.pinyin.takeIf { it.isNotEmpty() }, t.contextMeaning)
+        (if (engine is ZhEngine) engine.cardTranslation(t.text, (t.glossReading ?: t.pinyin).takeIf { it.isNotEmpty() }, t.contextMeaning)
             else if (item.phrase) engine.glossShort(t.text, item.key) else engine.cardTranslation(t.text, t.pinyin.takeIf { it.isNotEmpty() })
             ?: engine.glossShort(t.text, t.pinyin.takeIf { it.isNotEmpty() })).orEmpty()
     }

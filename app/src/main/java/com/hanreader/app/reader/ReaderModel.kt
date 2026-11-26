@@ -571,10 +571,12 @@ data class RToken(
     /** The reading of each character, in order; empty when unknown. Joined, they make [pinyin]. */
     val syllables: List<String> = emptyList(),
     /** The locally selected sense of this occurrence; never appended to visible pinyin. */
-    val contextMeaning: String? = null
+    val contextMeaning: String? = null,
+    /** Original reading for gloss lookup when only the displayed reading has changed. */
+    val glossReading: String? = null
 ) {
     /** A hint cache distinguishes senses of the same spelling and pronunciation. */
-    val glossKey: String get() = text + "|" + pinyin + (contextMeaning?.let { "|" + it } ?: "")
+    val glossKey: String get() = text + "|" + (glossReading ?: pinyin) + (contextMeaning?.let { "|" + it } ?: "")
 }
 
 /** A footnote mark in a paragraph: characters [start, end) and the note's text. */

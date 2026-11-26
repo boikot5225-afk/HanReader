@@ -4,6 +4,7 @@ import com.hanreader.app.lang.LanguageModule
 import com.hanreader.app.lang.IN_PHRASE
 import com.hanreader.app.reader.*
 import com.hanreader.app.zh.TokenKind
+import com.hanreader.app.zh.isHan
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
@@ -17,9 +18,10 @@ data class AiFragment(val book: Long, val chapter: Int, val block: Int, val reso
     val readings: Map<Int, String> = emptyMap(), val articleKey: String? = null) {
     val contextHash: String get() = AiContext.hash(JSONArray(listOf(book, resource, chapter, block,
         text, previous, next, variant, manualHash, AiContext.rules(language))).toString())
-    fun key(term: AiTerm, model: String): String {
+    fun key(term: AiTerm, model: String, legacy: Boolean = false): String {
         val parts = mutableListOf<Any>(contextHash, model, term.start, term.end, term.original, term.lemma, term.base)
         term.reading?.let { parts += it }
+        if (language == "zh-CN" && !legacy && term.original.all { it.isHan() }) parts += "pinyin-v1"
         return AiContext.hash(JSONArray(parts).toString())
     }
     fun json() = JSONObject().put("language", language).put("target_language", "ru").put("regional_variant", variant)
@@ -111,8 +113,7 @@ object AiContext {
             if (range != null && (end <= range.first || token.start > range.last)) continue
             if (range != null) end = maxOf(end, range.last + 1)
             if (protected.any { it.first < end && it.last >= token.start }) continue
-            // Unknown entries can be requested explicitly. Normal automatic candidate
-            // selection still requires a dictionary hint; includeMissing is for saved overlays.
+            // Include missing hints for explicit selections, saved overlays and eligible book checks.
             val base = engine.glossShort(token)?.takeIf { it.isNotBlank() }
                 ?: if (range != null || includeMissing) "" else continue
             if (glosses != null && glossOf(glosses, token, blockIndex).isNullOrBlank()) continue
@@ -142,6 +143,11 @@ object AiContext {
             if (engine.info.tag == "es-ES") variant else "ANY", manualHash, terms,
             words.flatMap { listOf(it.start, it.end) }.toSet(), protected, engine.info.tag,
             if (chinese) words.associate { it.start to it.pinyin } else emptyMap())
+    }
+
+    internal fun visibleTerms(fragment: AiFragment, visible: IntRange, eligible: (AiTerm) -> Boolean): AiFragment? {
+        val terms = fragment.terms.filter { it.start <= visible.last && it.end > visible.first && eligible(it) }
+        return if (terms.isEmpty()) null else fragment.copy(terms = terms.sortedByDescending { ' ' in it.lemma })
     }
 
     /** All-or-nothing validation: malformed or incomplete packets never become successful checks. */
@@ -206,12 +212,6 @@ object AiContext {
             val missingHintSuggestion = !correctionRequested && t.base.isBlank() && translation != null
             responseRequire(if (correctionRequested) translation != null else translation == null || missingHintSuggestion,
                 AiResponseProblem.VALUE)
-            val state = when {
-                missingHintSuggestion -> "proposed"
-                !correctionRequested -> "checked"
-                confidence == "high" -> "accepted"
-                else -> "proposed"
-            }
             var start = t.start
             var end = t.end
             if (r.has("span") && !r.isNull("span")) {
@@ -220,15 +220,28 @@ object AiContext {
                 start = sourceRange.first; end = sourceRange.last + 1
             }
             responseRequire(fragment.protected.none { it.first < end && it.last >= start }, AiResponseProblem.PROTECTED)
+            val pinyin = if (!r.has("suggested_pinyin")) null else optional("suggested_pinyin", 100)?.let { suggested ->
+                // Only an exact Chinese token has a reliable character-to-syllable alignment.
+                val parts = AiPinyin.parse(suggested, t.original)
+                if (fragment.language != "zh-CN" || start != t.start || end != t.end ||
+                    fragment.readings.keys.any { it > start && it < end } || parts == null) null
+                else parts.joinToString(" ").takeIf { parts.joinToString("") != t.reading?.replace(" ", "") }
+            }
+            val state = when {
+                missingHintSuggestion -> "proposed"
+                !correctionRequested && pinyin == null -> "checked"
+                confidence == "high" -> "accepted"
+                else -> "proposed"
+            }
             rows += AiCheck(fragment.key(t, model), fragment.book.takeIf { fragment.articleKey == null }, fragment.chapter, fragment.block,
                 fragment.contextHash, t.start, t.end, start, end, fragment.text.substring(start, end), t.base,
-                translation, explanation, confidence, state, articleKey = fragment.articleKey)
+                translation, explanation, confidence, state, articleKey = fragment.articleKey, pinyin = pinyin)
         }
         // Multiple terms can identify the same construction. Deduplicate consistent answers, reject conflicts.
-        val accepted = rows.filter { it.translation != null }.sortedBy { it.start }
+        val accepted = rows.filter { it.translation != null || it.pinyin != null }.sortedBy { it.start }
         for ((i, a) in accepted.withIndex()) for (b in accepted.drop(i + 1)) {
             if (b.start >= a.end) break
-            responseRequire(a.start == b.start && a.end == b.end && a.translation == b.translation, AiResponseProblem.CONFLICT)
+            responseRequire(a.start == b.start && a.end == b.end && a.translation == b.translation && a.pinyin == b.pinyin, AiResponseProblem.CONFLICT)
         }
         return rows
     }
@@ -264,8 +277,9 @@ object AiContext {
                 .filterKeys { it >= row.termStart && it < row.termEnd }.toSortedMap().values.filter { it.isNotBlank() }.joinToString(" ")
                 else term?.reading
             term != null && row.articleKey == fragment.articleKey && row.bookId == fragment.book.takeIf { fragment.articleKey == null } && row.contextHash == fragment.contextHash && row.start in fragment.boundaries && row.end in fragment.boundaries && row.termEnd in term.end..fragment.text.length &&
-                row.cacheKey == fragment.key(term.copy(end = row.termEnd,
-                    original = fragment.text.substring(term.start, row.termEnd), reading = reading), model)
+                term.copy(end = row.termEnd, original = fragment.text.substring(term.start, row.termEnd), reading = reading).let {
+                    row.cacheKey == fragment.key(it, model) || row.cacheKey == fragment.key(it, model, legacy = true)
+                }
         }
     }
 
