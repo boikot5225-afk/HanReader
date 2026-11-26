@@ -385,6 +385,7 @@ fun RubyParagraph(
     highlight: IntRange? = null,
     /** Words to underline in red (not known yet) and in blue (recommended); null: no marks. */
     unknownMarks: Set<String>? = null,
+    familiarity: Map<String, WordFamiliarity> = emptyMap(),
     recommendedMarks: Set<String>? = null,
     /** Token indices never marked (characters of a name). */
     noMarks: Set<Int> = emptySet(),
@@ -545,7 +546,11 @@ fun RubyParagraph(
                     isSaved -> colors.saved
                     p.token in noMarks -> null
                     recommendedMarks != null && t.text in recommendedMarks -> colors.recommendedLine
-                    unknownMarks != null && t.text in unknownMarks -> colors.unknownLine
+                    unknownMarks != null && t.text in unknownMarks -> when (familiarity[t.text]?.level) {
+                        FamiliarityLevel.REPEATED -> colors.repeatedLine
+                        FamiliarityLevel.FAMILIAR -> colors.familiarLine
+                        else -> colors.unknownLine
+                    }
                     else -> null
                 }
                 // A word highlighted in the whole book: a dashed line under it, below the line of unknown words.
@@ -589,7 +594,9 @@ data class RubyColors(
     val indent: Boolean = true,
     val unknownLine: Color = Color(0xFFC62828),
     val recommendedLine: Color = Color(0xFF1E5BB8),
-    val gloss: Color = Color(0xFF6B6459)
+    val gloss: Color = Color(0xFF6B6459),
+    val repeatedLine: Color = Color(0xFFAD5700),
+    val familiarLine: Color = Color(0xFF8B7565)
 ) {
     /**
      * The colour of a footnote mark: the theme's accent, or the colour of the underline of unknown
@@ -632,7 +639,9 @@ fun rubyColors(a: Appearance, spec: ThemeSpec) = RubyColors(
     indent = a.indent,
     unknownLine = spec.unknownLine,
     recommendedLine = spec.recommendedLine,
-    gloss = spec.muted
+    gloss = spec.muted,
+    repeatedLine = if (spec.dark) Color(0xFFFFAB53) else Color(0xFFAD5700),
+    familiarLine = if (spec.dark) Color(0xFFA09388) else Color(0xFF8B7565)
 )
 
 /** Tone of a pinyin syllable from its mark (ā á ǎ à); 5 = neutral. */

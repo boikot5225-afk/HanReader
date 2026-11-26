@@ -2,6 +2,8 @@ package com.hanreader.app.en
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.hanreader.app.lang.TextOptions
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -16,5 +18,13 @@ class EnDictionaryMapTest {
         val first = EnDictionary.load(context).analyses("went")
         assertTrue(first.any { it.entry.word == "go" && it.entry.russian.isNotEmpty() })
         assertTrue(EnDictionary.load(context).analyses("children").any { it.entry.word == "child" })
+    }
+
+    @Test fun selfPublishHasARussianHintAsOneHyphenatedWord() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val engine = EnEngine(EnDictionary.load(context))
+        val text = "She decided to self-publish her novel."
+        val token = engine.chapter(listOf(text), TextOptions())(text).tokens.single { it.text == "self-publish" }
+        assertEquals("издавать самостоятельно", engine.glossShort(token))
     }
 }

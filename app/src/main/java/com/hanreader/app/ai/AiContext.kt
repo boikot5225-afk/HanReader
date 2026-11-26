@@ -184,8 +184,9 @@ object AiContext {
             responseRequire(r.get("original") == t.original && r.has("current_translation") &&
                 (r.get("current_translation") == t.base || (t.base.isEmpty() && r.isNull("current_translation"))),
                 AiResponseProblem.SOURCE)
-            val correct = r.get("needs_correction") as? Boolean ?: throw AiResponseFailure(AiResponseProblem.VALUE)
-            val confidence = r.get("confidence") as? String ?: throw AiResponseFailure(AiResponseProblem.VALUE)
+            val correctionRequested = r.get("needs_correction") as? Boolean ?: throw AiResponseFailure(AiResponseProblem.VALUE)
+            val confidence = (r.get("confidence") as? String)?.trim()?.lowercase(java.util.Locale.ROOT)
+                ?: throw AiResponseFailure(AiResponseProblem.VALUE)
             responseRequire(confidence in setOf("high", "medium", "low"), AiResponseProblem.VALUE)
             require(r.has("suggested_translation") && r.has("explanation"))
             fun optional(name: String, limit: Int): String? {
@@ -200,7 +201,17 @@ object AiContext {
             }
             val translation = optional("suggested_translation", 100)
             val explanation = optional("explanation", 600)
-            responseRequire(if (correct) translation != null else translation == null, AiResponseProblem.VALUE)
+            // For a missing hint the model can supply a definition while interpreting
+            // "correction" literally. Keep it available for review, never apply it automatically.
+            val missingHintSuggestion = !correctionRequested && t.base.isBlank() && translation != null
+            responseRequire(if (correctionRequested) translation != null else translation == null || missingHintSuggestion,
+                AiResponseProblem.VALUE)
+            val state = when {
+                missingHintSuggestion -> "proposed"
+                !correctionRequested -> "checked"
+                confidence == "high" -> "accepted"
+                else -> "proposed"
+            }
             var start = t.start
             var end = t.end
             if (r.has("span") && !r.isNull("span")) {
@@ -211,7 +222,7 @@ object AiContext {
             responseRequire(fragment.protected.none { it.first < end && it.last >= start }, AiResponseProblem.PROTECTED)
             rows += AiCheck(fragment.key(t, model), fragment.book.takeIf { fragment.articleKey == null }, fragment.chapter, fragment.block,
                 fragment.contextHash, t.start, t.end, start, end, fragment.text.substring(start, end), t.base,
-                translation, explanation, confidence, if (!correct) "checked" else if (confidence == "high") "accepted" else "proposed", articleKey = fragment.articleKey)
+                translation, explanation, confidence, state, articleKey = fragment.articleKey)
         }
         // Multiple terms can identify the same construction. Deduplicate consistent answers, reject conflicts.
         val accepted = rows.filter { it.translation != null }.sortedBy { it.start }

@@ -378,6 +378,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val encounterSource = remember(book.entity.id, book.entity.title) { EncounterSource("book:${book.entity.id}", book.entity.title, book.entity.id) }
     val encounterViewport = remember(chapter) { EncounterViewport() }
     val encounterSpans by remember(encounterViewport) { derivedStateOf { encounterViewport.visible() } }
+    val familiarity = rememberWordFamiliarity(appearance.markUnknown && appearance.colorUnknownByHistory,
+        chapter, engine, encounterSpans, unknownSet)
     TrackWordEncounters(encounterSource, chapter, engine, encounterSpans,
         !sheetOpen && !chrome && bookNote == null && noteText == null &&
             aiLifecycle.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))
@@ -486,6 +488,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             glossOnly = glossTokens?.let { it[i] ?: emptySet() },
             blockIndex = i,
             unknownMarks = if (appearance.markUnknown) unknownSet else null,
+            familiarity = familiarity,
             noMarks = remember(block, names, engine) { engine?.let { VocabularyStats.nameTokens(block, names, it) } ?: emptySet() },
             recommendedMarks = if (appearance.markRecommended) recommendedSet else null,
             highlight = highlight?.takeIf { it.chapter == chapter?.index && it.block == i }?.let { h ->
@@ -904,6 +907,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onWikipedia = openWikipedia,
             entityPanel = entityControls,
             selection = sel,
+            wordFamiliarity = if (sel.first == sel.last) familiarity[block.tokens[sel.first].text] else null,
             block = block,
             engine = eng,
             saved = saved,
@@ -1725,7 +1729,8 @@ internal fun WordSheet(
     /** Where the word stands, for a doubted translation: «El narco · 5. Magnates». */
     doubtSource: String = "",
     onWikipedia: (() -> Unit)? = null,
-    entityPanel: (@Composable () -> Unit)? = null
+    entityPanel: (@Composable () -> Unit)? = null,
+    wordFamiliarity: WordFamiliarity? = null
 ) {
     val tokens = block.tokens
     val first = tokens[selection.first]
@@ -1838,72 +1843,36 @@ internal fun WordSheet(
                 else -> null
             }
             Row(verticalAlignment = Alignment.Top) {
-            FlowRow(Modifier.weight(1f), verticalArrangement = Arrangement.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                val shownWord = block.shown.substring(first.start, last.end)
-                // 3-4 characters share the row with the breakdown: a little smaller, so the word stays on one line.
-                Text(shownWord, fontFamily = WordFont, fontSize = when { word.length > 6 -> 28.sp; word.length >= 3 -> 32.sp; else -> 40.sp }, fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.alignByBaseline())
-                if (shownWord != word) {
-                    Text(word, fontFamily = WordFont, style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.alignByBaseline())
-                }
-                // A form of another word: hablo → hablar.
-                if (zh == null && !cardWord.equals(word, ignoreCase = true)) {
-                    Text("→ $cardWord", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
+                FlowRow(Modifier.weight(1f), verticalArrangement = Arrangement.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val shownWord = block.shown.substring(first.start, last.end)
+                    Text(shownWord, fontFamily = WordFont, fontSize = when { word.length > 6 -> 28.sp; word.length >= 3 -> 32.sp; else -> 40.sp }, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.alignByBaseline())
+                    if (shownWord != word) {
+                        Text(word, fontFamily = WordFont, style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.alignByBaseline())
+                    }
+                    // A form of another word: hablo → hablar.
+                    if (zh == null && !cardWord.equals(word, ignoreCase = true)) {
+                        Text("→ $cardWord", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.alignByBaseline())
+                    }
+                    Text(if (zh == null) es.firstOrNull()?.entry?.pronunciation.orEmpty() else reading, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.alignByBaseline())
                 }
-                Text(if (zh == null) es.firstOrNull()?.entry?.pronunciation.orEmpty() else reading, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.alignByBaseline())
-            }
-            // Beside the word: the switch, and under it what each character means (目 глаз, 不 не…).
-            val charRows = remember(word, selection) {
-                val inWord = tokens.subList(selection.first, selection.last + 1)
-                val syllables = inWord.flatMap { t -> if (t.syllables.size == t.text.length) t.syllables else List(t.text.length) { "" } }
-                if (zh == null || entry == null || word.length !in 2..4 || !word.all { it.isHan() }) emptyList()
-                else word.mapIndexed { k, c -> c.toString() to zh.charGloss(c.toString(), syllables.getOrNull(k)?.takeIf { it.isNotEmpty() }) }
-                    .takeIf { rows -> rows.all { it.second != null } }.orEmpty()
-            }
-            if (canMark || charRows.isNotEmpty()) {
-                Column(Modifier.padding(top = 8.dp).widthIn(max = 190.dp), horizontalAlignment = Alignment.End) {
-                    if (canMark) KnownToggle(known = knownNow, onKnown = { onKnown(cardWord, it) })
-                    if (charRows.isNotEmpty()) CharBreakdown(charRows, Modifier.padding(top = 10.dp))
-                }
-            }
-            }
-            if (onWikipedia != null) TextButton(onClick = onWikipedia, contentPadding = PaddingValues(0.dp)) { Text("Найти в Википедии") }
-            entityPanel?.invoke()
-            if (canMark && knownReason != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(knownReason.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (mark?.source == ReaderViewModel.UNKNOWN || mark?.source == "manual") {
-                        TextButton(onClick = { onClearKnown(cardWord) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                            Text("Сбросить", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
+                if (canMark) KnownToggle(known = knownNow, onKnown = { onKnown(cardWord, it) })
             }
             // A set expression: said before its meaning, since it is not read word by word.
             idiomKind(entry?.gloss)?.let {
                 Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
-            phrase?.let { (range, phraseWord, meaning) ->
-                Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Выражение: $phraseWord", style = MaterialTheme.typography.titleSmall)
-                        meaning?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                        TextButton(onClick = { changeBounds(range) }) { Text("Выделить выражение") }
-                    }
-                }
-            }
             val primaryMeaning = userMeaning ?: aiTranslation ?: nameInRussian ?: russian.firstOrNull() ?: translation
-            if (aiAvailable) {
-                AiWordControls(aiCheck, aiEnabled, aiBusy, aiMessage, userMeaning != null, onAiCheck, onAiState)
-            }
             MeaningSummary(primaryMeaning, russian,
                 aiTranslation != null || selectedMeaning != null || es.firstOrNull()?.entry?.contextMeaning != null,
                 own?.first, userMeaning != null || aiTranslation != null || nameInRussian != null || russian.isNotEmpty())
-            WordHistoryPanel(engine.info.tag, if (selection.first == selection.last) engine.lemma(word) else word.lowercase())
+            if (!knownNow && wordFamiliarity != null) {
+                Text("${wordFamiliarity.level.label} · Встреч: ${wordFamiliarity.encounters} · Обращений к словарю: ${wordFamiliarity.lookups}",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             DoubtRow(word, cardWord, primaryMeaning, sentence, doubtSource) { correctingHere = true; correcting = true }
             key(selection) { OwnMeaning(word, own, editing = correcting, startHere = correctingHere, onEditingChange = { open -> if (open) correctingHere = false; correcting = open }, suggestions = remember(word, russian, es) {
                 (russian + es.drop(1).flatMap { it.entry.ru.take(2) }).distinct().take(8)
@@ -1913,16 +1882,87 @@ internal fun WordSheet(
                 Doubts.correct(context,word,sentence,value,scope)
                 if (value.isNotEmpty()) ReadingChecks.record(context,ReadingChecks.Event.CORRECT)
             } }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(onClick = { growLeft?.let { changeBounds(it..selection.last) } }, enabled = growLeft != null) { Text("← слово") }
-                OutlinedButton(onClick = { growRight?.let { changeBounds(selection.first..it) } }, enabled = growRight != null) { Text("слово →") }
-                if (shrinkLeft != null) OutlinedButton(onClick = { changeBounds(shrinkLeft) }) { Text("Убрать слева") }
-                if (shrinkRight != null) OutlinedButton(onClick = { changeBounds(shrinkRight) }) { Text("Убрать справа") }
+            Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                Text(sentence, Modifier.padding(14.dp), fontFamily = WordFont, style = MaterialTheme.typography.titleMedium)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(onClick = { speaker.speak(word, STUDY_LANGUAGE) }) {
+                    Icon(LexiconIcons.Volume, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Слово")
+                }
+                OutlinedButton(onClick = { speaker.speak(sentence, STUDY_LANGUAGE) }) {
+                    Icon(LexiconIcons.Volume, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Фраза")
+                }
+            }
+            Surface(
+                onClick = {
+                    // Spanish: the card's second line is the part of speech and gender («сущ., ж. р.»).
+                    onSave(saveWord, if (aiExpression != null) aiExpressionReading else if (zh == null) es.firstOrNull()?.entry?.let { e ->
+                        listOf(e.pronunciation, e.posLabel).filter { it.isNotEmpty() }.joinToString(" · ")
+                    }.orEmpty() else reading, primaryMeaning, sentence) { r ->
+                        scope.launch {
+                            status = r.fold(
+                                onSuccess = { created -> if (created) "Добавлено в карточки" else "Уже в карточках: добавлен новый пример" },
+                                onFailure = { "Не удалось сохранить: ${it.message}" }
+                            )
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.inverseSurface,
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                modifier = Modifier.fillMaxWidth().height(56.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(if (isSaved) "Добавить пример к карточке" else if (aiExpression != null) "Сохранить выражение в карточки" else "Сохранить в карточки", style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            status?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+            speaker.message.takeIf { it.isNotEmpty() }?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            phrase?.let { (range, phraseWord, meaning) ->
+                Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Выражение: $phraseWord", style = MaterialTheme.typography.titleSmall)
+                        meaning?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                        TextButton(onClick = { changeBounds(range) }) { Text("Выделить выражение") }
+                    }
+                }
+            }
+            WordHistoryPanel(engine.info.tag, if (selection.first == selection.last) engine.lemma(word) else word.lowercase())
+            if (aiAvailable) {
+                val aiLabel = when (aiCheck?.state) {
+                    "proposed" -> "DeepSeek · есть предложение"
+                    "accepted" -> "DeepSeek · перевод по контексту"
+                    "checked" -> "DeepSeek · проверено"
+                    else -> "DeepSeek"
+                }
+                WordSheetSection(aiLabel) {
+                    AiWordControls(aiCheck, aiEnabled, aiBusy, aiMessage, userMeaning != null, onAiCheck, onAiState)
+                }
             }
             TextButton(onClick = { details = !details }, contentPadding = PaddingValues(0.dp)) {
                 Text(if (details) "Скрыть разбор и словарь" else "Разбор и словарь")
             }
             if (details) {
+                if (canMark && knownReason != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(knownReason.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (mark?.source == ReaderViewModel.UNKNOWN || mark?.source == "manual") {
+                            TextButton(onClick = { onClearKnown(cardWord) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                                Text("Сбросить", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+                // Meanings of the individual characters (目 глаз, 不 не…).
+                val charRows = remember(word, selection) {
+                    val inWord = tokens.subList(selection.first, selection.last + 1)
+                    val syllables = inWord.flatMap { t -> if (t.syllables.size == t.text.length) t.syllables else List(t.text.length) { "" } }
+                    if (zh == null || entry == null || word.length !in 2..4 || !word.all { it.isHan() }) emptyList()
+                    else word.mapIndexed { k, c -> c.toString() to zh.charGloss(c.toString(), syllables.getOrNull(k)?.takeIf { it.isNotEmpty() }) }
+                        .takeIf { rows -> rows.all { it.second != null } }.orEmpty()
+                }
+                if (charRows.isNotEmpty()) CharBreakdown(charRows)
                 (if (zh != null && selectedMeaning != null) "локальное контекстное правило" else zh?.russianSource(word)?.label
                     ?: es.firstOrNull()?.let { it.entry.source ?: if (it.entry.machine) "машинный перевод Викисловаря" else "Викисловарь" })?.let {
                     Text("Русский · $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2032,82 +2072,72 @@ internal fun WordSheet(
                     }
                 }
             } // Optional dictionary and grammar details.
-            // The dictionary glued two words together (把头 «подрядчик» where the text means 把 + 头): split it.
-            val oneMultiChar = selection.first == selection.last && word.length >= 2 && word.all { it.isHan() }
-            if (oneMultiChar) {
-                TextButton(onClick = { onSplit(word, true) }, contentPadding = PaddingValues(0.dp)) {
-                    Text("Разделить «$word» на отдельные слова")
+            WordSheetSection("Границы выделения") {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(onClick = { growLeft?.let { changeBounds(it..selection.last) } }, enabled = growLeft != null) { Text("← слово") }
+                    OutlinedButton(onClick = { growRight?.let { changeBounds(selection.first..it) } }, enabled = growRight != null) { Text("слово →") }
+                    if (shrinkLeft != null) OutlinedButton(onClick = { changeBounds(shrinkLeft) }) { Text("Убрать слева") }
+                    if (shrinkRight != null) OutlinedButton(onClick = { changeBounds(shrinkRight) }) { Text("Убрать справа") }
                 }
-            } else if (word in userSplits) {
-                TextButton(onClick = { onSplit(word, false) }, contentPadding = PaddingValues(0.dp)) {
-                    Text("Соединить «$word» обратно")
-                }
-            }
-            Panel(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                Text(sentence, Modifier.padding(14.dp), fontFamily = WordFont, style = MaterialTheme.typography.titleMedium)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedButton(onClick = { speaker.speak(word, STUDY_LANGUAGE) }) {
-                    Icon(LexiconIcons.Volume, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Слово")
-                }
-                OutlinedButton(onClick = { speaker.speak(sentence, STUDY_LANGUAGE) }) {
-                    Icon(LexiconIcons.Volume, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Фраза")
-                }
-            }
-            Surface(
-                onClick = {
-                    // Spanish: the card's second line is the part of speech and gender («сущ., ж. р.»).
-                    onSave(saveWord, if (aiExpression != null) aiExpressionReading else if (zh == null) es.firstOrNull()?.entry?.let { e ->
-                        listOf(e.pronunciation, e.posLabel).filter { it.isNotEmpty() }.joinToString(" · ")
-                    }.orEmpty() else reading, primaryMeaning, sentence) { r ->
-                        scope.launch {
-                            status = r.fold(
-                                onSuccess = { created -> if (created) "Добавлено в карточки" else "Уже в карточках: добавлен новый пример" },
-                                onFailure = { "Не удалось сохранить: ${it.message}" }
-                            )
-                        }
+                // The dictionary glued two words together (把头 «подрядчик» where the text means 把 + 头): split it.
+                val oneMultiChar = selection.first == selection.last && word.length >= 2 && word.all { it.isHan() }
+                if (oneMultiChar) {
+                    TextButton(onClick = { onSplit(word, true) }, contentPadding = PaddingValues(0.dp)) {
+                        Text("Разделить «$word» на отдельные слова")
                     }
-                },
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.inverseSurface,
-                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                modifier = Modifier.fillMaxWidth().height(56.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(if (isSaved) "Добавить пример к карточке" else if (aiExpression != null) "Сохранить выражение в карточки" else "Сохранить в карточки", style = MaterialTheme.typography.titleMedium)
+                } else if (word in userSplits) {
+                    TextButton(onClick = { onSplit(word, false) }, contentPadding = PaddingValues(0.dp)) {
+                        Text("Соединить «$word» обратно")
+                    }
                 }
             }
-            val lexiconName = zh?.nameKind(word)
-            val isUserName = word in userNames
-            if (lexiconName != null || isUserName) {
-                Text(
-                    "Имя собственное · " + (lexiconName?.title ?: "отмечено тобой"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            WordSheetSection("Заметки и Википедия") {
+                if (onWikipedia != null) TextButton(onClick = onWikipedia, contentPadding = PaddingValues(0.dp)) { Text("Найти в Википедии") }
+                entityPanel?.invoke()
+                val lexiconName = zh?.nameKind(word)
+                val isUserName = word in userNames
+                if (lexiconName != null || isUserName) {
+                    Text(
+                        "Имя собственное · " + (lexiconName?.title ?: "отмечено тобой"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (lexiconName == null) {
+                    OutlinedButton(
+                        onClick = { onUserName(word, !isUserName) },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Text(if (isUserName) "Это не имя" else "Это имя — не учить, не подчёркивать")
+                    }
+                }
+                val sentenceRange = remember(selection) { Highlights.sentence(block, selection.first, selection.last) }
+                HighlightPanel(
+                    current = highlight,
+                    canWiden = sentenceRange != selection.first..selection.last,
+                    onColor = { c, whole -> onHighlight(c, highlight, whole) },
+                    onWholeBook = { on -> onHighlightWholeBook(highlight, on) },
+                    onSentence = { onChange(selection.copy(first = sentenceRange.first, last = sentenceRange.last, phrase = true, done = true)) },
+                    onNote = { n -> highlight?.let { onNote(it, n) } },
+                    onRemove = { highlight?.let(onRemoveHighlight) }
                 )
             }
-            if (lexiconName == null) {
-                OutlinedButton(
-                    onClick = { onUserName(word, !isUserName) },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(18.dp)
-                ) {
-                    Text(if (isUserName) "Это не имя" else "Это имя — не учить, не подчёркивать")
-                }
-            }
-            val sentenceRange = remember(selection) { Highlights.sentence(block, selection.first, selection.last) }
-            HighlightPanel(
-                current = highlight,
-                canWiden = sentenceRange != selection.first..selection.last,
-                onColor = { c, whole -> onHighlight(c, highlight, whole) },
-                onWholeBook = { on -> onHighlightWholeBook(highlight, on) },
-                onSentence = { onChange(selection.copy(first = sentenceRange.first, last = sentenceRange.last, phrase = true, done = true)) },
-                onNote = { n -> highlight?.let { onNote(it, n) } },
-                onRemove = { highlight?.let(onRemoveHighlight) }
-            )
-            status?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
-            speaker.message.takeIf { it.isNotEmpty() }?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
+    }
+}
+
+@Composable
+private fun WordSheetSection(title: String, content: @Composable () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    TextButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, Modifier.weight(1f))
+            Text(if (expanded) "−" else "+")
+        }
+    }
+    if (expanded) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) { content() }
     }
 }
 

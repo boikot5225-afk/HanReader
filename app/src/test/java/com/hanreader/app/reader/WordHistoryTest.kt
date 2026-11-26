@@ -46,6 +46,28 @@ class WordHistoryTest {
         assertEquals(WordHistoryStats(2, 0, 1), dao.stats(engine.info.tag, "hablar").first())
         assertTrue(dao.contexts(engine.info.tag, "hablar").first().all { it.firstSeen == 100L })
     }
+
+    @Test fun familiarityJoinsWordFormsAcrossDaysAndRespondsToDictionaryLookups() = runBlocking {
+        val dao = db.wordHistoryDao()
+        val words = batch("Hablo y hablamos. Hablo y hablamos. Hablo y hablamos. Hablo y hablamos.")
+        val occurrences = words.words.filter { it.lemma == "hablar" }
+        assertEquals(8, occurrences.size)
+        suspend fun stats() = dao.familiarity(engine.info.tag, listOf("hablar")).first().single()
+
+        dao.record(words.copy(words = occurrences.take(2)))
+        assertEquals(FamiliarityLevel.NEW, stats().level)
+        dao.record(words.copy(words = occurrences.take(7)))
+        assertEquals(FamiliarityLevel.REPEATED, stats().level)
+        assertEquals(1, stats().days)
+        dao.record(words.copy(words = listOf(occurrences.last().copy(firstSeen = 2 * 86_400_000L))))
+        assertEquals(WordFamiliarity("hablar", 8, 0, 2), stats())
+        assertEquals(FamiliarityLevel.FAMILIAR, stats().level)
+        repeat(4) { dao.record(words.copy(words = listOf(occurrences.first())), lookup = true) }
+        assertEquals(8L, stats().encounters)
+        assertEquals(4L, stats().lookups)
+        assertEquals(FamiliarityLevel.LOOKED_UP, stats().level)
+        assertTrue(dao.familiarity("en-US", listOf("hablar")).first().isEmpty())
+    }
     @Test fun lookupsAreIndependentAndAtomicAcrossConcurrentRequests() = runBlocking {
         val ch = chapter("Hablo y hablamos.")
         val lookup = WordHistory.batch(source, ch, listOf(WikiVisibleSpan(0, 0, 5)), engine, selection = true)

@@ -220,6 +220,7 @@ private fun SummaryRow(
     var open by remember(item.key) { mutableStateOf(false) }
     val block = chapter.blocks[item.block] as ReaderBlock.Text
     val t = block.tokens[item.token]
+    val pinyin = if (engine is ZhEngine) t.pinyin.ifBlank { engine.reading(item.key).orEmpty() } else ""
     val translation = remember(item.key, t, engine) {
         (if (engine is ZhEngine) engine.cardTranslation(t.text, t.pinyin.takeIf { it.isNotEmpty() }, t.contextMeaning)
             else if (item.phrase) engine.glossShort(t.text, item.key) else engine.cardTranslation(t.text, t.pinyin.takeIf { it.isNotEmpty() })
@@ -227,9 +228,13 @@ private fun SummaryRow(
     }
     val sentence = remember(item.key) { ChapterBuilder.sentence(block.text, t.start, t.start + item.shown.length) }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(item.key, style = MaterialTheme.typography.titleMedium, fontFamily = WordFont, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f))
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(item.key, style = MaterialTheme.typography.titleMedium, fontFamily = WordFont, fontWeight = FontWeight.SemiBold)
+                if (pinyin.isNotBlank()) {
+                    Text(pinyin, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                }
+            }
             val note = listOfNotNull(
                 "${item.count}×",
                 if (item.faded) "без подсказки" else null,

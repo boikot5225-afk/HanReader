@@ -139,7 +139,19 @@ fun AppearanceSheet(onDismiss: () -> Unit, levelText: String? = null, showChapte
 
             Section("Подсказки в тексте")
             SwitchRow("Подчёркивать незнакомые слова", a.markUnknown) { on -> AppearanceStore.update { it.copy(markUnknown = on) } }
-            LineSample(spec.unknownLine, "красная линия — слово ещё не знакомо")
+            if (showChapterTools && a.markUnknown) {
+                SwitchRow("Менять цвет по истории встреч", a.colorUnknownByHistory) { on ->
+                    AppearanceStore.update { it.copy(colorUnknownByHistory = on) }
+                }
+            }
+            if (showChapterTools && a.markUnknown && a.colorUnknownByHistory) {
+                val colors = rubyColors(a, spec)
+                LineSample(colors.unknownLine, "красная — мало встреч или часто смотришь перевод")
+                LineSample(colors.repeatedLine, "оранжевая — уже встречалось")
+                LineSample(colors.familiarLine, "приглушённая — встречалось в разные дни, перевод открывался редко")
+            } else {
+                LineSample(spec.unknownLine, "красная линия — слово ещё не знакомо")
+            }
             SwitchRow("Подчёркивать рекомендуемые", a.markRecommended) { on -> AppearanceStore.update { it.copy(markRecommended = on) } }
             LineSample(spec.recommendedLine, "синяя линия — стоит выучить сейчас: часто в книге и чуть выше твоего уровня")
             if (a.markRecommended) {

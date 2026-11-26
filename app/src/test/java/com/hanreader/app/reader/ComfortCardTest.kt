@@ -7,6 +7,8 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.core.app.ApplicationProvider
 import com.hanreader.app.Speaker
+import com.hanreader.app.ai.AiCheck
+import com.hanreader.app.ai.AI_UNCHANGED_MESSAGE
 import com.hanreader.app.es.EsEngineTest
 import com.hanreader.app.lang.Languages
 import com.hanreader.app.lang.LanguageModule
@@ -37,7 +39,8 @@ class ComfortCardTest {
     @Before fun setup() { speaker=Speaker(app); Doubts.clear(app); ReadingChecks.reset(app) }
     @After fun cleanup() { speaker.close(); Languages.current=language }
 
-    private fun show(engine: LanguageModule, text: String, target: String, initialMeanings: Map<String,String> = emptyMap()) {
+    private fun show(engine: LanguageModule, text: String, target: String, initialMeanings: Map<String,String> = emptyMap(),
+        aiCheck: AiCheck? = null, onWikipedia: (() -> Unit)? = null) {
         val prepared=engine.chapter(listOf(text),TextOptions())(text)
         val block=ReaderBlock.Text(prepared.text,false,prepared.tokens)
         val i=prepared.tokens.indexOfFirst { it.text==target }; assertTrue(i>=0)
@@ -46,6 +49,8 @@ class ComfortCardTest {
             var meanings by remember { mutableStateOf(initialMeanings) }
             WordSheet(selection,block,engine,emptySet(),emptySet(),{false},{flowOf(null)},speaker,
                 onKnown={_,_->},onClearKnown={},highlight=null,onHighlight={_,_,_->},onNote={_,_->},onRemoveHighlight={},
+                aiCheck = aiCheck, aiAvailable = aiCheck != null, aiEnabled = aiCheck != null,
+                aiMessage = aiCheck?.let { AI_UNCHANGED_MESSAGE }, onWikipedia = onWikipedia,
                 userMeanings=meanings,meaningKey={scope,key->"${scope.name}:$key"},onUserMeaning={key,value->meanings=if (value.isBlank()) meanings-key else meanings+(key to value);observedMeanings=meanings},
                 onChange={selection=it},onDismiss={},onSave={_,_,meaning,_,done->savedMeaning=meaning;done(Result.success(true))},doubtSource="Свой пример")
         }
@@ -81,11 +86,28 @@ class ComfortCardTest {
     @Test fun spanishSelectionExpandsThroughASpaceWithoutCountingAnotherLookup() {
         Languages.current=Languages.SPANISH
         show(EsEngineTest.load(),"Una casa grande.","casa")
-        compose.onNodeWithText("слово →").performClick()
+        compose.onNodeWithText("Границы выделения").performScrollTo().performClick()
+        compose.onNodeWithText("слово →").performScrollTo().performClick()
         compose.onNodeWithText("casa grande",substring=false).assertExists()
-        compose.onNodeWithText("Убрать справа").performClick()
+        compose.onNodeWithText("Убрать справа").performScrollTo().performClick()
         assertEquals(1,ReadingChecks.load(app).opened)
         assertEquals(2,ReadingChecks.load(app).boundaries)
+    }
+
+    @Test fun translationIsVisibleWhileAiAndWikipediaDetailsOpenOnDemand() {
+        Languages.current = Languages.CHINESE
+        var wikiOpened = false
+        val row = AiCheck("check", 1L, 0, 0, "context", 0, 2, 0, 2,
+            "礁石", "риф", null, null, "high", "checked")
+        show(ZhContextRegressionTest.engine, "海边有礁石。", "礁石", aiCheck = row, onWikipedia = { wikiOpened = true })
+        compose.onNodeWithText("риф", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Найти в Википедии").assertDoesNotExist()
+        compose.onNodeWithText(AI_UNCHANGED_MESSAGE).assertDoesNotExist()
+        compose.onNodeWithText("DeepSeek · проверено").performScrollTo().performClick()
+        compose.onAllNodesWithText(AI_UNCHANGED_MESSAGE).assertCountEquals(1)
+        compose.onNodeWithText("Заметки и Википедия").performScrollTo().performClick()
+        compose.onNodeWithText("Найти в Википедии").performScrollTo().performClick()
+        compose.runOnIdle { assertTrue(wikiOpened) }
     }
     @Test fun notSuitableDefaultsToHereEvenWithAnExistingBookMeaning() {
         Languages.current=Languages.CHINESE

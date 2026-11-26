@@ -117,8 +117,8 @@ class AiRepository(
                 out += rows
                 _message.value = if (rows.any { it.state == "accepted" }) "Контекстные значения сохранены."
                     else if (rows.any { it.state == "proposed" }) "Есть предложение ИИ — открой карточку слова."
-                    else if (rows.any { it.base.isEmpty() }) "Проверено: надёжного значения для неизвестного слова не найдено."
-                    else "Проверено: перевод сохранён без изменений."
+                    else if (rows.any { it.base.isEmpty() }) AI_UNKNOWN_CHECKED_MESSAGE
+                    else AI_UNCHANGED_MESSAGE
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 _message.value = (e as? AiFailure)?.userMessage ?: "Не удалось проверить или сохранить значения. Исходный словарь сохранён."

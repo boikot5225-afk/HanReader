@@ -249,6 +249,7 @@ data class Appearance(
     val brightness: Float = -1f,
     /** Underline words not known yet (red line). */
     val markUnknown: Boolean = false,
+    val colorUnknownByHistory: Boolean = false,
     /** Underline words recommended for the reader's level (blue line). */
     val markRecommended: Boolean = false,
     /** How many recommended words a chapter shows at most. */
@@ -306,6 +307,7 @@ object AppearanceStore {
             keepScreenOn = p.getBoolean("keepScreenOn", d.keepScreenOn),
             brightness = p.getFloat("brightness", d.brightness).coerceAtMost(1f),
             markUnknown = p.getBoolean("markUnknown", d.markUnknown),
+            colorUnknownByHistory = p.getBoolean("colorUnknownByHistory", d.colorUnknownByHistory),
             markRecommended = p.getBoolean("markRecommended", d.markRecommended),
             recommendedPerChapter = p.getInt("recommendedPerChapter", d.recommendedPerChapter).coerceIn(Appearance.RECOMMENDED),
             gloss = GlossMode.entries.firstOrNull { it.name == p.getString("gloss", null) } ?: d.gloss,
@@ -339,6 +341,7 @@ object AppearanceStore {
             putBoolean("keepScreenOn", next.keepScreenOn)
             putFloat("brightness", next.brightness)
             putBoolean("markUnknown", next.markUnknown)
+            putBoolean("colorUnknownByHistory", next.colorUnknownByHistory)
             putBoolean("markRecommended", next.markRecommended)
             putInt("recommendedPerChapter", next.recommendedPerChapter)
             putString("gloss", next.gloss.name)

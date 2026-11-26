@@ -82,6 +82,8 @@ class DeepSeekClient : AiClient {
             исходные значения скопируй точно, остальные поля заполни по результату анализа.
             Если translation_missing=true, словарного значения нет: current_translation остаётся пустой строкой.
             По явному запросу читателя предложи краткое русское значение слова или выражения по контексту.
+            Заполнение отсутствующего значения тоже считается исправлением: ставь needs_correction=true,
+            если suggested_translation содержит значение, даже когда current_translation пуст.
             При недостаточной уверенности ничего не придумывай: needs_correction=false,
             suggested_translation=null и краткое пояснение неоднозначности.
             Если перевод подходит, needs_correction=false, suggested_translation=null. Если он явно неудачен,

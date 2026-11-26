@@ -126,6 +126,24 @@ class AiResponseTest {
             assertThrows(AiResponseFailure::class.java) { parse(known, result(known).put("current_translation", JSONObject.NULL)) }.problem)
     }
 
+    @Test fun aDefinitionForAnUnknownHyphenatedWordCanBeReviewedDespiteAFalseCorrectionFlag() = runBlocking {
+        val f = fragment("She decided to self-publish her novel.", "self-publish").copy(language = Languages.ENGLISH.tag)
+        val row = result(f, "издавать самостоятельно")
+            .put("needs_correction", false).put("confidence", " High ")
+        val repo = repository { packet(row) }
+        val saved = repo.check(f, false) { true }.single()
+        assertEquals("self-publish", saved.original)
+        assertEquals("издавать самостоятельно", saved.translation)
+        assertEquals("proposed", saved.state)
+        assertEquals("high", saved.confidence)
+        assertEquals(saved, repo.observe(7).first().single())
+
+        val known = f.copy(terms = f.terms.map { it.copy(base = "издавать") })
+        val contradictory = result(known, "издавать самостоятельно").put("needs_correction", false)
+        assertEquals(AiResponseProblem.VALUE,
+            assertThrows(AiResponseFailure::class.java) { parse(known, contradictory) }.problem)
+    }
+
     @Test fun formattingWhitespaceIsNormalizedButHiddenControlCharactersAreRejected() {
         val f = fragment()
         val r = result(f).put("suggested_translation", "Убийца\nдрузей")

@@ -27,6 +27,15 @@ data class WordHistoryContext(val original: String, val start: Int, val end: Int
 
 @Dao
 abstract class WordHistoryDao {
+    @Query("""
+        SELECT lemma, COUNT(*) AS encounters, COALESCE(SUM(lookups), 0) AS lookups,
+            COUNT(DISTINCT date(firstSeen / 1000, 'unixepoch', 'localtime')) AS days
+        FROM word_encounters
+        WHERE language = :language AND lemma IN (:lemmas)
+        GROUP BY lemma
+    """)
+    abstract fun familiarity(language: String, lemmas: List<String>): Flow<List<WordFamiliarity>>
+
     @Query("SELECT w.*, f.title, f.chapterTitle, f.sourceKey, f.textStart, f.text FROM word_encounters w JOIN reading_fragments f ON f.id = w.fragmentId WHERE w.language = :language AND w.lemma IN (:lemmas) ORDER BY w.firstSeen DESC, w.id LIMIT 60")
     abstract fun studyContexts(language: String, lemmas: List<String>): Flow<List<com.hanreader.app.StudyEncounter>>
     @Query("SELECT w.*, f.title, f.chapterTitle, f.sourceKey, f.textStart, f.text FROM word_encounters w JOIN reading_fragments f ON f.id = w.fragmentId WHERE w.id = :id")
