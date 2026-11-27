@@ -15,6 +15,10 @@
 - Тесты: `web/WebArticlesTest` (чистый JVM, локальный HttpServer), `web/WebImportFlowTest`
   (Robolectric: диалог → VM → Room → EPUB, повтор, ошибки). Локально Android SDK недоступен
   (dl.google.com закрыт) — WebArticlesTest прогонялся отдельной JVM-обвязкой, всё остальное — CI.
+- **CI:** [46059920559](https://github.com/boikot5225-afk/HanReader/actions/runs/46059920559) SUCCESS
+  (`testDebugUnitTest` целиком + debug/release APK). Push-запуски на коммит Copilot получили
+  `action_required` — CI запускался вручную `gh workflow run android.yml --ref amauta`;
+  эмуляторный workflow на этот коммит не прогонялся. Телефон не проверялся.
 - Живая проверка извлечения: go.dev, docs.github.com (es/zh), nodejs.org, pypi — хорошо.
   Новостные сайты (El País, BBC, китайские сайты романов) из среды недоступны — не проверены.
 - Ограничения: без картинок; JS-сайты/пейволлы — понятная ошибка; обновить статью нельзя
