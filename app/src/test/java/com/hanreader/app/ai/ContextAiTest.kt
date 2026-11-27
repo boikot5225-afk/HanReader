@@ -274,6 +274,37 @@ class ContextAiTest {
         assertEquals(2, calls); assertEquals(1, repo.usage.value.requests)
     }
 
+    @Test fun explanationIsPaidOnceAndInventedQuotesAreDropped() = runBlocking {
+        val text = "Buscaba una pista en los periódicos."
+        val payload = AiExplain.payload("es-ES", "ANY", text, "Era tarde. $text", focus = "pista")!!
+        var sent: JSONObject? = null
+        reply = { p ->
+            sent = p
+            AiReply(JSONObject().put("translation", "Он искал улику в газетах.").put("grammar", "Imperfecto: длительное действие.")
+                .put("parts", JSONArray().put(JSONObject().put("text", "una pista").put("meaning", "улику"))
+                    .put(JSONObject().put("text", "el detective").put("meaning", "выдумано"))).toString(), 30, true)
+        }
+        val first = repo.explain(payload)
+        assertEquals("explain", sent!!.getString("task")); assertEquals("pista", sent!!.getString("focus"))
+        assertEquals(listOf("una pista"), first.parts.map { it.text })
+        assertEquals(first, repo.explain(payload))
+        assertEquals(first, repo.savedExplanation(payload))
+        assertEquals(1, calls); assertEquals(30, repo.usage.value.tokens)
+        repo.clear(false)
+        assertNull(repo.savedExplanation(payload))
+        assertNull(AiExplain.payload("es-ES", "ANY", "a".repeat(AiExplain.MAX_TEXT + 1), ""))
+    }
+
+    @Test fun malformedExplanationIsNotSaved() = runBlocking {
+        val payload = AiExplain.payload("es-ES", "ANY", "La pista del aeropuerto.", "La pista del aeropuerto.")!!
+        for (bad in listOf("{\"parts\":[]}", "{\"translation\":\"x\"} tail", "{\"translation\":5}")) {
+            reply = { AiReply(bad, 10, true) }
+            try { repo.explain(payload); fail("accepted $bad") } catch (e: AiFailure) { assertTrue(e.userMessage.startsWith("Ответ DeepSeek отклонён")) }
+            assertNull(repo.savedExplanation(payload))
+        }
+        assertEquals(3, calls)
+    }
+
     @Test fun sentenceIsSentOnlyForRepeatedWords() {
         fun term(f: AiFragment, word: String) = f.json().getJSONArray("terms").let { a ->
             (0 until a.length()).map { a.getJSONObject(it) }.first { it.getString("original") == word }

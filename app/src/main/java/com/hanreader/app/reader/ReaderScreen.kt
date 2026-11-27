@@ -866,7 +866,11 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             onRemove = { vm.removeHighlight(it.id); selection = null },
             onDismiss = { selection = null },
             onWikipedia = openWikipedia,
-            entityPanel = entityControls
+            entityPanel = entityControls,
+            aiExplain = if (supportedAi) { {
+                com.hanreader.app.ai.AiExplainPanel(com.hanreader.app.lang.Languages.current.tag, appearance.esVariant.name,
+                    block.shown.substring(start, end), block.shown, contextAi = ai)
+            } } else null
         )
     }
     bookNote?.let { (record, bi, t) ->
@@ -968,6 +972,11 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             aiLimitReached = usage.requests >= aiConfig.limit,
             onAiCheck = { checkManualAi(sel) },
             onAiState = { row, state -> scope.launch { ai.repository.setState(row.cacheKey, state) } },
+            aiExplain = {
+                com.hanreader.app.ai.AiExplainPanel(com.hanreader.app.lang.Languages.current.tag, appearance.esVariant.name,
+                    ChapterBuilder.sentence(block.shown, start, end), block.shown, focus = block.shown.substring(start, end),
+                    label = "Объяснить предложение", contextAi = ai)
+            },
             userMeanings = userMeanings,
             meaningKey = { scope, key ->
                 when (scope) {
@@ -1747,6 +1756,8 @@ internal fun WordSheet(
     aiLimitReached: Boolean = false,
     onAiCheck: () -> Unit = {},
     onAiState: (AiCheck, String) -> Unit = { _, _ -> },
+    /** «Объяснить предложение» with this word in focus. */
+    aiExplain: (@Composable () -> Unit)? = null,
     userMeanings: Map<String, String> = emptyMap(),
     meaningKey: (MeaningScope, String) -> String = { _, key -> key },
     onUserMeaning: (String, String) -> Unit = { _, _ -> },
@@ -1970,6 +1981,7 @@ internal fun WordSheet(
                 val status = aiWordStatus(aiCheck, aiEnabled, aiChecking, aiMessage, aiAutomatic, aiLimitReached, userMeaning != null)
                 WordSheetSection("DeepSeek", subtitle = status) {
                     AiWordControls(aiCheck, aiEnabled, aiBusy || aiChecking, aiLimitReached, userMeaning != null, onAiCheck, onAiState)
+                    aiExplain?.invoke()
                 }
             }
             TextButton(onClick = { details = !details }, contentPadding = PaddingValues(0.dp)) {

@@ -67,7 +67,8 @@ class AiRepository(
     private val config: () -> AiConfig,
     private val key: () -> String?,
     private val usageStore: AiUsageStore = MemoryUsage(),
-    private val today: () -> Long = { java.time.LocalDate.now().toEpochDay() }
+    private val today: () -> Long = { java.time.LocalDate.now().toEpochDay() },
+    private val explanations: AiExplainCache = MemoryExplainCache()
 ) {
     private val mutex = Mutex()
     private val attempts = HashSet<String>()
@@ -283,6 +284,25 @@ class AiRepository(
         return if (saved) kept else null
     }
 
+    /** A saved explanation for [payload] (see [AiExplain.payload]); free, no request. */
+    suspend fun savedExplanation(payload: JSONObject): AiExplanation? = withContext(Dispatchers.IO) {
+        explanations.get(AiExplain.key(config().model, payload))?.let {
+            try { AiExplain.parse(it, payload.getString("text")) } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+        }
+    }
+
+    /** One paid request, once per fragment: the answer is kept and shown again for free. */
+    suspend fun explain(payload: JSONObject): AiExplanation = mutex.withLock {
+        val c = config()
+        savedExplanation(payload)?.let { return@withLock it }
+        val reply = request(payload, c)
+        if (!reply.finished) throw AiFailure("Ответ DeepSeek обрезан. Выдели фрагмент короче.")
+        val explanation = try { withContext(Dispatchers.Default) { AiExplain.parse(reply.content, payload.getString("text")) } }
+            catch (e: AiResponseFailure) { throw AiFailure("Ответ DeepSeek отклонён: ${e.problem.description} [${e.problem.name}].") }
+        withContext(Dispatchers.IO) { explanations.put(AiExplain.key(c.model, payload), AiExplain.json(explanation).toString()) }
+        explanation
+    }
+
     suspend fun probe() = mutex.withLock {
         try {
             val reply = request(JSONObject().put("task", "Connection check. Return JSON {\"results\":[]}")
@@ -306,6 +326,7 @@ class AiRepository(
     }
     suspend fun clear(all: Boolean) = mutex.withLock {
         if (all) dao.clearAll() else dao.clearCache()
+        withContext(Dispatchers.IO) { explanations.clear() }
         attempts.clear()
         _wordFeedback.value = AiWordFeedback()
     }
@@ -314,7 +335,8 @@ class AiRepository(
 /** App-lifetime settings and counters; a new process starts a new bounded session. */
 class ContextAi internal constructor(context: Context, val settings: AiSettings = AiSettings(context), client: AiClient = DeepSeekClient()) {
     val repository = AiRepository(LexiconDatabase.get(context), client,
-        { settings.config.value }, { settings.vault.read() }, PrefsUsage(context))
+        { settings.config.value }, { settings.vault.read() }, PrefsUsage(context),
+        explanations = FileExplainCache(context))
     companion object {
         @Volatile private var instance: ContextAi? = null
         fun get(context: Context): ContextAi = instance ?: synchronized(this) {

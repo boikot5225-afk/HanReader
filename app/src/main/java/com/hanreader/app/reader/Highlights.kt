@@ -294,7 +294,9 @@ internal fun PhraseSheet(
     /** Moves [highlight] to the whole book (true) or back to this place. */
     onWholeBook: (Highlight?, Boolean) -> Unit = { _, _ -> },
     onWikipedia: (() -> Unit)? = null,
-    entityPanel: (@Composable () -> Unit)? = null
+    entityPanel: (@Composable () -> Unit)? = null,
+    /** «Объяснить с ИИ» for the selected text. */
+    aiExplain: (@Composable () -> Unit)? = null
 ) {
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
@@ -310,6 +312,7 @@ internal fun PhraseSheet(
             if (reading.isNotBlank()) {
                 Text(reading, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
             }
+            aiExplain?.invoke()
             HighlightPanel(
                 current = highlight,
                 canWiden = canWiden,

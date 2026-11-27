@@ -2,6 +2,14 @@
 
 Состояние на 26 ноября 2026, исходники **0.32.0** (versionCode 85), ветка **`amauta`**.
 
+## «Объяснить предложение» — 0.35.0
+
+- `ai/AiExplain.kt`: запрос/строгий разбор/кеш (`FileExplainCache`), `AiRepository.explain` и
+  `savedExplanation`; промпт `DeepSeekClient.EXPLAIN` (выбор по `task=explain`).
+- UI: `AiExplainPanel` (AiWordControls.kt) — в `PhraseSheet` (слот `aiExplain`) и в разделе
+  DeepSeek карточки слова. Только книги/статьи; Википедия — следующий шаг.
+- Тесты: `ContextAiTest.explanation…`, `malformedExplanationIsNotSaved`.
+
 ## DeepSeek: надёжность и экономия — 0.34.0
 
 - **Дневной лимит** вместо «за сеанс»: `AiUsage.day`, `AiUsageStore` (prefs `context_ai_usage`),
