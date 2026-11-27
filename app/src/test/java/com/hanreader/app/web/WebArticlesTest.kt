@@ -3,7 +3,6 @@ package com.hanreader.app.web
 import com.hanreader.app.epub.BookFiles
 import com.hanreader.app.epub.BookFormat
 import com.hanreader.app.epub.EpubBlock
-import com.sun.net.httpserver.HttpServer
 import org.jsoup.Jsoup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,7 +12,8 @@ import org.junit.Assert.fail
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.File
-import java.net.InetSocketAddress
+import java.net.InetAddress
+import java.net.ServerSocket
 
 /** Pages written for this test: a news page with its usual clutter, a GBK novel page, a script-drawn page. */
 class WebArticlesTest {
@@ -114,13 +114,29 @@ class WebArticlesTest {
     }
 
     @Test fun downloadFollowsRedirectsReadsCharsetAndExplainsFailures() {
-        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        fun route(path: String, code: Int, type: String?, body: ByteArray, location: String? = null) = server.createContext(path) { ex ->
-            type?.let { ex.responseHeaders.add("Content-Type", it) }
-            location?.let { ex.responseHeaders.add("Location", it) }
-            ex.sendResponseHeaders(code, if (body.isEmpty()) -1 else body.size.toLong())
-            if (body.isNotEmpty()) ex.responseBody.use { it.write(body) } else ex.close()
+        // A few lines of HTTP over a socket: com.sun.net.httpserver is not on the Android test classpath.
+        val routes = HashMap<String, ByteArray>()
+        fun route(path: String, code: Int, type: String?, body: ByteArray, location: String? = null) {
+            val head = buildString {
+                append("HTTP/1.1 $code X\r\n")
+                type?.let { append("Content-Type: $it\r\n") }
+                location?.let { append("Location: $it\r\n") }
+                append("Content-Length: ${body.size}\r\nConnection: close\r\n\r\n")
+            }
+            routes[path] = head.toByteArray(Charsets.ISO_8859_1) + body
         }
+        val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+        Thread {
+            while (!server.isClosed) {
+                val socket = runCatching { server.accept() }.getOrNull() ?: break
+                socket.use { s ->
+                    val reader = s.getInputStream().bufferedReader(Charsets.ISO_8859_1)
+                    val path = reader.readLine().orEmpty().split(' ').getOrElse(1) { "/" }
+                    while (!reader.readLine().isNullOrEmpty()) { }
+                    s.getOutputStream().apply { write(routes[path] ?: "HTTP/1.1 404 X\r\nContent-Length: 0\r\n\r\n".toByteArray()); flush() }
+                }
+            }
+        }.apply { isDaemon = true }.start()
         val latin = newsPage.toByteArray(Charsets.ISO_8859_1)
         route("/old", 301, null, ByteArray(0), "/new")
         route("/new", 200, "text/html; charset=ISO-8859-1", latin)
@@ -128,9 +144,8 @@ class WebArticlesTest {
         route("/file", 200, "application/pdf", "%PDF".toByteArray())
         route("/loop", 302, null, ByteArray(0), "/loop")
         route("/plain", 200, "text/plain; charset=utf-8", story.joinToString("\n\n").toByteArray())
-        server.start()
         try {
-            val base = "http://127.0.0.1:${server.address.port}"
+            val base = "http://127.0.0.1:${server.localPort}"
             val a = WebPages.article("$base/old", "test", httpsOnly = false)
             assertEquals("$base/new", a.url)
             assertEquals(story[0], a.blocks.first().text)
@@ -141,6 +156,6 @@ class WebArticlesTest {
             assertEquals("Слишком много переадресаций", message("/loop"))
             try { WebPages.article("$base/new", "test"); fail() } catch (e: WebArticleException) { assertTrue(e.message!!.contains("https")) }
             assertFalse(runCatching { WebPages.article("$base/new", "test", httpsOnly = false, active = { false }) }.isSuccess)
-        } finally { server.stop(0) }
+        } finally { server.close() }
     }
 }
