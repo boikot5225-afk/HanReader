@@ -62,7 +62,8 @@ data class OpenBook(
 class ReaderViewModel @JvmOverloads constructor(app: Application,
     private val aiOverride: com.hanreader.app.ai.ContextAi? = null,
     private val loadTimeoutMs: Long = READER_LOAD_TIMEOUT_MS,
-    private val bookOpener: suspend (File) -> BookSource = { BookFiles.open(it) }) : AndroidViewModel(app) {
+    private val bookOpener: suspend (File) -> BookSource = { BookFiles.open(it) },
+    private val pageLoader: suspend (String) -> com.hanreader.app.web.WebArticle = ::downloadArticle) : AndroidViewModel(app) {
     private val db = LexiconDatabase.get(app)
     private val books = db.bookDao()
     private val cards = db.cardDao()
@@ -352,6 +353,49 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
             })
         }
     }
+
+    /**
+     * An article from a link: the page is downloaded (only its address leaves the phone) and its
+     * text kept as a small EPUB book. The same link again opens the copy saved before, with its place.
+     */
+    fun importUrl(url: String, onDone: (Result<Long>) -> Unit) {
+        viewModelScope.launch {
+            val result = try {
+                Result.success(withContext(Dispatchers.IO) {
+                    webImports.withLock {
+                        val name = "web-" + java.security.MessageDigest.getInstance("SHA-256").digest(url.toByteArray())
+                            .take(10).joinToString("") { "%02x".format(it) } + ".epub"
+                        val target = File(booksDir, name)
+                        val existing = books.findByFileName(name)
+                        if (existing != null && target.isFile && target.length() > 0) {
+                            val tag = com.hanreader.app.lang.BookLanguages.of(getApplication(), existing.id)
+                            val l = com.hanreader.app.lang.Languages.ALL.firstOrNull { it.tag == tag }
+                            if (l != null && l != com.hanreader.app.lang.Languages.current) {
+                                throw EpubException("Статья уже в библиотеке языка «${l.title.lowercase()}». Переключить язык: библиотека → «Язык» → «Сменить».")
+                            }
+                            return@withLock existing.id
+                        }
+                        val article = pageLoader(url)
+                        val stamp = System.currentTimeMillis()
+                        val temp = File(booksDir, "import-$stamp.tmp")
+                        temp.writeBytes(com.hanreader.app.web.WebArticles.epub(article, java.time.LocalDate.now().toString()))
+                        if (existing != null) {
+                            // The saved file went missing: put it back, keeping place, bookmarks and notes.
+                            if (!temp.renameTo(target)) { temp.copyTo(target, overwrite = true); temp.delete() }
+                            existing.id
+                        } else importFile(temp, stamp, article.title, name)
+                    }
+                })
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: com.hanreader.app.web.WebArticleException) { Result.failure(EpubException(e.message ?: "")) }
+            catch (e: EpubException) { Result.failure(e) }
+            catch (_: java.io.IOException) { Result.failure(EpubException("Не удалось загрузить страницу. Проверь интернет и попробуй ещё раз.")) }
+            catch (_: Exception) { Result.failure(EpubException("Не удалось открыть страницу")) }
+            onDone(result)
+        }
+    }
+
+    private val webImports = Mutex()
 
     /** Recognises, checks and stores a book file copied to [temp]; returns the new book's id. */
     private suspend fun importFile(temp: File, stamp: Long, shownName: String?, storedName: String? = null): Long {
@@ -1157,4 +1201,12 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
     override fun onCleared() {
         closeBookInternal()
     }
+}
+
+/** The page at [url] as an article: a mobile browser's User-Agent (sites refuse unknown ones) plus the app's name. */
+private suspend fun downloadArticle(url: String): com.hanreader.app.web.WebArticle {
+    val job = kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]
+    val agent = "Mozilla/5.0 (Linux; Android ${android.os.Build.VERSION.RELEASE}; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "Chrome/131.0 Mobile Safari/537.36 AmautaReader/${com.hanreader.app.BuildConfig.VERSION_NAME}"
+    return com.hanreader.app.web.WebPages.article(url, agent) { job?.isActive != false }
 }

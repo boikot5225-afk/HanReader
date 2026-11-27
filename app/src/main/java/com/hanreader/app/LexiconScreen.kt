@@ -125,6 +125,15 @@ fun LexiconScreen(vm: LexiconViewModel = viewModel(), reader: ReaderViewModel = 
                     r.onSuccess { id -> pasting = null; session = null; bookStats = null; tab = Tab.READ; reading = id }
                         .onFailure { e -> pasteError = e.message ?: "Не удалось сохранить текст" }
                 }
+            },
+            onLink = { url ->
+                pasteBusy = true
+                pasteError = null
+                reader.importUrl(url) { r ->
+                    pasteBusy = false
+                    r.onSuccess { id -> pasting = null; session = null; bookStats = null; tab = Tab.READ; reading = id }
+                        .onFailure { e -> pasteError = e.message ?: "Не удалось открыть страницу" }
+                }
             }
         )
     }

@@ -199,7 +199,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
                 }
             } else {
                 BigButton("Добавить книгу", onClick = { picker.launch(BOOK_MIME_TYPES) })
-                androidx.compose.material3.TextButton(onClick = onPaste, modifier = Modifier.fillMaxWidth()) { Text("Вставить текст") }
+                androidx.compose.material3.TextButton(onClick = onPaste, modifier = Modifier.fillMaxWidth()) { Text("Вставить текст или ссылку") }
                 if (demo != null && books.isNotEmpty()) {
                     TextButton(onClick = openDemo, modifier = Modifier.fillMaxWidth()) { Text("Открыть пробную книгу") }
                 }

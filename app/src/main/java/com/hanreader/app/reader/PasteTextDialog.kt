@@ -32,14 +32,19 @@ import com.hanreader.app.LexiconIcons
 import com.hanreader.app.WordFont
 
 /**
- * Chinese text to read: pasted here, shared from another app or selected there («Читать в
- * HanReader»). [initial]: the text that came in. [busy]: saving, the buttons wait.
+ * Text to read: pasted here, shared from another app or selected there («Читать в
+ * HanReader»). A lone link (a page shared from the browser) becomes an article: [onLink].
+ * [initial]: the text that came in. [busy]: saving, the buttons wait.
  */
 @Composable
-fun PasteTextDialog(initial: String, busy: Boolean, error: String?, onDismiss: () -> Unit, onSave: (title: String, text: String) -> Unit) {
+fun PasteTextDialog(
+    initial: String, busy: Boolean, error: String?, onDismiss: () -> Unit,
+    onSave: (title: String, text: String) -> Unit, onLink: (url: String) -> Unit = {}
+) {
     val clipboard = LocalClipboardManager.current
     var text by remember { mutableStateOf(initial) }
     var title by remember { mutableStateOf("") }
+    val link = remember(text) { com.hanreader.app.web.WebArticles.linkIn(text) }
     val hasChinese = text.any { com.hanreader.app.lang.Languages.current.isWordChar(it) }
     Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).imePadding()) {
@@ -48,7 +53,7 @@ fun PasteTextDialog(initial: String, busy: Boolean, error: String?, onDismiss: (
                 Text("Текст для чтения", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             }
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
+                if (link == null) OutlinedTextField(
                     value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth(), singleLine = true,
                     label = { Text("Название") }, placeholder = { Text(PastedText.title(PastedText.tidy(text)).takeIf { text.isNotBlank() } ?: "Первая строка текста") },
                     shape = RoundedCornerShape(14.dp)
@@ -56,7 +61,7 @@ fun PasteTextDialog(initial: String, busy: Boolean, error: String?, onDismiss: (
                 OutlinedTextField(
                     value = text, onValueChange = { text = it },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 420.dp),
-                    label = { Text("Китайский текст") },
+                    label = { Text("Текст или ссылка на статью") },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = WordFont),
                     shape = RoundedCornerShape(14.dp)
                 )
@@ -70,15 +75,25 @@ fun PasteTextDialog(initial: String, busy: Boolean, error: String?, onDismiss: (
                         modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End
                     )
                 }
-                if (text.isNotBlank() && !hasChinese) {
+                if (link == null && text.isNotBlank() && !hasChinese) {
                     Text(com.hanreader.app.lang.Languages.current.noWordsMessage + ".", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                Button(
+                if (link != null) {
+                    Button(
+                        onClick = { onLink(link) }, enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(18.dp)
+                    ) { Text(if (busy) "Загружаю статью…" else "Загрузить статью") }
+                    Text(
+                        "Страница с ${com.hanreader.app.web.WebArticles.hostOf(link)} загрузится без рекламы и меню и сохранится в библиотеке как книга. " +
+                            "Сайт получит только адрес страницы. Не откроются страницы за входом или платной подпиской.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else Button(
                     onClick = { onSave(title, text) }, enabled = hasChinese && !busy,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(18.dp)
                 ) { Text(if (busy) "Сохраняю…" else "Читать") }
-                Text(
+                if (link == null) Text(
                     "Текст сохранится в библиотеке как книга: " + (if (com.hanreader.app.lang.Languages.current.readingTitle != null) "пиньинь, " else "") + "перевод по нажатию, карточки и место чтения — всё как в книгах.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
