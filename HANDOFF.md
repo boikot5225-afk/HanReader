@@ -9,6 +9,7 @@
 - UI: `AiExplainPanel` (AiWordControls.kt) — в `PhraseSheet` (слот `aiExplain`) и в разделе
   DeepSeek карточки слова. Только книги/статьи; Википедия — следующий шаг.
 - Тесты: `ContextAiTest.explanation…`, `malformedExplanationIsNotSaved`.
+- **CI:** [46081306266](https://github.com/boikot5225-afk/HanReader/actions/runs/46081306266) SUCCESS. Живой DeepSeek не проверялся.
 
 ## DeepSeek: надёжность и экономия — 0.34.0
 
