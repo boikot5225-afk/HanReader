@@ -152,12 +152,12 @@ class WikiAiTest {
         assertEquals(20, f.terms.size)
         assertNull(WikiAiContext.automatic(reading("pista ".repeat(1500)),0,engine,emptyMap(),appearance,glosses))
     }
-    @Test fun automaticModeSharesTheExistingSessionLimitAndCounters() = runBlocking {
+    @Test fun automaticModeSharesTheExistingDailyLimitAndCounters() = runBlocking {
         config = config.copy(limit = 1)
         val a = fragment(reading()); val b = fragment(reading(a = article.copy(id = 43)))
         repo.attachArticle(a.articleKey!!); repo.attachArticle(b.articleKey!!)
         repo.check(a,true) { true }; assertTrue(repo.check(b,true) { true }.isEmpty())
-        assertEquals(AiUsage(1,50,0),repo.usage.value); assertEquals(1, calls)
+        assertEquals(AiUsage(1,50,0,repo.usage.value.day),repo.usage.value); assertEquals(1, calls)
     }
     @Test fun explicitUnknownWordGetsAContextualTranslationButIsNotAnAutomaticCandidate() = runBlocking {
         val r = reading("Desconocido.")
