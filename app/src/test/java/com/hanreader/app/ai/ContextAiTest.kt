@@ -263,7 +263,7 @@ class ContextAiTest {
         }
         var day = 100L
         config = config.copy(limit = 1)
-        fun daily() = AiRepository(db, client, { config }, { "mock-key-no-account" }, store) { day }
+        fun daily() = AiRepository(db, client, { config }, { "mock-key-no-account" }, store, { day })
         daily().check(fragment(), false) { true }
         repo = daily()
         assertEquals(1, repo.usage.value.requests)
