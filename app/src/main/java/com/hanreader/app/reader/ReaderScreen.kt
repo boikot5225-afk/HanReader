@@ -407,11 +407,9 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             chapter == null || aiEngine == null || aiObscured ||
             !aiLifecycle.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return@LaunchedEffect
         kotlinx.coroutines.delay(1200)
-        // One bounded packet per visible paragraph, sequenced without prefetching the book.
-        for (span in encounterSpans) {
-            // Scrolling cancels this waiter, not a paid request already running in the same chapter.
-            automaticAiJob?.join()
-            val fragment = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        // The visible paragraphs go together (up to AiContext.BATCH words per request), without prefetching the book.
+        val fragments = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            encounterSpans.mapNotNull { span ->
                 AiContext.build(book.entity.id, chapter, span.block, aiResource, aiEngine, userMeanings,
                     appearance.esVariant.name, includeMissing = true)?.let { built ->
                     AiContext.visibleTerms(built, span.start until span.end) { term ->
@@ -419,14 +417,15 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                             !matcher.isKnown(term.original) && !matcher.isKnown(term.lemma) &&
                             !aiEngine.isName(term.original)
                     }
-                }
-            } ?: continue
-            val request = scope.launch {
-                vm.checkAi(fragment, automatic = true) { !currentAiObscured && span in currentAiSpans }
+                }?.let { fragment -> fragment to { !currentAiObscured && span in currentAiSpans } }
             }
-            automaticAiJob = request
-            request.join()
         }
+        if (fragments.isEmpty()) return@LaunchedEffect
+        // Scrolling cancels this waiter, not a paid request already running in the same chapter.
+        automaticAiJob?.join()
+        val request = scope.launch { vm.checkAiGroup(fragments) }
+        automaticAiJob = request
+        request.join()
     }
     var manualAiJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     DisposableEffect(book.entity.id, chapter, aiConfig, userMeanings, appearance.esVariant, aiLifecycle) {

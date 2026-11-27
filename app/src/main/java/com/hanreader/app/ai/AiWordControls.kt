@@ -6,6 +6,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
 
+internal const val AI_LIMIT_MESSAGE = "Достигнут дневной лимит запросов DeepSeek. Его можно изменить в настройках."
 internal const val AI_UNCHANGED_MESSAGE = "Проверено: перевод сохранён без изменений."
 internal const val AI_UNKNOWN_CHECKED_MESSAGE = "Проверено: надёжного значения для неизвестного слова не найдено."
 
@@ -19,7 +20,7 @@ internal fun aiWordStatus(row: AiCheck?, enabled: Boolean, checking: Boolean, me
     row?.state == "proposed" -> "Есть предложение DeepSeek."
     row?.state == "accepted" -> "Исправление применено здесь."
     !enabled -> null
-    limitReached -> "Достигнут лимит запросов за сеанс. Его можно изменить в настройках."
+    limitReached -> AI_LIMIT_MESSAGE
     automatic -> "Это слово ещё не проверено."
     else -> "Автопроверка выключена."
 }

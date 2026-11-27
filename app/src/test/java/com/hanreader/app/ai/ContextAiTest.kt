@@ -203,11 +203,83 @@ class ContextAiTest {
     @Test fun truncatedMalformedAndUnknownTermResponsesNeverPersist() = runBlocking {
         val f = fragment()
         for (bad in listOf(AiReply("{", 10, true), AiReply(fakeReply(f.json()).content, 10, false),
-            AiReply("{\"results\":[]}", 10, true), AiReply(fakeReply(f.json()).content.replace("t_12_17", "alien"), 10, true))) {
+            AiReply("{\"results\":[]}", 10, true))) {
             reply = { bad }; repo.check(f, false) { true }
             assertTrue(repo.observe(7).first().isEmpty())
         }
-        assertEquals(40, repo.usage.value.tokens)
+        assertEquals(30, repo.usage.value.tokens)
+    }
+
+    @Test fun wrongAnswerForOneWordKeepsTheOthers() = runBlocking {
+        val f = fragment()
+        reply = { AiReply(fakeReply(it).content.replace("t_12_17", "alien"), 10, true) }
+        val rows = repo.check(f, false) { true }
+        assertEquals(listOf("periódicos"), rows.map { it.original })
+        assertEquals(listOf("periódicos"), repo.observe(7).first().map { it.original })
+        assertTrue(repo.message.value!!.startsWith("Часть ответа DeepSeek отклонена"))
+        val pista = f.terms.single { it.original == "pista" }
+        assertTrue(repo.wordFeedback.value.failures.keys.any { it.start == pista.start })
+    }
+
+    @Test fun visibleParagraphsShareOneRequestWithoutRepeatingTheirContext() = runBlocking {
+        val texts = listOf("Buscaba una pista en los periódicos.", "La pista del aeropuerto.")
+        var offset = 0
+        val blocks = texts.map { text ->
+            val tokens = Regex("\\p{L}+|\\s+|[^\\p{L}\\s]").findAll(text).map {
+                RToken(it.value, "", if (it.value.first().isLetter()) TokenKind.HAN else TokenKind.PUNCT,
+                    it.range.first, it.range.last + 1, true)
+            }.toList()
+            ReaderBlock.Text(text, false, tokens).also { offset += text.length }
+        }
+        val chapter = ChapterContent(0, "Test", blocks, 0, offset)
+        val fragments = (0..1).map { AiContext.build(7, chapter, it, "OEBPS/chapter.xhtml", Dictionary, emptyMap(), "ANY")!! }
+        var sent: JSONObject? = null
+        reply = { payload ->
+            sent = payload
+            val results = JSONArray()
+            val paragraphs = payload.getJSONArray("paragraphs")
+            for (i in 0 until paragraphs.length()) {
+                val rows = JSONObject(fakeReply(paragraphs.getJSONObject(i)).content).getJSONArray("results")
+                for (j in 0 until rows.length()) results.put(rows.get(j))
+            }
+            AiReply(JSONObject().put("results", results).toString(), 50, true)
+        }
+        repo.checkVisibleGroup(fragments.map { AiVisibleCheck(it, { true }) { true } })
+        assertEquals(1, calls)
+        val paragraphs = sent!!.getJSONArray("paragraphs")
+        assertFalse(paragraphs.getJSONObject(0).has("next_context"))
+        assertFalse(paragraphs.getJSONObject(1).has("previous_context"))
+        val saved = repo.observe(7).first()
+        assertEquals("улика", saved.single { it.original == "pista" && it.block == 0 }.translation)
+        assertEquals("checked", saved.single { it.original == "pista" && it.block == 1 }.state)
+        assertEquals(3, saved.size)
+    }
+
+    @Test fun dailyLimitSurvivesRestartAndResetsAtMidnight() = runBlocking {
+        val store = object : AiUsageStore {
+            var value = AiUsage()
+            override fun load() = value
+            override fun save(usage: AiUsage) { value = usage }
+        }
+        var day = 100L
+        config = config.copy(limit = 1)
+        fun daily() = AiRepository(db, client, { config }, { "mock-key-no-account" }, store) { day }
+        daily().check(fragment(), false) { true }
+        repo = daily()
+        assertEquals(1, repo.usage.value.requests)
+        repo.check(fragment("La pista del aeropuerto."), false) { true }
+        assertEquals(1, calls); assertTrue(repo.message.value!!.contains("дневной лимит"))
+        day = 101
+        repo.check(fragment("La pista del aeropuerto."), false) { true }
+        assertEquals(2, calls); assertEquals(1, repo.usage.value.requests)
+    }
+
+    @Test fun sentenceIsSentOnlyForRepeatedWords() {
+        fun term(f: AiFragment, word: String) = f.json().getJSONArray("terms").let { a ->
+            (0 until a.length()).map { a.getJSONObject(it) }.first { it.getString("original") == word }
+        }
+        assertFalse(term(fragment(), "pista").has("sentence"))
+        assertTrue(term(fragment("Una pista. Otra pista."), "pista").has("sentence"))
     }
 
     @Test fun invalidSpansWrongTypesDuplicateIdsAndTrailingGarbageAreRejected() {
@@ -219,16 +291,24 @@ class ContextAiTest {
         }
         val good = fakeReply(f.json()).content
         rejects(good + " trailing")
+        rejects(good.replace("\"results\"", "'results'"))
+        val first = f.terms.single { it.id == JSONObject(good).getJSONArray("results").getJSONObject(0).getString("term_id") }
+        // A bad row loses only its own word.
+        fun rejectsFirstOnly(content: String) {
+            val parsed = AiContext.read(content, f, config.model)
+            assertTrue(parsed.problems.isNotEmpty())
+            assertTrue(parsed.rows.none { it.termStart == first.start })
+            assertEquals(1, parsed.rows.size)
+        }
         val root = JSONObject(good)
         root.getJSONArray("results").getJSONObject(0).put("needs_correction", "true")
-        rejects(root.toString())
+        rejectsFirstOnly(root.toString())
         val span = JSONObject(good)
         span.getJSONArray("results").getJSONObject(0).put("span", JSONObject().put("start", 0).put("end", 99999).put("text", "bad"))
-        rejects(span.toString())
+        rejectsFirstOnly(span.toString())
         val dup = JSONObject(good)
         dup.getJSONArray("results").put(1, dup.getJSONArray("results").getJSONObject(0))
-        rejects(dup.toString())
-        rejects(good.replace("\"results\"", "'results'"))
+        assertTrue(AiContext.read(dup.toString(), f, config.model).problems.contains(AiResponseProblem.TERMS))
     }
 
     @Test fun mediumConfidenceIsOnlyProposedAndCanBeExplicitlyAccepted() = runBlocking {
@@ -240,7 +320,7 @@ class ContextAiTest {
         assertEquals("accepted", repo.observe(7).first().first { it.translation != null }.state)
     }
 
-    @Test fun concurrentChecksDeduplicateAndSessionLimitIncludesAllBatches() = runBlocking {
+    @Test fun concurrentChecksDeduplicateAndDailyLimitIncludesAllBatches() = runBlocking {
         coroutineScope { List(4) { async(Dispatchers.Default) { repo.check(fragment(), false) { true } } }.awaitAll() }
         assertEquals(1, calls)
         assertEquals(50, repo.usage.value.tokens)

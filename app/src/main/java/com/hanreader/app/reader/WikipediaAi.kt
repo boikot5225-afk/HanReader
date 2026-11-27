@@ -65,20 +65,25 @@ internal fun rememberWikipediaAi(ai: ContextAi, reading: WikiReading?, engine: L
         if (!enabled || !attached || !config.automatic || blocked || appearance.gloss == GlossMode.OFF ||
             reading == null || engine == null || !lifecycle.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
         delay(1200)
-        for (span in visible.distinct().sortedBy { it.block }.take(3)) {
-            // Scrolling cancels the waiter; a running paid request may finish and fill the cache.
-            automaticJob?.join()
-            val fragment = withContext(Dispatchers.Default) { WikiAiContext.automatic(reading, span.block, engine, meanings, appearance, baseGlosses, span.start until span.end) } ?: continue
-            val request = scope.launch { try { repo.checkVisible(fragment, canStart = {
+        val items = withContext(Dispatchers.Default) {
+            visible.distinct().sortedBy { it.block }.take(3).mapNotNull { span ->
+                WikiAiContext.automatic(reading, span.block, engine, meanings, appearance, baseGlosses, span.start until span.end)
+            }
+        }.map { fragment ->
+            AiVisibleCheck(fragment, canStart = {
                 !currentBlocked && currentAppearance.gloss != GlossMode.OFF && currentVisible.any { shown ->
                     shown.block == fragment.block && fragment.terms.any { it.start < shown.end && it.end > shown.start }
                 }
-            }) { stillValid(reading, meanings, appearance, fragment) } }
-                catch (e: CancellationException) { throw e }
-                catch (_: Exception) { repo.notice("Не удалось проверить или сохранить значение. Исходный словарь сохранён.") }
-            }
-            automaticJob = request; request.join()
+            }) { stillValid(reading, meanings, appearance, fragment) }
         }
+        if (items.isEmpty()) return@LaunchedEffect
+        // Scrolling cancels the waiter; a running paid request may finish and fill the cache.
+        automaticJob?.join()
+        val request = scope.launch { try { repo.checkVisibleGroup(items) }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { repo.notice("Не удалось проверить или сохранить значение. Исходный словарь сохранён.") }
+        }
+        automaticJob = request; request.join()
     }
     return WikiAiState(valid, enabled && attached, busy,
         check = { block, range ->

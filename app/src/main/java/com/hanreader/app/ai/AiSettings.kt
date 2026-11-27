@@ -19,7 +19,8 @@ data class AiConfig(
     val consent: Boolean = false,
     val indicators: Boolean = true,
     val model: String = "deepseek-flash",
-    val limit: Int = 20,
+    /** Paid requests per day. */
+    val limit: Int = 100,
     val hasKey: Boolean = false
 )
 
@@ -65,16 +66,18 @@ class AiSettings(context: Context, val vault: AiKeyVault = AiKeyVault(context)) 
     private val prefs = context.getSharedPreferences("context_ai", Context.MODE_PRIVATE)
     private fun load() = AiConfig(prefs.getBoolean("enabled", false), prefs.getBoolean("auto", false),
         prefs.getBoolean("consent", false), prefs.getBoolean("indicators", true),
-        prefs.getString("model", "deepseek-flash")!!, prefs.getInt("limit", 20).coerceIn(1, 200), vault.exists())
+        prefs.getString("model", "deepseek-flash")!!, prefs.getInt("daily_limit", 100).coerceIn(1, MAX_LIMIT), vault.exists())
     private val _config = MutableStateFlow(load())
     val config = _config.asStateFlow()
     fun update(value: AiConfig) {
         require(value.model.matches(Regex("[a-zA-Z0-9._-]{1,80}")))
-        require(value.limit in 1..200)
+        require(value.limit in 1..MAX_LIMIT)
         prefs.edit().putBoolean("enabled", value.enabled && value.consent).putBoolean("auto", value.automatic)
             .putBoolean("consent", value.consent).putBoolean("indicators", value.indicators)
-            .putString("model", value.model).putInt("limit", value.limit).apply()
+            .putString("model", value.model).putInt("daily_limit", value.limit).apply()
         _config.value = load()
     }
     fun refresh() { _config.value = load() }
+
+    companion object { const val MAX_LIMIT = 1000 }
 }

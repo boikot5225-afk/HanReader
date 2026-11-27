@@ -77,28 +77,41 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
     private val booksDir = File(app.filesDir, "books").apply { mkdirs() }
     val contextAi by lazy { aiOverride ?: com.hanreader.app.ai.ContextAi.get(app) }
 
-    suspend fun checkAi(fragment: com.hanreader.app.ai.AiFragment, automatic: Boolean, visible: (() -> Boolean)? = null) {
-        suspend fun stillValid(): Boolean {
-            val open = _open.value
-            val chapter = open?.chapter
-            return if (open == null || chapter == null || open.loading || open.entity.id != fragment.book || chapter.index != fragment.chapter) false
-            else {
-                val engine = engineDeferred.await()
-                val meanings = db.userMeaningDao().all().filter { it.language.isEmpty() || it.language == lang }.associate { it.word to it.meaning }
-                withContext(Dispatchers.Default) {
-                    val fresh = com.hanreader.app.ai.AiContext.build(fragment.book, chapter, fragment.block,
-                        open.epub.chapters[chapter.index].path, engine, meanings, com.hanreader.app.AppearanceStore.appearance.value.esVariant.name,
-                        includeMissing = true)
-                    fresh != null && fresh.contextHash == fragment.contextHash && fragment.terms.all { old ->
-                        fresh.terms.any { it.start == old.start && it.base == old.base && it.lemma == old.lemma &&
-                            (it.reading == old.reading || old.end > it.end) }
-                    }
+    /** The paragraph and its words are unchanged since [fragment] was built. */
+    private suspend fun aiStillValid(fragment: com.hanreader.app.ai.AiFragment): Boolean {
+        val open = _open.value
+        val chapter = open?.chapter
+        return if (open == null || chapter == null || open.loading || open.entity.id != fragment.book || chapter.index != fragment.chapter) false
+        else {
+            val engine = engineDeferred.await()
+            val meanings = db.userMeaningDao().all().filter { it.language.isEmpty() || it.language == lang }.associate { it.word to it.meaning }
+            withContext(Dispatchers.Default) {
+                val fresh = com.hanreader.app.ai.AiContext.build(fragment.book, chapter, fragment.block,
+                    open.epub.chapters[chapter.index].path, engine, meanings, com.hanreader.app.AppearanceStore.appearance.value.esVariant.name,
+                    includeMissing = true)
+                fresh != null && fresh.contextHash == fragment.contextHash && fragment.terms.all { old ->
+                    fresh.terms.any { it.start == old.start && it.base == old.base && it.lemma == old.lemma &&
+                        (it.reading == old.reading || old.end > it.end) }
                 }
             }
         }
+    }
+
+    suspend fun checkAi(fragment: com.hanreader.app.ai.AiFragment, automatic: Boolean, visible: (() -> Boolean)? = null) {
+        suspend fun stillValid() = aiStillValid(fragment)
         try {
             if (automatic && visible != null) contextAi.repository.checkVisible(fragment, visible, allowMissing = true, stillValid = ::stillValid)
             else contextAi.repository.check(fragment, automatic, ::stillValid)
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (_: Exception) { contextAi.repository.notice("Не удалось прочитать или сохранить данные проверки. Обычный словарь доступен.") }
+    }
+
+    /** Automatic check of the paragraphs on screen in as few requests as possible. */
+    suspend fun checkAiGroup(items: List<Pair<com.hanreader.app.ai.AiFragment, () -> Boolean>>) {
+        try {
+            contextAi.repository.checkVisibleGroup(items.map { (fragment, visible) ->
+                com.hanreader.app.ai.AiVisibleCheck(fragment, { visible() }) { aiStillValid(fragment) }
+            })
         } catch (e: kotlinx.coroutines.CancellationException) { throw e }
         catch (_: Exception) { contextAi.repository.notice("Не удалось прочитать или сохранить данные проверки. Обычный словарь доступен.") }
     }

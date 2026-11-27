@@ -27,6 +27,7 @@ fun AiSettingsDialog(onClose: () -> Unit) {
     val ai = remember(context) { ContextAi.get(context) }
     val c by ai.settings.config.collectAsState()
     val usage by ai.repository.usage.collectAsState()
+    LaunchedEffect(Unit) { ai.repository.refreshUsage() }
     val busy by ai.repository.busy.collectAsState()
     val appearance by com.hanreader.app.AppearanceStore.appearance.collectAsState()
     val message by ai.repository.message.collectAsState()
@@ -89,16 +90,16 @@ fun AiSettingsDialog(onClose: () -> Unit) {
                 TextButton(onClick = { com.hanreader.app.AppearanceStore.update { it.copy(gloss = com.hanreader.app.GlossMode.UNKNOWN) } }) { Text("Показать переводы над незнакомыми словами") }
             }
             OutlinedTextField(model, { model = it }, label = { Text("Модель") }, singleLine = true)
-            OutlinedTextField(limit, { limit = it }, label = { Text("Лимит запросов за сеанс (1–200)") }, singleLine = true)
-            TextButton(enabled = model.matches(Regex("[a-zA-Z0-9._-]{1,80}")) && (limit.toIntOrNull() ?: 0) in 1..200,
+            OutlinedTextField(limit, { limit = it }, label = { Text("Лимит запросов в день (1–${AiSettings.MAX_LIMIT})") }, singleLine = true)
+            TextButton(enabled = model.matches(Regex("[a-zA-Z0-9._-]{1,80}")) && (limit.toIntOrNull() ?: 0) in 1..AiSettings.MAX_LIMIT,
                 onClick = { ai.settings.update(c.copy(model = model, limit = limit.toInt())); localMessage = "Настройки сохранены." }) { Text("Сохранить модель и лимит") }
             Row {
                 Switch(c.indicators, onCheckedChange = { ai.settings.update(c.copy(indicators = it)) })
                 Text("Отмечать исправления точкой", Modifier.padding(12.dp))
             }
-            Text("За сеанс: запросов ${usage.requests}/${c.limit}, токенов ${usage.tokens}" +
+            Text("Сегодня: запросов ${usage.requests}/${c.limit}, токенов ${usage.tokens}" +
                 if (usage.unknown > 0) ". Расход ещё ${usage.unknown} запросов неизвестен." else ".")
-            Text("Сеанс длится до завершения процесса приложения. Смена книги или статьи не сбрасывает лимит.", style = MaterialTheme.typography.bodySmall)
+            Text("Счётчик общий для книг и статей и обнуляется в полночь. Один запрос проверяет до ${AiContext.BATCH} слов со всех абзацев на экране.", style = MaterialTheme.typography.bodySmall)
             TextButton(enabled = c.enabled && c.hasKey && c.consent && !busy && !saving,
                 onClick = { localMessage = null; action { ai.repository.probe() } }) { Text(if (busy) "Проверяю…" else "Проверить подключение (платный запрос)") }
             (localMessage ?: message)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
