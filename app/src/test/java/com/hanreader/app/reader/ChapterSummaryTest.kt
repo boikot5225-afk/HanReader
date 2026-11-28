@@ -29,6 +29,7 @@ class ChapterSummaryTest {
         // Tapped first, then the word whose hint faded (four times, hints stop after three).
         assertEquals(listOf("狐狸", "猫头鹰"), words)
         assertTrue(items.first { it.key == "猫头鹰" }.faded)
+        assertEquals(4, items.first { it.key == "猫头鹰" }.places.size)
         assertTrue(items.first { it.key == "狐狸" }.tapped)
         // A chengyu is listed as an expression.
         assertTrue(items.first { it.key == "画蛇添足" }.phrase)

@@ -49,6 +49,36 @@ class BookVocabularyTest {
         assertFalse(list.any { it.word == "终于" })
     }
 
+    private fun ai(block: Int, start: Int, end: Int, state: String, translation: String?, base: String = "") =
+        com.hanreader.app.ai.AiCheck("k$block:$start:$state", 7, sample.index, block, "h", start, end, start, end, "终于", base,
+            translation, null, "high", state)
+
+    private fun startOf(block: Int, word: String) = (sample.blocks[block] as ReaderBlock.Text).tokens.first { it.text == word }.start
+
+    @Test
+    fun preparationUsesTheMeaningsOfTheChapter() {
+        val known = setOf("他", "了", "在", "到", "很", "的", "每天", "去", "看书", "书", "多", "一", "份", "可是", "找到", "喜欢", "以后")
+        // 终于 three times: the reader's own meaning in the second paragraph, DeepSeek's in the third, the dictionary in the first.
+        val user = mapOf(ContextMeanings.here(7, sample.index, 1, startOf(1, "终于")) to "наконец-то")
+        val s2 = startOf(2, "终于")
+        val rows = listOf(ai(2, s2, s2 + 2, "accepted", "в конце концов"), ai(2, s2, s2 + 2, "rejected", "никогда"))
+        val meanings = ChapterMeanings(7, sample, engine, user, rows)
+        val c = VocabularyStats.chapter(sample, known, emptySet(), emptySet(), engine, meanings = meanings).first { it.word == "终于" }
+        assertEquals(listOf(MeaningSource.USER, MeaningSource.AI, MeaningSource.DICTIONARY), c.meanings.map { it.source })
+        assertEquals("наконец-то", c.gloss)
+        assertEquals("工作很忙，可是他终于习惯了。", c.meanings.first().sentence)
+        assertEquals(engine.cardTranslation("终于", c.pinyin), c.meanings.last().meaning)
+        assertEquals("小明终于到了北京。", c.meanings.last().sentence)
+        // Only the place still on the dictionary is worth asking DeepSeek about.
+        assertEquals(listOf(0), refineTargets(listOf(c)).single().second.map { it.block })
+        // A DeepSeek confirmation of the hint counts as the meaning in context.
+        val s0 = startOf(0, "终于")
+        val all = ChapterMeanings(7, sample, engine, user, rows + ai(0, s0, s0 + 2, "checked", null, base = "наконец"))
+        val d = VocabularyStats.chapter(sample, known, emptySet(), emptySet(), engine, meanings = all).first { it.word == "终于" }
+        assertTrue(d.meanings.all { it.source.contextual })
+        assertTrue(refineTargets(listOf(d)).isEmpty())
+    }
+
     @Test
     fun firstSentenceComesFromTheChapter() {
         assertEquals("小明终于到了北京。", VocabularyStats.firstSentence(sample, "终于"))

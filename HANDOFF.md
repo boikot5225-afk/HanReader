@@ -2,6 +2,22 @@
 
 Состояние на 26 ноября 2026, исходники **0.32.0** (versionCode 85), ветка **`amauta`**.
 
+## Значения из контекста в подготовке и итоге главы — 0.37.0
+
+- Отзыв: «Подготовиться к разделу» показывал словарную статью (犯罪 «совершать преступление; преступление»)
+  и так же сохранял карточку; «Итог главы» не видел своих значений и ответов DeepSeek.
+- `reader/ChapterMeanings.kt`: значение каждого вхождения — своё (здесь/книга/везде) → принятый
+  DeepSeek / «DeepSeek: подходит» (checked) / чтение ИИ → контекстное правило → «DeepSeek не уверен»
+  (proposed) → словарь. `groups()` группирует вхождения по значению и чтению, контекстные первыми.
+- Подготовка (`VocabularyStats.chapter(meanings=…)`, `PrepareChapterSheet`, `MeaningLines`): значения
+  с источником и числом вхождений; карточка (`addCandidates`) — значение, чтение и предложение
+  первой группы. Кнопка «Уточнить у DeepSeek» (`refineTargets`/`refineFragments` →
+  `ReaderViewModel.checkAiChosen` → `AiRepository.checkGroup`, ручной групповой запрос, работает и при
+  выключенной автопроверке) — только места со словарным/неуверенным значением, ≤2 на слово.
+- Итог главы: `SummaryItem.places`, строки через `ChapterMeanings`; сохранение берёт чтение группы.
+- Тесты: `BookVocabularyTest.preparationUsesTheMeaningsOfTheChapter`,
+  `ContextAiTest.chosenWordsAreCheckedWithAutomaticChecksOff`, `ChapterSummaryTest` (places).
+
 ## Надёжный DeepSeek — 0.36.0
 
 - Отзыв: карточка слова «Ответ DeepSeek отклонён … [SPAN]» — цитата модели не совпала с нарезкой слов.

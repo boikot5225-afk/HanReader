@@ -226,7 +226,9 @@ data class StudyCandidate(
     val count: Int,
     val pinyin: String,
     val gloss: String,
-    val firstChapter: Int
+    val firstChapter: Int,
+    /** In one chapter: the meanings it has there, the one for the card first (see [ChapterMeanings]). */
+    val meanings: List<MeaningGroup> = emptyList()
 )
 
 /** Share of the text covered when every word up to an HSK 3.0 level is known. */
@@ -307,23 +309,34 @@ object VocabularyStats {
         saved: Set<String>,
         ignored: Set<String>,
         engine: LanguageModule,
-        limit: Int = 50
+        limit: Int = 50,
+        /** The meanings in this chapter's context; without them the candidates carry the dictionary's. */
+        meanings: ChapterMeanings? = null
     ): List<StudyCandidate> {
         val matcher = KnownMatcher(known, engine)
         val counts = HashMap<String, Int>()
-        for (b in chapter.blocks) {
-            if (b !is ReaderBlock.Text) continue
+        val places = HashMap<String, MutableList<Place>>()
+        chapter.blocks.forEachIndexed { bi, b ->
+            if (b !is ReaderBlock.Text) return@forEachIndexed
             val inNames = nameTokens(b, ignored, engine)
             for ((i, t) in b.tokens.withIndex()) {
                 // By dictionary form (Spanish habló -> hablar): the cards keep that form.
-                if (t.kind == TokenKind.HAN && i !in inNames) engine.lemma(t.text).let { w -> counts[w] = (counts[w] ?: 0) + 1 }
+                if (t.kind == TokenKind.HAN && i !in inNames) engine.lemma(t.text).let { w ->
+                    counts[w] = (counts[w] ?: 0) + 1
+                    if (meanings != null && !b.heading) places.getOrPut(w) { ArrayList() } += Place(bi, i, t.end)
+                }
             }
         }
         return counts.entries.asSequence()
             .filter { (w, _) -> !matcher.isKnown(w) && w !in saved && w !in ignored && engine.studyable(w) && !isName(w, engine) }
             .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
             .take(limit)
-            .map { (w, n) -> candidate(w, n, chapter.index, engine) }
+            .map { (w, n) ->
+                val base = candidate(w, n, chapter.index, engine)
+                val groups = meanings?.groups(places[w].orEmpty()).orEmpty()
+                val top = groups.firstOrNull() ?: return@map base
+                base.copy(pinyin = top.reading.ifBlank { base.pinyin }, gloss = top.meaning.ifBlank { base.gloss }, meanings = groups)
+            }
             .toList()
     }
 

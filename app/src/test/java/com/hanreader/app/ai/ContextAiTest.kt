@@ -256,6 +256,22 @@ class ContextAiTest {
         assertEquals(3, saved.size)
     }
 
+    @Test fun chosenWordsAreCheckedWithAutomaticChecksOff() = runBlocking {
+        config = config.copy(automatic = false)
+        val text = "Buscaba una pista en los periódicos."
+        val tokens = Regex("\\p{L}+|\\s+|[^\\p{L}\\s]").findAll(text).map {
+            RToken(it.value, "", if (it.value.first().isLetter()) TokenKind.HAN else TokenKind.PUNCT, it.range.first, it.range.last + 1, true)
+        }.toList()
+        val chapter = ChapterContent(0, "Test", listOf(ReaderBlock.Text(text, false, tokens)), 0, text.length)
+        val fragment = AiContext.build(7, chapter, 0, "OEBPS/chapter.xhtml", Dictionary, emptyMap(), "ANY")!!
+        repo.checkVisibleGroup(listOf(AiVisibleCheck(fragment, { true }) { true }))
+        assertEquals(0, calls) // automatic checks are off
+        repo.checkGroup(listOf(AiVisibleCheck(fragment, { true }) { true }))
+        assertEquals(1, calls)
+        repo.checkGroup(listOf(AiVisibleCheck(fragment, { true }) { true }))
+        assertEquals(1, calls) // saved answers are not paid for twice
+    }
+
     @Test fun dailyLimitSurvivesRestartAndResetsAtMidnight() = runBlocking {
         val store = object : AiUsageStore {
             var value = AiUsage()

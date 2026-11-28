@@ -724,12 +724,16 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val sumItems = summaryOpen
     if (sumItems != null && chapter != null && sumEngine != null) {
         val summaryChapter = displayChapter ?: chapter
+        val summaryMeanings = remember(book.entity.id, summaryChapter, sumEngine, userMeanings, validAiRows) {
+            ChapterMeanings(book.entity.id, summaryChapter, sumEngine, userMeanings, validAiRows)
+        }
         ChapterSummarySheet(
             chapter = summaryChapter, items = sumItems, engine = sumEngine, percent = coverage?.takeIf { it.total > 0 }?.percent,
+            meanings = summaryMeanings,
             onKnown = vm::setKnown,
-            onSave = { item, translation, sentence ->
+            onSave = { item, group, translation, sentence ->
                 val token = (summaryChapter.blocks[item.block] as? ReaderBlock.Text)?.tokens?.getOrNull(item.token)
-                val pinyin = token?.pinyin?.takeIf { sumEngine is ZhEngine && it.isNotBlank() }
+                val pinyin = (group?.reading ?: token?.pinyin)?.takeIf { sumEngine is ZhEngine && it.isNotBlank() }
                 vm.saveWord(ReaderSave(
                     word = item.key, reading = pinyin ?: sumEngine.reading(item.key).orEmpty(), translation = translation, sentence = sentence,
                     bookId = book.entity.id, bookTitle = book.entity.title, chapterIndex = chapter.index, chapterTitle = chapter.title
@@ -740,7 +744,8 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     }
     val prepEngine = engine
     if (showPrepare && chapter != null && prepEngine != null) {
-        PrepareChapterSheet(vm, book, chapter, prepEngine, names = names, onDismiss = { showPrepare = false })
+        PrepareChapterSheet(vm, book, chapter, prepEngine, names = names, shown = displayChapter ?: chapter, aiRows = validAiRows,
+            onDismiss = { showPrepare = false })
     }
 
     if (showAppearance) {

@@ -57,6 +57,7 @@ import com.hanreader.app.Panel
 import com.hanreader.app.ProgressBar
 import com.hanreader.app.WordFont
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val SIZES = listOf(10, 20, 30)
@@ -77,7 +78,8 @@ internal fun CandidatePicker(
     modifier: Modifier = Modifier,
     preview: @Composable (List<StudyCandidate>) -> Unit = {},
     sentenceFor: (StudyCandidate) -> String? = { null },
-    loading: Boolean = false
+    loading: Boolean = false,
+    actions: @Composable (List<StudyCandidate>) -> Unit = {}
 ) {
     var size by remember { mutableStateOf(10) }
     var unchecked by remember { mutableStateOf(setOf<String>()) }
@@ -111,6 +113,7 @@ internal fun CandidatePicker(
             )
         }
         Spacer(Modifier.height(4.dp))
+        actions(chosen)
         Surface(
             onClick = { if (!busy && chosen.isNotEmpty()) onAdd(chosen) },
             enabled = !busy && chosen.isNotEmpty(),
@@ -154,7 +157,8 @@ private fun CandidateRow(
                     Spacer(Modifier.width(8.dp))
                     Text(c.pinyin, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
                 }
-                Text(c.gloss, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (c.meanings.isEmpty()) Text(c.gloss, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                else MeaningLines(c.meanings, c.pinyin)
                 Text("$countLabel: ${c.count}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (!sentence.isNullOrBlank()) Text(sentence, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -167,28 +171,62 @@ private fun CandidateRow(
     }
 }
 
+/**
+ * The meanings a word has in the chapter, the one for the card first: each with where it comes from
+ * and, when there are several, how often it stands so; another reading is shown before its meaning.
+ */
+@Composable
+internal fun MeaningLines(groups: List<MeaningGroup>, reading: String, max: Int = 3) {
+    groups.take(max).forEachIndexed { i, g ->
+        val head = (if (g.reading.isNotBlank() && g.reading != reading) g.reading + " — " else "") + g.meaning.ifBlank { "нет перевода" }
+        val note = g.source.label + if (groups.size > 1) " · ${g.count}×" else ""
+        Text(
+            androidx.compose.ui.text.buildAnnotatedString {
+                append(head)
+                pushStyle(androidx.compose.ui.text.SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp))
+                append("  $note")
+                pop()
+            },
+            style = if (i == 0) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+            maxLines = 2, overflow = TextOverflow.Ellipsis
+        )
+    }
+    if (groups.size > max) Text("и ещё ${groups.size - max}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
 /** «Подготовиться к разделу»: the chapter's most frequent unknown words. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PrepareChapterSheet(vm: ReaderViewModel, book: OpenBook, chapter: ChapterContent, engine: com.hanreader.app.lang.LanguageModule,
-    names: Set<String> = emptySet(), onDismiss: () -> Unit) {
+    names: Set<String> = emptySet(),
+    /** The chapter as drawn (readings DeepSeek chose), and the DeepSeek answers still valid for it. */
+    shown: ChapterContent = chapter, aiRows: List<com.hanreader.app.ai.AiCheck> = emptyList(),
+    onDismiss: () -> Unit) {
     val known by vm.knownWords.collectAsState()
     val saved by vm.savedWords.collectAsState()
     val bookWordsFlow = remember(book.entity.id) { vm.bookWords(book.entity.id) }
     val bookWords by bookWordsFlow.collectAsState(initial = emptyList())
     val ignored = remember(bookWords, names) { bookWords.filter { it.ignored }.mapTo(HashSet()) { it.word }.apply { addAll(names) } }
     // Drop the previous snapshot immediately when the source/marks change; never mix chapters.
-    val snapshot by androidx.compose.runtime.key(chapter, known, saved, ignored, engine) {
+    val userMeanings by vm.userMeanings.collectAsState()
+    val snapshot by androidx.compose.runtime.key(shown, known, saved, ignored, engine, userMeanings, aiRows) {
         produceState<PreparationSnapshot?>(null) {
             value = withContext(Dispatchers.Default) {
-                val candidates = VocabularyStats.chapter(chapter, known, saved, ignored, engine)
-                PreparationSnapshot(candidates, ChapterPreparation.of(chapter, known, ignored, engine),
-                    candidates.associate { it.word to VocabularyStats.firstSentence(chapter, it.word, engine) })
+                val meanings = ChapterMeanings(book.entity.id, shown, engine, userMeanings, aiRows)
+                val candidates = VocabularyStats.chapter(shown, known, saved, ignored, engine, meanings = meanings)
+                PreparationSnapshot(candidates, ChapterPreparation.of(shown, known, ignored, engine),
+                    candidates.associate { c -> c.word to (c.meanings.firstOrNull()?.sentence ?: VocabularyStats.firstSentence(shown, c.word, engine)) })
             }
         }
     }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
+    val aiConfig by vm.contextAi.settings.config.collectAsState()
+    val aiBusy by vm.contextAi.repository.busy.collectAsState()
+    val aiMessage by vm.contextAi.repository.message.collectAsState()
+    var refining by remember { mutableStateOf(false) }
+    var refined by remember { mutableStateOf(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = 700.dp), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp)) {
             item {
@@ -212,6 +250,35 @@ fun PrepareChapterSheet(vm: ReaderViewModel, book: OpenBook, chapter: ChapterCon
                     onIgnore = { vm.setIgnored(book.entity.id, it.word, true) },
                     preview = { chosen -> prepared?.let { PreparationForecast(it.plan, chosen) } },
                     sentenceFor = { prepared?.sentences?.get(it.word) },
+                    actions = { chosen ->
+                        if (com.hanreader.app.ai.AiContext.supports(engine.info.tag) && aiConfig.enabled) {
+                            val targets = refineTargets(chosen)
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = {
+                                    refining = true; refined = true
+                                    scope.launch {
+                                        val fragments = withContext(Dispatchers.Default) {
+                                            refineFragments(book.entity.id, chapter, book.epub.chapters.getOrNull(chapter.index)?.path.orEmpty(),
+                                                engine, userMeanings, targets)
+                                        }
+                                        vm.checkAiChosen(fragments) { refining = false }
+                                    }
+                                },
+                                enabled = !refining && !aiBusy && targets.isNotEmpty() && aiConfig.hasKey && aiConfig.consent,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(if (refining) "DeepSeek проверяет…" else "Уточнить у DeepSeek: ${targets.sumOf { it.second.size }} мест")
+                            }
+                            Text(
+                                if (!aiConfig.hasKey || !aiConfig.consent) "Чтобы уточнять значения, добавь ключ DeepSeek в настройках ИИ."
+                                else if (targets.isEmpty()) "У выбранных слов значения уже взяты из контекста."
+                                else "Одним запросом проверит значения выбранных слов прямо в их предложениях. " +
+                                    "Слова со своим или уже проверенным значением не отправляются.",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (refined && !refining) aiMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
+                        }
+                    },
                     onAdd = { list ->
                         busy = true
                         vm.addCandidates(book.entity, list, chapter) { r ->
@@ -222,6 +289,22 @@ fun PrepareChapterSheet(vm: ReaderViewModel, book: OpenBook, chapter: ChapterCon
                 )
             }
         }
+    }
+}
+
+/** Words to ask DeepSeek about and where: the places of their meanings not chosen by context, two at most per word. */
+internal fun refineTargets(chosen: List<StudyCandidate>): List<Pair<StudyCandidate, List<MeaningGroup>>> =
+    chosen.mapNotNull { c -> c.meanings.filter { !it.source.contextual }.take(2).takeIf { it.isNotEmpty() }?.let { c to it } }
+
+/** One request's worth of fragments: one per paragraph, with every chosen place in it as a term. */
+internal fun refineFragments(book: Long, chapter: ChapterContent, resource: String, engine: com.hanreader.app.lang.LanguageModule,
+    meanings: Map<String, String>, targets: List<Pair<StudyCandidate, List<MeaningGroup>>>): List<com.hanreader.app.ai.AiFragment> {
+    val variant = com.hanreader.app.AppearanceStore.appearance.value.esVariant.name
+    return targets.flatMap { it.second }.groupBy { it.block }.mapNotNull { (bi, groups) ->
+        val parts = groups.mapNotNull { g ->
+            com.hanreader.app.ai.AiContext.build(book, chapter, bi, resource, engine, meanings, variant, range = g.start until g.end)
+        }
+        parts.firstOrNull()?.copy(terms = parts.flatMap { it.terms }.distinctBy { it.start }.sortedBy { it.start })
     }
 }
 

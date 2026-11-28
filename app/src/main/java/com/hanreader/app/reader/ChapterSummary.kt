@@ -50,7 +50,9 @@ data class SummaryItem(
     /** The reader tapped it in this chapter. */
     val tapped: Boolean,
     val block: Int,
-    val token: Int
+    val token: Int,
+    /** Every place it stood in the chapter, for its meanings there (see [ChapterMeanings]). */
+    val places: List<Place> = emptyList()
 )
 
 /**
@@ -87,6 +89,7 @@ object ChapterSummary {
         class Acc(val key: String, val shown: String, val phrase: Boolean, val block: Int, val token: Int) {
             var count = 0
             var hinted = 0
+            val places = ArrayList<Place>()
         }
         val acc = LinkedHashMap<String, Acc>()
         chapter.blocks.forEachIndexed { bi, b ->
@@ -101,6 +104,7 @@ object ChapterSummary {
                         Acc(key, b.text.substring(t.start, t.end), idiomKind(engine.lookup(key)?.gloss) != null, bi, ti)
                     }
                     a.count++
+                    a.places += Place(bi, ti, t.end)
                     if (glossFor == null || glossOf(glossFor, t, bi) != null) a.hinted++
                     continue
                 }
@@ -119,6 +123,7 @@ object ChapterSummary {
                     Acc(key, b.text.substring(t.start, tokens[end].end), phrase, bi, ti)
                 }
                 a.count++
+                a.places += Place(bi, ti, if (phrase) phraseEnd(tokens, ti) else t.end)
                 if (glossFor == null || glossOf(glossFor, t, bi) != null) a.hinted++
             }
         }
@@ -126,12 +131,23 @@ object ChapterSummary {
             val word = (chapter.blocks[a.block] as ReaderBlock.Text).tokens[a.token].text
             (a.hinted > 0 || a.key in tapped) && !isKnown(word, a.key) && !skip(word, a.key)
         }
-        fun item(a: Acc) = SummaryItem(a.key, a.shown, a.phrase, a.count, a.count > repeats, a.key in tapped, a.block, a.token)
+        fun item(a: Acc) = SummaryItem(a.key, a.shown, a.phrase, a.count, a.count > repeats, a.key in tapped, a.block, a.token, a.places)
         // Tapped first, then those whose hint faded, then by how often they stood in the chapter.
         fun score(a: Acc) = (if (a.key in tapped) 1000 else 0) + (if (a.count > repeats) 100 else 0) + a.count
         val phrases = candidates.filter { it.phrase }.sortedByDescending(::score).take(PHRASES).map(::item)
         val words = candidates.filter { !it.phrase }.sortedByDescending(::score).take(WORDS + PHRASES - phrases.size).map(::item)
         return words + phrases
+    }
+
+    /** Where a phrase that starts at token [start] ends: its last word (the others are IN_PHRASE). */
+    private fun phraseEnd(tokens: List<RToken>, start: Int): Int {
+        var end = tokens[start].end
+        var k = start + 1
+        while (k < tokens.size && (tokens[k].kind != TokenKind.HAN || tokens[k].pinyin == com.hanreader.app.lang.IN_PHRASE)) {
+            if (tokens[k].kind == TokenKind.HAN) end = tokens[k].end
+            k++
+        }
+        return end
     }
 }
 
@@ -175,8 +191,10 @@ internal fun ChapterSummarySheet(
     /** Share of the chapter's words known now. */
     percent: Int?,
     onKnown: (String, Boolean) -> Unit,
-    onSave: (SummaryItem, String, String) -> Unit,
-    onDismiss: () -> Unit
+    /** The item, and the meaning it is saved with: translation, reading and sentence of this chapter. */
+    onSave: (SummaryItem, MeaningGroup?, String, String) -> Unit,
+    onDismiss: () -> Unit,
+    meanings: ChapterMeanings? = null
 ) {
     val startPercent = remember { percent }
     val decided = remember { mutableStateMapOf<String, String>() }
@@ -198,9 +216,9 @@ internal fun ChapterSummarySheet(
                 )
             }
             items(items, key = { it.key }) { item ->
-                SummaryRow(chapter, item, engine, decided[item.key],
+                SummaryRow(chapter, item, engine, decided[item.key], meanings,
                     onKnown = { known -> onKnown(item.key, known); decided[item.key] = if (known) "Знаю" else "Не знаю" },
-                    onSave = { translation, sentence -> onSave(item, translation, sentence); decided[item.key] = "В карточках" })
+                    onSave = { group, translation, sentence -> onSave(item, group, translation, sentence); decided[item.key] = "В карточках" })
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
             item { Spacer(Modifier.height(28.dp)) }
@@ -214,19 +232,25 @@ private fun SummaryRow(
     item: SummaryItem,
     engine: LanguageModule,
     decision: String?,
+    meanings: ChapterMeanings?,
     onKnown: (Boolean) -> Unit,
-    onSave: (String, String) -> Unit
+    onSave: (MeaningGroup?, String, String) -> Unit
 ) {
     var open by remember(item.key) { mutableStateOf(false) }
     val block = chapter.blocks[item.block] as ReaderBlock.Text
     val t = block.tokens[item.token]
-    val pinyin = if (engine is ZhEngine) t.pinyin.ifBlank { engine.reading(item.key).orEmpty() } else ""
-    val translation = remember(item.key, t, engine) {
+    // The meanings it had in this chapter, the one for the card first; without them, the first place's.
+    val groups = remember(item, meanings) { meanings?.groups(item.places.ifEmpty { listOf(Place(item.block, item.token, t.end)) }).orEmpty() }
+    val top = groups.firstOrNull()?.takeIf { it.meaning.isNotBlank() }
+    val pinyin = if (engine is ZhEngine) top?.reading?.takeIf { it.isNotBlank() } ?: t.pinyin.ifBlank { engine.reading(item.key).orEmpty() } else ""
+    val dictionary = remember(item.key, t, engine) {
         (if (engine is ZhEngine) engine.cardTranslation(t.text, (t.glossReading ?: t.pinyin).takeIf { it.isNotEmpty() }, t.contextMeaning)
             else if (item.phrase) engine.glossShort(t.text, item.key) else engine.cardTranslation(t.text, t.pinyin.takeIf { it.isNotEmpty() })
             ?: engine.glossShort(t.text, t.pinyin.takeIf { it.isNotEmpty() })).orEmpty()
     }
-    val sentence = remember(item.key) { ChapterBuilder.sentence(block.text, t.start, t.start + item.shown.length) }
+    val translation = top?.meaning ?: dictionary
+    val first = remember(item.key) { ChapterBuilder.sentence(block.text, t.start, t.start + item.shown.length) }
+    val sentence = top?.sentence ?: first
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -245,7 +269,8 @@ private fun SummaryRow(
         if (!open) {
             TextButton(onClick = { open = true }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) { Text("Показать значение") }
         } else {
-            if (translation.isNotEmpty()) Text(translation, style = MaterialTheme.typography.bodyLarge)
+            if (groups.isNotEmpty()) MeaningLines(groups, pinyin)
+            else if (translation.isNotEmpty()) Text(translation, style = MaterialTheme.typography.bodyLarge)
             Text(sentence, style = MaterialTheme.typography.bodyMedium, fontFamily = WordFont, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (decision != null) {
@@ -254,7 +279,7 @@ private fun SummaryRow(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onKnown(true) }) { Text("Знаю") }
                 OutlinedButton(onClick = { onKnown(false) }) { Text("Не знаю") }
-                TextButton(onClick = { onSave(translation, sentence) }) { Text("В карточки") }
+                TextButton(onClick = { onSave(top, translation, sentence) }) { Text("В карточки") }
             }
             Spacer(Modifier.width(0.dp))
         }

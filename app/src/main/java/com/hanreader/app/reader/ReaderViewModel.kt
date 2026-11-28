@@ -116,6 +116,22 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
         catch (_: Exception) { contextAi.repository.notice("Не удалось прочитать или сохранить данные проверки. Обычный словарь доступен.") }
     }
 
+    /**
+     * The reader's own request for chosen words (chapter preparation): every place in as few
+     * requests as possible, whether or not automatic checks are on. Outlives the sheet that asked.
+     */
+    fun checkAiChosen(fragments: List<com.hanreader.app.ai.AiFragment>, onDone: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                if (fragments.isNotEmpty()) contextAi.repository.checkGroup(fragments.map { fragment ->
+                    com.hanreader.app.ai.AiVisibleCheck(fragment, { true }) { aiStillValid(fragment) }
+                })
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { contextAi.repository.notice("Не удалось прочитать или сохранить данные проверки. Обычный словарь доступен.") }
+            finally { onDone() }
+        }
+    }
+
     private val openMutex = Mutex()
     private var openingJob: kotlinx.coroutines.Job? = null
     private val preparedChapters = PreparedChapterCache()
@@ -1186,6 +1202,13 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
                 try {
                     for (w in words) {
                         val source = epub ?: own!!
+                        // Chapter preparation: the meaning, reading and sentence the word has in this chapter.
+                        val here = w.meanings.firstOrNull()?.takeIf { chapter != null && it.meaning.isNotBlank() }
+                        if (here != null && chapter != null) {
+                            if (cards.saveFromReader(STUDY_LANGUAGE, ReaderSave(w.word, here.reading.ifBlank { engine.reading(w.word) ?: w.pinyin },
+                                    here.meaning, here.sentence, book.id, book.title, chapter.index, chapter.title))) created++
+                            continue
+                        }
                         val c = chapter?.takeIf { ch -> VocabularyStats.firstSentence(ch, w.word, engine) != null }
                             ?: loaded.getOrPut(w.firstChapter) {
                                 withContext(Dispatchers.Default) { ChapterBuilder.build(source, w.firstChapter, engine, namesToKeepWhole(book.id)) }

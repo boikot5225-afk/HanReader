@@ -157,14 +157,22 @@ class AiRepository(
      * Automatic check of the paragraphs on screen: their words go together, up to
      * [AiContext.BATCH] per request, so a page usually costs one request instead of one per paragraph.
      */
-    suspend fun checkVisibleGroup(items: List<AiVisibleCheck>): Unit = mutex.withLock {
+    suspend fun checkVisibleGroup(items: List<AiVisibleCheck>): Unit = group(items, automatic = true)
+
+    /** The reader's request for words of several paragraphs (chapter preparation): grouped as [checkVisibleGroup]. */
+    suspend fun checkGroup(items: List<AiVisibleCheck>): Unit = group(items, automatic = false)
+
+    private suspend fun group(items: List<AiVisibleCheck>, automatic: Boolean): Unit = mutex.withLock {
         val c = config()
+        var allowedAny = false
         val parts = items.flatMap { item ->
-            if (!allowed(item.fragment, c, automatic = true)) return@flatMap emptyList()
-            pending(item.fragment, c, automatic = true, allowMissing = true).second.chunked(AiContext.BATCH)
+            if (!allowed(item.fragment, c, automatic)) return@flatMap emptyList()
+            allowedAny = true
+            pending(item.fragment, c, automatic, allowMissing = true).second.chunked(AiContext.BATCH)
                 .map { AiVisibleCheck(item.fragment.copy(terms = it), item.canStart, item.stillValid) }
         }
         if (parts.isNotEmpty()) _message.value = null
+        else if (!automatic && allowedAny) _message.value = "Показан сохранённый результат. Новый запрос не нужен."
         val groups = ArrayList<MutableList<AiVisibleCheck>>()
         var size = 0
         for (part in parts) {
