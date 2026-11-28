@@ -277,13 +277,14 @@ object AiContext {
             return normalized.takeIf { it.isNotBlank() }
         }
         val suggested = optional("suggested_translation", 100)
-        val translation = suggested?.takeIf { it != t.base }
         val explanation = try { optional("explanation", 600) } catch (_: AiResponseFailure) { null }
         val flag = when (val v = r.opt("needs_correction")) {
             is Boolean -> v
             is String -> v.trim().lowercase(java.util.Locale.ROOT).toBooleanStrictOrNull()
             else -> null
         }
+        // The dictionary value repeated without a correction asked for is no proposal.
+        val translation = suggested?.takeIf { flag == true || it != t.base }
         val confidence = (r.opt("confidence") as? String)?.trim()?.lowercase(java.util.Locale.ROOT)
             ?.takeIf { it in setOf("high", "medium", "low") } ?: "low"
         var start = t.start

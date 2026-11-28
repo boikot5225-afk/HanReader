@@ -271,6 +271,7 @@ class AiLanguagesTest {
         val f = fragment("銀行", zh)
         val root = JSONObject(response(f, "銀行", "банк"))
         root.getJSONArray("results").getJSONObject(0).put("span", JSONObject().put("start", 0).put("end", 1).put("text", "銀"))
-        try { AiContext.validate(root.toString(), f, "model"); fail("split a Chinese token") } catch (_: IllegalArgumentException) {}
+        // A quote of part of a word is widened to the whole word, never splits it.
+        assertEquals("銀行", AiContext.validate(root.toString(), f, "model").single().original)
     }
 }

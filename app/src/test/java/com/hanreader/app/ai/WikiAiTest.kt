@@ -142,7 +142,8 @@ class WikiAiTest {
         assertTrue(repo.check(f,false) { true }.isEmpty()); assertTrue(db.aiCheckDao().all().isEmpty())
         malformed = false; fail = true
         assertTrue(repo.check(f,false) { true }.isEmpty()); assertTrue(db.aiCheckDao().all().isEmpty())
-        assertEquals("дорожка", engine.glossShort("pista")); assertEquals(2, calls)
+        // The malformed answer is asked again once; the server error is not.
+        assertEquals("дорожка", engine.glossShort("pista")); assertEquals(3, calls)
     }
     @Test fun automaticCandidatePacketsAreBoundedAndRequireVisibleLocalHints() = runBlocking {
         val r = reading((1..100).joinToString(" ") { "pista" })
