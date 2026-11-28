@@ -17,6 +17,7 @@
 - Итог главы: `SummaryItem.places`, строки через `ChapterMeanings`; сохранение берёт чтение группы.
 - Тесты: `BookVocabularyTest.preparationUsesTheMeaningsOfTheChapter`,
   `ContextAiTest.chosenWordsAreCheckedWithAutomaticChecksOff`, `ChapterSummaryTest` (places).
+- CI 46145517561 SUCCESS.
 
 ## Надёжный DeepSeek — 0.36.0
 
