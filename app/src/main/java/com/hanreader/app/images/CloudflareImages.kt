@@ -148,8 +148,8 @@ object CardImagePrompt {
         ?.takeIf { p -> p.length in 8..600 && p.count { it in 'A'..'Z' || it in 'a'..'z' } >= 8 }
 
     /** The English part of [text] (FLUX reads only English); null when nothing Latin is there. */
-    fun latin(text: String): String? = text.replace(Regex("[^A-Za-z0-9 ,.'-]"), " ").replace(Regex("\\s+"), " ").trim()
-        .take(120).takeIf { t -> t.any { it in 'A'..'Z' || it in 'a'..'z' } }
+    fun latin(text: String): String? = text.replace(Regex("[^A-Za-z0-9 ,.'-]"), " ").replace(Regex("\\s+"), " ")
+        .trim(' ', ',', '.', '-', '\'').take(120).takeIf { t -> t.any { it in 'A'..'Z' || it in 'a'..'z' } }
 
     /** Without DeepSeek: the meaning in English (already English or translated); never a scene unrelated to the word. */
     fun fallback(english: String): String = "A clear picture that shows the idea \"${english.take(120)}\""

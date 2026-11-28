@@ -88,11 +88,11 @@ class CloudflareImageClientTest {
         val seen = mutableListOf<String>()
         val ok = serve(200, """{"success":true,"result":{"translated_text":" borrow  money "}}""", seen)
         try {
-            val english = CloudflareImageClient("http://127.0.0.1:${ok.localPort}").translate("0123456789abcdef0123456789abcdef", "t", "брать в долг")
+            val english = CloudflareImageClient("http://127.0.0.1:${ok.localPort}").translate("0123456789abcdef0123456789abcdef", "t", "dolg")
             assertEquals("borrow money", english)
             assertTrue(seen.single().contains("/ai/run/@cf/meta/m2m100-1.2b"))
             val body = JSONObject(seen.single().substringAfter("\n\n"))
-            assertEquals("брать в долг", body.getString("text"))
+            assertEquals("dolg", body.getString("text"))
             assertEquals("english", body.getString("target_lang"))
         } finally { ok.close() }
         assertEquals("A clear picture that shows the idea \"borrow money\"", CardImagePrompt.fallback("borrow money"))
