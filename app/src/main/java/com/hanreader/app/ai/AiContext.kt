@@ -295,11 +295,13 @@ object AiContext {
         }
         responseRequire(fragment.protected.none { it.first < end && it.last >= start }, AiResponseProblem.PROTECTED)
         val pinyin = if (!r.has("suggested_pinyin")) null else optional("suggested_pinyin", 100)?.let { suggested ->
-            // Only an exact Chinese token has a reliable character-to-syllable alignment.
-            val parts = AiPinyin.parse(suggested, t.original)
-            if (fragment.language != "zh-CN" || start != t.start || end != t.end ||
-                fragment.readings.keys.any { it > start && it < end } || parts == null) null
-            else parts.joinToString(" ").takeIf { parts.joinToString("") != t.reading?.replace(" ", "") }
+            // One syllable per character of the whole span (不还 → "bù huán"); the reader splits them by words.
+            val text = fragment.text.substring(start, end)
+            val parts = AiPinyin.parse(suggested, text)
+            val current = if (start == t.start && end == t.end) t.reading
+                else fragment.readings.filterKeys { it in start until end }.toSortedMap().values.joinToString("")
+            if (fragment.language != "zh-CN" || parts == null) null
+            else parts.joinToString(" ").takeIf { parts.joinToString("") != current?.replace(" ", "") }
         }
         val state = when {
             missingHintSuggestion -> "proposed"

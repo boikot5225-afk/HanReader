@@ -64,6 +64,8 @@ read	处	next:得不在于理置事罚境	chǔ	处得来, 处在
 
 # --- Single rules ---
 read	还	next:给钱债清	huán	还钱
+read	还	prev=不,没,没有 & earlier:借,欠,借钱,欠钱,欠债,借款,贷款,借债	huán	借钱不还: долг не возвращают
+read	还	prev=不,没 & !next	huán	他就是不还: «ещё» не стоит в конце фразы
 read	行	prev:$COUNTERS & next & !next:了吗吧啊呢不	háng	一行字
 read	数	prev:一	shǔ	数一数
 read	数	next:一了着过钱星 & !prev:$COUNTERS	shǔ	数钱

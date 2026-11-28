@@ -36,6 +36,13 @@ class PolyphonesTest {
     }
 
     @Test
+    fun huanAfterABorrowing() {
+        assertEquals(listOf("huán", "huán"), readings("大多数人都遇到过被人借钱不还的情况，也不会忘记借钱不还者。", "还"))
+        assertEquals(listOf("huán"), readings("他借了我的书，一直不还。", "还"))
+        assertEquals(listOf("hái"), readings("你不还年轻吗？", "还"))
+    }
+
+    @Test
     fun measureZhi() {
         assertEquals(listOf("zhī"), readings("那只猫在睡觉。", "只"))
     }

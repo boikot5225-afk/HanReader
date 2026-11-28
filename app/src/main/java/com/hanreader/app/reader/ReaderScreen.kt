@@ -1797,9 +1797,15 @@ internal fun WordSheet(
     val cardWord = remember(word, esLemma, engine) { if (zh != null) word else esLemma ?: engine.lemma(word) }
     // One token: its reading in context (慢慢地 de, not the dictionary's dì).
     val contextualPinyin = remember(first, aiCheck) { AiPinyin.apply(first, aiCheck).pinyin }
+    // A construction DeepSeek read anew (借钱不还: bù huán) keeps that reading over the dictionary's.
+    val aiReading = remember(tokens, selection, aiCheck) {
+        if (aiCheck?.pinyin == null || aiCheck.state != "accepted") null
+        else tokens.subList(selection.first, selection.last + 1).filter { it.kind == TokenKind.HAN }
+            .map { AiPinyin.apply(it, aiCheck) }.takeIf { t -> t.any { it.pinyin.isNotEmpty() } }?.joinToString(" ") { it.pinyin }
+    }
     val reading = if (zh == null) "" else if (selection.first == selection.last && contextualPinyin.isNotEmpty())
         contextualPinyin
-        else entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
+        else aiReading ?: entry?.pinyin ?: tokens.subList(selection.first, selection.last + 1).joinToString(" ") { it.pinyin }
     // A single token keeps the meanings of its reading on the page (得 de, 重重 zhòng zhòng).
     val pageReading = if (zh != null && selection.first == selection.last) first.pinyin.takeIf { it.isNotEmpty() } else null
     val selectedMeaning = first.contextMeaning.takeIf { selection.first == selection.last }

@@ -130,6 +130,28 @@ class AiLanguagesTest {
         assertEquals(term.original, accepted.original)
     }
 
+    @Test fun aConstructionCorrectsTheReadingOfEachOfItsWords() {
+        val text = "他借钱不还。"
+        val sourceChapter = chapter(text, zh)
+        val sourceBlock = sourceChapter.blocks.first() as ReaderBlock.Text
+        assertTrue(sourceBlock.tokens.any { it.text == "不" } && sourceBlock.tokens.any { it.text == "还" })
+        // The reading the dictionary would give 还 alone, before the context rule.
+        val block = sourceBlock.copy(tokens = sourceBlock.tokens.map {
+            if (it.text == "还") it.copy(pinyin = "hái", syllables = listOf("hái")) else it
+        })
+        val original = sourceChapter.copy(blocks = listOf(block))
+        val f = AiContext.build(1, original, 0, "chapter.xhtml", zh, emptyMap(), "ANY")!!
+            .let { built -> built.copy(terms = built.terms.filter { it.original == "不" }) }
+        val answer = JSONObject(response(f, "不", "не возвращать", span = "不还")).apply {
+            getJSONArray("results").getJSONObject(0).put("suggested_pinyin", "bù huán")
+        }
+        val row = AiContext.validate(answer.toString(), f, "deepseek-flash").single()
+        assertEquals("不还", row.original); assertEquals("bù huán", row.pinyin); assertEquals("accepted", row.state)
+        val tokens = (AiPinyin.chapter(original, listOf(row)).blocks.first() as ReaderBlock.Text).tokens
+        assertEquals("huán", tokens.single { it.text == "还" }.pinyin)
+        assertEquals("bù", tokens.single { it.text == "不" }.pinyin)
+    }
+
     @Test fun visibleBookChecksCanIncludeUnknownWordsAndExcludeOffscreenTerms() = runBlocking {
         val text = "The globally-admired writer arrived."
         val ch = chapter(text, en)

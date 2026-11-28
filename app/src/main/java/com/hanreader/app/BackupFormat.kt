@@ -356,8 +356,7 @@ object BackupFormat {
                 c.confidence !in setOf("high", "medium", "low") ||
                 c.state !in setOf("checked", "accepted", "proposed", "rejected") ||
                 (c.translation != null && c.translation.isBlank()) ||
-                (c.pinyin != null && (c.start != c.termStart || c.end != c.termEnd ||
-                    com.hanreader.app.ai.AiPinyin.parse(c.pinyin, c.original) == null)) ||
+                (c.pinyin != null && com.hanreader.app.ai.AiPinyin.parse(c.pinyin, c.original) == null) ||
                 (c.state in setOf("accepted", "proposed", "rejected") && c.translation == null && c.pinyin == null)) {
                 throw BackupFormatException("Файл копии повреждён: некорректная проверка ИИ")
             }
