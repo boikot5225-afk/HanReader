@@ -77,13 +77,24 @@ class CloudflareImageClientTest {
         try { CloudflareImageClient.parse("""{"success":false,"errors":[{"message":"x"}]}"""); fail() } catch (_: AiFailure) {}
         assertEquals("A man at a bank counter", CardImagePrompt.parse("""{"prompt":"  A man at a bank   counter "}"""))
         assertNull(CardImagePrompt.parse("""{"prompt":"Человек в банке"}"""))
+        assertEquals("A man hands money to a friend", CardImagePrompt.parse("""{"prompt":"A man hands money (钱) to a friend"}"""))
         assertNull(CardImagePrompt.parse("not json"))
         assertTrue(CardImagePrompt.final("A bank.").startsWith("A bank. Simple clean flat illustration"))
     }
 
-    @Test
-    fun templateIsPlainEnglish() {
-        assertEquals("A clear picture that shows the idea \"committee member\"", CardImagePrompt.fallback("委员", "committee member"))
-        assertFalse(CardImagePrompt.fallback("委员", "член комитета").any { it.code > 127 })
+    @Test fun templateIsTheMeaningInEnglish() = runBlocking {
+        assertNull(CardImagePrompt.latin("брать в долг"))
+        assertEquals("committee member", CardImagePrompt.latin("член, committee member"))
+        val seen = mutableListOf<String>()
+        val ok = serve(200, """{"success":true,"result":{"translated_text":" borrow  money "}}""", seen)
+        try {
+            val english = CloudflareImageClient("http://127.0.0.1:${ok.localPort}").translate("0123456789abcdef0123456789abcdef", "t", "брать в долг")
+            assertEquals("borrow money", english)
+            assertTrue(seen.single().contains("/ai/run/@cf/meta/m2m100-1.2b"))
+            val body = JSONObject(seen.single().substringAfter("\n\n"))
+            assertEquals("брать в долг", body.getString("text"))
+            assertEquals("english", body.getString("target_lang"))
+        } finally { ok.close() }
+        assertEquals("A clear picture that shows the idea \"borrow money\"", CardImagePrompt.fallback("borrow money"))
     }
 }

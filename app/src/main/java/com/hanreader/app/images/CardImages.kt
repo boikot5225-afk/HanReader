@@ -89,20 +89,29 @@ class CardPictures private constructor(context: Context, private val client: Ima
                 val token = withContext(Dispatchers.IO) { settings.vault.read() } ?: throw AiFailure("Токен Cloudflare отсутствует.")
                 val ai = ContextAi.get(app)
                 val aiOn = ai.settings.config.value.let { it.enabled && it.consent && it.hasKey }
-                var usedTemplate = !aiOn
-                val scene = if (!aiOn) CardImagePrompt.fallback(card.word, meaning) else try {
+                // Without DeepSeek the meaning itself, in English; a picture of nothing in particular is worse than none.
+                suspend fun template(): String {
+                    val english = CardImagePrompt.latin(meaning) 
+                        ?: try { client.translate(c.accountId, token, meaning)?.let(CardImagePrompt::latin) }
+                            catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { null }
+                        ?: CardImagePrompt.latin(card.word)
+                        ?: throw AiFailure("Не получилось описать картинку по-английски. Включи DeepSeek или выбери фото.")
+                    return CardImagePrompt.fallback(english)
+                }
+                var why: String? = if (aiOn) null else "DeepSeek выключен"
+                val scene = if (!aiOn) template() else try {
                     ai.repository.imagePrompt(CardImagePrompt.payload(card.language, card.word, card.reading, meaning, sentence))
                 } catch (e: kotlinx.coroutines.CancellationException) { throw e }
-                catch (_: Exception) { usedTemplate = true; CardImagePrompt.fallback(card.word, meaning) }
+                catch (e: Exception) { why = (e as? AiFailure)?.userMessage ?: "DeepSeek не ответил"; template() }
                 val bytes = try { client.generate(c.accountId, token, CardImagePrompt.final(scene), 0) }
                     catch (e: ImageFailure) {
                         // A refused description (a filter, an odd word): once more with the plain template.
-                        if (e.status != 400 && e.status != 422 || usedTemplate) throw e
-                        usedTemplate = true
-                        client.generate(c.accountId, token, CardImagePrompt.final(CardImagePrompt.fallback(card.word, meaning)), 0)
+                        if (e.status != 400 && e.status != 422 || why != null) throw e
+                        why = e.userMessage
+                        client.generate(c.accountId, token, CardImagePrompt.final(template()), 0)
                     }
                 withContext(Dispatchers.IO) { store.save(card.id, CardImageStore.shrink(bytes)) }
-                note(card.id, if (usedTemplate) "Нарисовано по шаблону: с DeepSeek описание точнее." else null)
+                note(card.id, why?.let { "Нарисовано по шаблону, без описания DeepSeek. Причина: ${it.trimEnd('.')}." })
             } catch (e: kotlinx.coroutines.CancellationException) { throw e }
             catch (e: Exception) { note(card.id, (e as? AiFailure)?.userMessage ?: "Не удалось нарисовать картинку.") }
             finally { _busy.value = _busy.value - card.id }

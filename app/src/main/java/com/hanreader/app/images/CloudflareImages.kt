@@ -36,16 +36,31 @@ class ImageSettings(context: Context, val vault: AiKeyVault = AiKeyVault(context
 /** A refused picture request; [status] tells a rejected description (400/422) from other failures. */
 class ImageFailure(val status: Int, message: String) : AiFailure(message)
 
-fun interface ImageClient { suspend fun generate(account: String, token: String, prompt: String, seed: Int): ByteArray }
+interface ImageClient {
+    suspend fun generate(account: String, token: String, prompt: String, seed: Int): ByteArray
+    suspend fun translate(account: String, token: String, text: String): String?
+}
 
 /**
  * FLUX.1 [schnell] on Cloudflare Workers AI: `POST …/accounts/{id}/ai/run/@cf/black-forest-labs/flux-1-schnell`
  * with `{prompt, steps}`; the answer is `{"result":{"image":"<base64 JPEG>"},"success":true}`.
  */
 class CloudflareImageClient(private val base: String = "https://api.cloudflare.com/client/v4") : ImageClient {
-    override suspend fun generate(account: String, token: String, prompt: String, seed: Int): ByteArray = withContext(Dispatchers.IO) {
+    override suspend fun generate(account: String, token: String, prompt: String, seed: Int): ByteArray =
+        // Only the documented fields: an unknown one (seed) makes the model refuse the request with 400.
+        parse(post(account, token, MODEL, JSONObject().put("prompt", prompt.take(MAX_PROMPT)).put("steps", STEPS)))
+
+    /** Russian [text] in English through m2m100 on the same account; null when it gives nothing usable. */
+    override suspend fun translate(account: String, token: String, text: String): String? {
+        val reply = post(account, token, TRANSLATOR, JSONObject().put("text", text.take(300))
+            .put("source_lang", "russian").put("target_lang", "english"))
+        return runCatching { JSONObject(reply).optJSONObject("result")?.optString("translated_text") }.getOrNull()
+            ?.replace(Regex("\\s+"), " ")?.trim()?.takeIf { t -> t.any { it in 'A'..'Z' || it in 'a'..'z' } }
+    }
+
+    private suspend fun post(account: String, token: String, model: String, body: JSONObject): String = withContext(Dispatchers.IO) {
         require(ImageSettings.validAccount(account))
-        val connection = URL("$base/accounts/$account/ai/run/$MODEL").openConnection() as HttpURLConnection
+        val connection = URL("$base/accounts/$account/ai/run/$model").openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"
             connection.instanceFollowRedirects = false
@@ -54,8 +69,6 @@ class CloudflareImageClient(private val base: String = "https://api.cloudflare.c
             connection.doOutput = true
             connection.setRequestProperty("Authorization", "Bearer $token")
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            // Only the documented fields: an unknown one (seed) makes the model refuse the request with 400.
-            val body = JSONObject().put("prompt", prompt.take(MAX_PROMPT)).put("steps", STEPS)
             connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             val status = connection.responseCode
             if (status != 200) {
@@ -68,8 +81,7 @@ class CloudflareImageClient(private val base: String = "https://api.cloudflare.c
                     else -> "Cloudflare временно недоступен (HTTP $status)."
                 } + (reason?.let { " Ответ Cloudflare: $it" } ?: ""))
             }
-            val text = connection.inputStream.use { String(it.readLimited(MAX_RESPONSE), Charsets.UTF_8) }
-            parse(text)
+            connection.inputStream.use { String(it.readLimited(MAX_RESPONSE), Charsets.UTF_8) }
         } catch (e: AiFailure) { throw e }
         catch (e: kotlinx.coroutines.CancellationException) { throw e }
         catch (e: java.net.SocketTimeoutException) { throw AiFailure("Cloudflare не ответил вовремя. Попробуй ещё раз.") }
@@ -79,6 +91,7 @@ class CloudflareImageClient(private val base: String = "https://api.cloudflare.c
 
     companion object {
         const val MODEL = "@cf/black-forest-labs/flux-1-schnell"
+        const val TRANSLATOR = "@cf/meta/m2m100-1.2b"
         const val STEPS = 4
         const val MAX_PROMPT = 2048
         private const val MAX_RESPONSE = 12_000_000
@@ -128,18 +141,18 @@ object CardImagePrompt {
         JSONObject().put("task", "image_prompt").put("language", language).put("word", word.take(80))
             .put("reading", reading.take(120)).put("meaning", meaning.take(200)).put("sentence", sentence.take(400))
 
-    /** DeepSeek's `{"prompt":"…"}`; null when it is missing or not a usable English scene. */
-    fun parse(content: String): String? = runCatching {
-        JSONObject(content).optString("prompt").replace(Regex("\\s+"), " ").trim()
-    }.getOrNull()?.takeIf { p -> p.length in 8..600 && p.none { c -> Character.UnicodeScript.of(c.code).let { s ->
-        s == Character.UnicodeScript.HAN || s == Character.UnicodeScript.CYRILLIC } } }
+    /** DeepSeek's `{"prompt":"…"}` with stray Han/Cyrillic dropped; null when no usable English scene is left. */
+    fun parse(content: String): String? = runCatching { JSONObject(content).optString("prompt") }.getOrNull()
+        ?.filterNot { c -> Character.UnicodeScript.of(c.code).let { it == Character.UnicodeScript.HAN || it == Character.UnicodeScript.CYRILLIC } }
+        ?.replace(Regex("""\(\s*\)|"\s*"|“\s*”"""), " ")?.replace(Regex("\\s+"), " ")?.trim()
+        ?.takeIf { p -> p.length in 8..600 && p.count { it in 'A'..'Z' || it in 'a'..'z' } >= 8 }
 
-    /** Without DeepSeek: FLUX reads only English, so Latin words of the meaning or the word survive, else a generic scene. */
-    fun fallback(word: String, meaning: String): String {
-        fun latin(s: String) = s.replace(Regex("[^A-Za-z0-9 ,.'-]"), " ").replace(Regex("\\s+"), " ").trim().take(120)
-        val idea = latin(meaning).takeIf { it.any(Char::isLetter) } ?: latin(word).takeIf { it.any(Char::isLetter) }
-        return if (idea != null) "A clear picture that shows the idea \"$idea\"" else "A simple everyday scene with one clear object in the center"
-    }
+    /** The English part of [text] (FLUX reads only English); null when nothing Latin is there. */
+    fun latin(text: String): String? = text.replace(Regex("[^A-Za-z0-9 ,.'-]"), " ").replace(Regex("\\s+"), " ").trim()
+        .take(120).takeIf { t -> t.any { it in 'A'..'Z' || it in 'a'..'z' } }
+
+    /** Without DeepSeek: the meaning in English (already English or translated); never a scene unrelated to the word. */
+    fun fallback(english: String): String = "A clear picture that shows the idea \"${english.take(120)}\""
 
     fun final(scene: String) = "${scene.trimEnd('.', ' ')}. $STYLE".take(CloudflareImageClient.MAX_PROMPT)
 }
