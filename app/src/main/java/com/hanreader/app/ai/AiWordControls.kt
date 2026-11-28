@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
+import com.hanreader.app.zh.isHan
 import kotlinx.coroutines.launch
 
 internal const val AI_LIMIT_MESSAGE = "Достигнут дневной лимит запросов DeepSeek. Его можно изменить в настройках."
@@ -29,9 +30,15 @@ internal fun aiWordStatus(row: AiCheck?, enabled: Boolean, checking: Boolean, me
     else -> "Автопроверка выключена."
 }
 
+/** «Уточнить» is for a word or a short construction; a longer fragment is explained instead. */
+internal fun aiRefinable(text: String): Boolean {
+    val han = text.count { it.isHan() }
+    return if (han > 0) han <= 8 else text.trim().split(Regex("\\s+")).size <= 5
+}
+
 @Composable
 internal fun AiWordControls(row: AiCheck?, enabled: Boolean, busy: Boolean, limitReached: Boolean, manual: Boolean,
-    onCheck: () -> Unit, onState: (AiCheck, String) -> Unit, status: String? = null) {
+    onCheck: () -> Unit, onState: (AiCheck, String) -> Unit, status: String? = null, refinable: Boolean = true) {
     var settings by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (row != null) {
@@ -47,7 +54,9 @@ internal fun AiWordControls(row: AiCheck?, enabled: Boolean, busy: Boolean, limi
             if (row.state in setOf("accepted", "proposed")) TextButton(onClick = { onState(row, "rejected") }) { Text("Отменить исправление ИИ") }
         }
         status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-        if (!manual && enabled) TextButton(onClick = onCheck, enabled = !busy && (!limitReached || row != null)) { Text("Уточнить с DeepSeek") }
+        if (!manual && enabled && !refinable) Text("Уточнение — для слова или короткого выражения. Длинный фрагмент лучше объяснить целиком.",
+            style = MaterialTheme.typography.bodySmall)
+        else if (!manual && enabled) TextButton(onClick = onCheck, enabled = !busy && (!limitReached || row != null)) { Text("Уточнить с DeepSeek") }
         else if (!manual) TextButton(onClick = { settings = true }) { Text("Настроить DeepSeek") }
     }
     if (settings) AiSettingsDialog { settings = false }

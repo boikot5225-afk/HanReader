@@ -1986,7 +1986,8 @@ internal fun WordSheet(
             if (aiAvailable) {
                 val status = aiWordStatus(aiCheck, aiEnabled, aiChecking, aiMessage, aiAutomatic, aiLimitReached, userMeaning != null)
                 WordSheetSection("DeepSeek", subtitle = status) {
-                    AiWordControls(aiCheck, aiEnabled, aiBusy || aiChecking, aiLimitReached, userMeaning != null, onAiCheck, onAiState)
+                    AiWordControls(aiCheck, aiEnabled, aiBusy || aiChecking, aiLimitReached, userMeaning != null, onAiCheck, onAiState,
+                        refinable = aiRefinable(word))
                     aiExplain?.invoke()
                 }
             }

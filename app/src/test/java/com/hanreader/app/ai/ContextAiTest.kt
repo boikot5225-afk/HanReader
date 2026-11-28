@@ -207,7 +207,8 @@ class ContextAiTest {
             reply = { bad }; repo.check(f, false) { true }
             assertTrue(repo.observe(7).first().isEmpty())
         }
-        assertEquals(30, repo.usage.value.tokens)
+        // A malformed or empty answer is asked again once; a truncated one is not.
+        assertEquals(50, repo.usage.value.tokens)
     }
 
     @Test fun wrongAnswerForOneWordKeepsTheOthers() = runBlocking {
@@ -216,7 +217,7 @@ class ContextAiTest {
         val rows = repo.check(f, false) { true }
         assertEquals(listOf("periódicos"), rows.map { it.original })
         assertEquals(listOf("periódicos"), repo.observe(7).first().map { it.original })
-        assertTrue(repo.message.value!!.startsWith("Часть ответа DeepSeek отклонена"))
+        assertTrue(repo.message.value!!.contains("DeepSeek не дал надёжного ответа") && repo.message.value!!.endsWith("Остальное сохранено."))
         val pista = f.terms.single { it.original == "pista" }
         assertTrue(repo.wordFeedback.value.failures.keys.any { it.start == pista.start })
     }
@@ -299,7 +300,7 @@ class ContextAiTest {
         val payload = AiExplain.payload("es-ES", "ANY", "La pista del aeropuerto.", "La pista del aeropuerto.")!!
         for (bad in listOf("{\"parts\":[]}", "{\"translation\":\"x\"} tail", "{\"translation\":5}")) {
             reply = { AiReply(bad, 10, true) }
-            try { repo.explain(payload); fail("accepted $bad") } catch (e: AiFailure) { assertTrue(e.userMessage.startsWith("Ответ DeepSeek отклонён")) }
+            try { repo.explain(payload); fail("accepted $bad") } catch (e: AiFailure) { assertTrue(e.userMessage.startsWith("DeepSeek не дал понятного объяснения")) }
             assertNull(repo.savedExplanation(payload))
         }
         assertEquals(3, calls)
@@ -332,11 +333,13 @@ class ContextAiTest {
             assertEquals(1, parsed.rows.size)
         }
         val root = JSONObject(good)
-        root.getJSONArray("results").getJSONObject(0).put("needs_correction", "true")
+        root.getJSONArray("results").getJSONObject(0).put("suggested_translation", JSONArray())
         rejectsFirstOnly(root.toString())
+        // A quote that can't be placed is not a reason to lose the answer: it stays on the word.
         val span = JSONObject(good)
         span.getJSONArray("results").getJSONObject(0).put("span", JSONObject().put("start", 0).put("end", 99999).put("text", "bad"))
-        rejectsFirstOnly(span.toString())
+        val kept = AiContext.read(span.toString(), f, config.model).rows.single { it.termStart == first.start }
+        assertEquals(first.start, kept.start); assertEquals(first.end, kept.end)
         val dup = JSONObject(good)
         dup.getJSONArray("results").put(1, dup.getJSONArray("results").getJSONObject(0))
         assertTrue(AiContext.read(dup.toString(), f, config.model).problems.contains(AiResponseProblem.TERMS))

@@ -39,6 +39,9 @@ fun AiSettingsDialog(onClose: () -> Unit) {
     var localMessage by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    var journal by remember { mutableStateOf<List<String>>(emptyList()) }
+    var showJournal by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { journal = withContext(Dispatchers.IO) { ai.repository.journal.entries() } }
     fun action(work: suspend () -> Unit) {
         scope.launch {
             saving = true
@@ -106,12 +109,40 @@ fun AiSettingsDialog(onClose: () -> Unit) {
             HorizontalDivider()
             TextButton(enabled = !busy && !saving, onClick = { action { ai.repository.clear(false); localMessage = "Кеш проверок очищен. Принятые исправления и отказы сохранены." } }) { Text("Очистить кеш проверок") }
             TextButton(enabled = !busy && !saving, onClick = { confirmClear = true }) { Text("Удалить все результаты ИИ…") }
+            HorizontalDivider()
+            Text("Журнал неудачных ответов", style = MaterialTheme.typography.titleSmall)
+            Text(if (journal.isEmpty()) "Неудачных ответов DeepSeek не было."
+                else "Сохранено: ${journal.size}. В каждом — запрос с фрагментом текста и ответ DeepSeek, без ключа. Отправь разработчику, чтобы ошибки можно было исправить.",
+                style = MaterialTheme.typography.bodySmall)
+            if (journal.isNotEmpty()) Row {
+                TextButton(onClick = { showJournal = true }) { Text("Посмотреть") }
+                TextButton(onClick = { shareJournal(context, journal) }) { Text("Отправить") }
+                TextButton(onClick = { action { withContext(Dispatchers.IO) { ai.repository.journal.clear() }; journal = emptyList() } }) { Text("Удалить") }
+            }
+            HorizontalDivider()
             Text("Исправления книг сохраняются в резервной копии вместе с книгами. Статьи Википедии и их исправления пока хранятся только на этом устройстве. После восстановления ключ DeepSeek нужно ввести заново.", style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onClose) { Text("Готово") }
         }
     }
+    if (showJournal) AlertDialog(onDismissRequest = { showJournal = false }, title = { Text("Неудачные ответы DeepSeek") },
+        text = { Text(journal.joinToString("\n\n========\n\n").take(30_000), fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            fontSize = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp),
+            modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) },
+        confirmButton = { TextButton(onClick = { showJournal = false }) { Text("Закрыть") } })
     if (confirmClear) AlertDialog(onDismissRequest = { confirmClear = false }, title = { Text("Удалить все результаты ИИ?") },
         text = { Text("Удалятся исправления, предложения и отказы. Ручные значения останутся. Повторная проверка потребует запросов.") },
         confirmButton = { TextButton(onClick = { confirmClear = false; action { ai.repository.clear(true); localMessage = "Результаты ИИ удалены." } }) { Text("Удалить") } },
         dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Отмена") } })
+}
+
+/** The journal as text through the system share sheet (Telegram, mail...). */
+private fun shareJournal(context: android.content.Context, entries: List<String>) {
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(android.content.Intent.EXTRA_SUBJECT, "${com.hanreader.app.BuildConfig.APP_NAME}: неудачные ответы DeepSeek")
+        putExtra(android.content.Intent.EXTRA_EMAIL, arrayOf(com.hanreader.app.DEVELOPER_EMAIL))
+        putExtra(android.content.Intent.EXTRA_TEXT, entries.joinToString("\n\n========\n\n").take(200_000))
+    }
+    runCatching { context.startActivity(android.content.Intent.createChooser(send, "Отправить журнал")
+        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
 }

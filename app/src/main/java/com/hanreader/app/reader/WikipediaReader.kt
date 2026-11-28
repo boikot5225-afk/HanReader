@@ -314,7 +314,7 @@ internal fun WikipediaReader(initialDocument: WikiDocument, source: WikipediaSou
                                     aiConfig.automatic, limitReached, manual != null)
                                 AiWordControls(row, wikiAi.enabled, wikiAi.busy || checking, limitReached, manual != null,
                                     onCheck = { wikiAi.check(selection.first, selection.second until selection.third) },
-                                    onState = wikiAi.state, status = status)
+                                    onState = wikiAi.state, status = status, refinable = aiRefinable(text))
                             }
                             val historyText = (ready?.textChapter?.blocks?.getOrNull(selection.first) as? ReaderBlock.Text)
                                 ?.text?.takeIf { selection.second >= 0 && selection.third <= it.length }

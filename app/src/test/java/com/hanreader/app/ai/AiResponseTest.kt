@@ -66,8 +66,7 @@ class AiResponseTest {
         val f = fragment()
         val template = f.json().getJSONObject("response_template").getJSONArray("results").getJSONObject(0)
         assertEquals(f.terms.single().id, template.getString("term_id"))
-        assertEquals("Mataamigos", template.getString("original"))
-        assertEquals("", template.getString("current_translation"))
+        assertFalse(template.has("original")); assertFalse(template.has("current_translation"))
         val row = result(f).put("current_translation", JSONObject.NULL).put("explanation", "").put("span", JSONObject.NULL)
         var repo = repository { packet(row) }
         val saved = repo.check(f, false) { true }
@@ -102,11 +101,11 @@ class AiResponseTest {
         assertEquals(AiResponseProblem.PROTECTED, e.problem)
     }
 
-    @Test fun repeatedOverlappingPhrasesAreRejectedUnlessExactOldOffsetsDisambiguateThem() {
+    @Test fun repeatedOverlappingPhrasesStayOnTheWordUnlessExactOldOffsetsDisambiguateThem() {
         val f = fragment("no no no", "no", 3)
         val r = result(f, "нет нет").put("span", JSONObject().put("text", "no no"))
-        val e = assertThrows(AiResponseFailure::class.java) { parse(f, r) }
-        assertEquals(AiResponseProblem.SPAN, e.problem)
+        val kept = parse(f, r).single()
+        assertEquals(3, kept.start); assertEquals(5, kept.end); assertEquals("proposed", kept.state)
         r.getJSONObject("span").put("start", 3).put("end", 8)
         val saved = parse(f, r).single()
         assertEquals(3, saved.start); assertEquals(8, saved.end)
@@ -122,8 +121,8 @@ class AiResponseTest {
             assertThrows(AiResponseFailure::class.java) { parse(f, blankCorrection) }.problem)
         val known = f.copy(terms = f.terms.map { it.copy(base = "старое значение") })
         assertFalse(known.json().has("response_template"))
-        assertEquals(AiResponseProblem.SOURCE,
-            assertThrows(AiResponseFailure::class.java) { parse(known, result(known).put("current_translation", JSONObject.NULL)) }.problem)
+        // The echo is not compared: a lost echo costs nothing.
+        assertEquals("accepted", parse(known, result(known).put("current_translation", JSONObject.NULL)).single().state)
     }
 
     @Test fun aDefinitionForAnUnknownHyphenatedWordCanBeReviewedDespiteAFalseCorrectionFlag() = runBlocking {
@@ -140,8 +139,7 @@ class AiResponseTest {
 
         val known = f.copy(terms = f.terms.map { it.copy(base = "издавать") })
         val contradictory = result(known, "издавать самостоятельно").put("needs_correction", false)
-        assertEquals(AiResponseProblem.VALUE,
-            assertThrows(AiResponseFailure::class.java) { parse(known, contradictory) }.problem)
+        assertEquals("proposed", parse(known, contradictory).single().state)
     }
 
     @Test fun formattingWhitespaceIsNormalizedButHiddenControlCharactersAreRejected() {
@@ -159,17 +157,12 @@ class AiResponseTest {
             assertThrows(AiResponseFailure::class.java) { parse(f, r) }.problem)
     }
 
-    @Test fun mismatchedIdentityInvalidTranslationsAndFabricatedSpansNeverPersistOrLeakInDiagnostics() = runBlocking {
+    @Test fun mismatchedIdentityAndEmptyCorrectionsNeverPersistOrLeakInDiagnostics() = runBlocking {
         val f = fragment()
         val bad = listOf(
-            packet(result(f).put("original", "другое слово")),
             packet(result(f).put("term_id", "other-id")),
-            packet(result(f).put("current_translation", "нет в словаре")),
             packet(result(f).put("suggested_translation", "")),
-            packet(result(f).put("confidence", "certain")),
-            packet(result(f).put("explanation", JSONArray())),
-            packet(result(f).put("span", JSONObject().put("text", "Mataamigo"))), // partial token
-            packet(result(f).put("span", JSONObject().put("text", "Mataamigos").put("start", "0"))),
+            packet(result(f).put("suggested_translation", JSONArray())),
             "{\"error\":\"mock-key-no-account private-response-body\"}"
         )
         var response = bad.first()
@@ -182,7 +175,44 @@ class AiResponseTest {
             assertTrue(message.contains("Переводы не сохранены"))
             assertFalse(message.contains("private-response-body")); assertFalse(message.contains("mock-key"))
         }
-        assertEquals(bad.size, calls)
+        assertEquals(bad.size * 2, calls) // Each unusable answer is asked again once.
         assertTrue(repo.message.value!!.contains("[FORMAT]"))
+        assertEquals(bad.size * 2, repo.journal.entries().size)
+    }
+
+    @Test fun aQuoteThatDoesNotMatchTheWordsExactlyIsRepairedOrLeftOnTheWord() {
+        val f = fragment("Él dijo: Mataamigos, otra vez.")
+        fun span(text: String) = parse(f, result(f).put("span", JSONObject().put("text", text))).single()
+        // Edge punctuation, punctuation width and a cut word are repaired to whole words.
+        for (text in listOf("Mataamigos，", " Mataamigos.", "Mataamigo")) {
+            val row = span(text)
+            assertEquals(text, "Mataamigos", row.original); assertEquals("accepted", row.state)
+        }
+        // A quote that isn't in the text, or doesn't contain the word: the answer stays on the word, for review.
+        for (text in listOf("Mataperros", "otra vez", "")) {
+            val row = span(text)
+            assertEquals("Mataamigos", row.original); assertEquals("Убийца друзей", row.translation)
+            assertEquals("proposed", row.state)
+        }
+        // String offsets, a missing flag or confidence do not cost the answer.
+        val loose = result(f).put("span", JSONObject().put("text", "Mataamigos").put("start", "0"))
+        loose.remove("needs_correction"); loose.remove("confidence"); loose.remove("original")
+        val row = parse(f, loose).single()
+        assertEquals("Убийца друзей", row.translation); assertEquals("proposed", row.state)
+    }
+
+    @Test fun anUnusableAnswerIsAskedAgainOnceWithTheReason() = runBlocking {
+        val f = fragment()
+        val sent = ArrayList<JSONObject>()
+        val replies = ArrayDeque(listOf("{\"results\":[", packet(result(f))))
+        val repo = AiRepository(db, AiClient { _, _, payload -> calls++; sent += payload; AiReply(replies.removeFirst(), 12, true) },
+            { config }, { "mock-key-no-account" })
+        assertEquals("Убийца друзей", repo.check(f, false) { true }.single().translation)
+        assertEquals(2, calls)
+        assertFalse(sent[0].has("retry_reason")); assertTrue(sent[1].getString("retry_reason").contains("JSON"))
+        assertEquals(1, repo.journal.entries().size)
+        assertTrue(repo.journal.entries().single().contains("FORMAT"))
+        // The answer is saved: no third request.
+        repo.check(f, false) { true }; assertEquals(2, calls)
     }
 }

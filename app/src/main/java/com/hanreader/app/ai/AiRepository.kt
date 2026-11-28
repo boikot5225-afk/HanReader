@@ -68,7 +68,8 @@ class AiRepository(
     private val key: () -> String?,
     private val usageStore: AiUsageStore = MemoryUsage(),
     private val today: () -> Long = { java.time.LocalDate.now().toEpochDay() },
-    private val explanations: AiExplainCache = MemoryExplainCache()
+    private val explanations: AiExplainCache = MemoryExplainCache(),
+    val journal: AiJournal = MemoryJournal()
 ) {
     private val mutex = Mutex()
     private val attempts = HashSet<String>()
@@ -202,64 +203,91 @@ class AiRepository(
         return cached.values.toList() to pending
     }
 
+    /** What one request gave: the saved rows, what was wrong, and the words worth asking again. */
+    private class Round(val out: List<AiCheck>, val problems: List<AiResponseProblem>, val again: List<AiVisibleCheck>)
+
+    /** One paid request for [parts]; [reason] tells the model what was wrong with its previous answer. */
+    private suspend fun round(parts: List<AiVisibleCheck>, c: AiConfig, reason: AiResponseProblem?): Round {
+        val payload = (if (parts.size == 1) parts[0].fragment.json() else AiContext.groupJson(parts.map { it.fragment }))
+            .apply { reason?.let { put("retry_reason", "Предыдущий ответ не принят: ${it.description}. Ответь строго по формату.") } }
+        val reply = request(payload, c)
+        if (!reply.finished) throw AiFailure("Ответ DeepSeek обрезан. Переводы не сохранены.")
+        val problems = ArrayList<AiResponseProblem>()
+        val again = ArrayList<AiVisibleCheck>()
+        val out = ArrayList<AiCheck>()
+        val contents = try {
+            if (parts.size == 1) listOf(reply.content) else AiContext.splitGroup(reply.content, parts.size)
+        } catch (e: AiResponseFailure) {
+            journal.record(c.model, listOf(e.problem), payload.toString(), reply.content)
+            return Round(emptyList(), listOf(e.problem), parts)
+        }
+        for ((i, part) in parts.withIndex()) {
+            val parsed = try { withContext(Dispatchers.Default) { AiContext.read(contents[i], part.fragment, c.model) } }
+                catch (e: CancellationException) { throw e }
+                catch (e: Exception) {
+                    problems += (e as? AiResponseFailure)?.problem ?: AiResponseProblem.FORMAT
+                    again += part; continue
+                }
+            problems += parsed.problems
+            if (parsed.rejected.isNotEmpty()) again += AiVisibleCheck(part.fragment.copy(terms = parsed.rejected), part.canStart, part.stillValid)
+            currentCoroutineContext().ensureActive()
+            if (config() != c || !part.stillValid()) continue
+            out += save(part.fragment, parsed.rows, part.stillValid) ?: continue
+        }
+        if (problems.isNotEmpty()) journal.record(c.model, problems, payload.toString(), reply.content)
+        return Round(out, problems, again)
+    }
+
     /**
-     * One paid request for [parts] (one paragraph each). Kept: every valid answer of a paragraph
-     * still in place; a wrong answer for some words does not throw away the others. Null: nothing
-     * was kept (failure, or the text changed), and the caller stops — no automatic retry.
+     * Kept: every valid answer of a paragraph still in place; a wrong answer for some words does not
+     * throw away the others. Words whose answer was unusable are asked once more, with the reason —
+     * at most one extra request, within the daily limit. Network failures are never repeated.
+     * Null: nothing was kept (failure, or the text changed), and the caller stops.
      */
     private suspend fun send(parts: List<AiVisibleCheck>, c: AiConfig): List<AiCheck>? {
         for (part in parts) attempts += part.fragment.terms.map { part.fragment.key(it, c.model) }
         val locations = parts.flatMap { it.fragment.wordLocations(c.model) }
         _wordFeedback.update { it.copy(checking = locations, failures = it.failures - locations.toSet()) }
         try {
-            val reply = request(if (parts.size == 1) parts[0].fragment.json() else AiContext.groupJson(parts.map { it.fragment }), c)
-            if (!reply.finished) throw AiFailure("Ответ DeepSeek обрезан. Переводы не сохранены.")
-            val problems = ArrayList<AiResponseProblem>()
-            val rejected = ArrayList<AiWordLocation>()
-            val out = ArrayList<AiCheck>()
-            val contents = try {
-                if (parts.size == 1) listOf(reply.content) else AiContext.splitGroup(reply.content, parts.size)
-            } catch (e: AiResponseFailure) { throw rejectedReply(e.problem) }
-            for ((i, part) in parts.withIndex()) {
-                val parsed = try { withContext(Dispatchers.Default) { AiContext.read(contents[i], part.fragment, c.model) } }
-                    catch (e: CancellationException) { throw e }
-                    catch (e: Exception) {
-                        problems += (e as? AiResponseFailure)?.problem ?: AiResponseProblem.FORMAT
-                        rejected += part.fragment.wordLocations(c.model); continue
-                    }
-                problems += parsed.problems
-                rejected += part.fragment.copy(terms = parsed.rejected).wordLocations(c.model)
-                currentCoroutineContext().ensureActive()
-                if (config() != c || !part.stillValid()) continue
-                out += save(part.fragment, parsed.rows, part.stillValid) ?: continue
+            val first = round(parts, c, null)
+            val out = first.out.toMutableList()
+            var problems = first.problems
+            var again = first.again
+            if (again.isNotEmpty()) {
+                val ready = again.filter { exists(it.fragment) && it.stillValid() }
+                if (ready.isNotEmpty() && config() == c) try {
+                    val second = round(ready, c, problems.firstOrNull() ?: AiResponseProblem.TERMS)
+                    out += second.out; problems = second.problems; again = second.again
+                } catch (e: CancellationException) { throw e }
+                catch (_: Exception) { /* The first answer stays; the rest keeps its dictionary value. */ }
             }
+            val rejected = again.flatMap { it.fragment.wordLocations(c.model) }
             if (out.isEmpty()) {
-                if (problems.isNotEmpty()) throw rejectedReply(problems.first())
+                if (problems.isNotEmpty() || rejected.isNotEmpty()) throw rejectedReply(problems.firstOrNull() ?: AiResponseProblem.TERMS)
                 return null
             }
-            if (problems.isNotEmpty() && rejected.isNotEmpty()) {
-                val p = problems.first()
-                noticeWords(rejected, "Ответ DeepSeek для этого слова отклонён: ${p.description} [${p.name}]. Можно уточнить ещё раз.")
-            }
-            _message.value = if (out.any { it.state == "accepted" && it.pinyin != null }) "Контекстное чтение сохранено."
+            if (rejected.isNotEmpty()) noticeWords(rejected, unclearWord(problems.firstOrNull() ?: AiResponseProblem.TERMS))
+            _message.value = if (rejected.isNotEmpty()) "Для ${rejected.size} из ${locations.size} слов DeepSeek не дал " +
+                    "надёжного ответа — у них оставлен словарь. Остальное сохранено."
+                else if (out.any { it.state == "accepted" && it.pinyin != null }) "Контекстное чтение сохранено."
                 else if (out.any { it.state == "accepted" }) "Контекстные значения сохранены."
                 else if (out.any { it.state == "proposed" }) "Есть предложение ИИ — открой карточку слова."
                 else if (out.any { it.base.isEmpty() }) AI_UNKNOWN_CHECKED_MESSAGE
                 else AI_UNCHANGED_MESSAGE
-            if (problems.isNotEmpty() && rejected.isNotEmpty()) _message.value = "Часть ответа DeepSeek отклонена " +
-                "(${rejected.size} из ${locations.size} слов): ${problems.first().description} [${problems.first().name}]. Остальное сохранено."
             return out
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) {
             noticeWords(locations, (e as? AiFailure)?.userMessage
                 ?: "Не удалось проверить или сохранить значения. Исходный словарь сохранён.")
-            return null // No automatic retry, including after uncertain network failures.
+            return null // No automatic retry after network failures, including uncertain ones.
         } finally {
             _wordFeedback.update { it.copy(checking = emptyList()) }
         }
     }
 
-    private fun rejectedReply(p: AiResponseProblem) = AiFailure("Ответ DeepSeek отклонён: ${p.description} [${p.name}]. Переводы не сохранены.")
+    private fun unclearWord(p: AiResponseProblem) = "DeepSeek не дал надёжного ответа — оставлен словарь. Можно уточнить ещё раз. [${p.name}]"
+    private fun rejectedReply(p: AiResponseProblem) = AiFailure("DeepSeek не дал надёжного ответа — оставлен словарь. " +
+        "Переводы не сохранены, можно уточнить ещё раз. [${p.name}]")
 
     /** Stores [rows] unless the text changed meanwhile; earlier choices of the reader win. */
     private suspend fun save(fragment: AiFragment, rows: List<AiCheck>, stillValid: suspend () -> Boolean): List<AiCheck>? {
@@ -298,7 +326,10 @@ class AiRepository(
         val reply = request(payload, c)
         if (!reply.finished) throw AiFailure("Ответ DeepSeek обрезан. Выдели фрагмент короче.")
         val explanation = try { withContext(Dispatchers.Default) { AiExplain.parse(reply.content, payload.getString("text")) } }
-            catch (e: AiResponseFailure) { throw AiFailure("Ответ DeepSeek отклонён: ${e.problem.description} [${e.problem.name}].") }
+            catch (e: AiResponseFailure) {
+                journal.record(c.model, listOf(e.problem), payload.toString(), reply.content)
+                throw AiFailure("DeepSeek не дал понятного объяснения. Попробуй ещё раз. [${e.problem.name}]")
+            }
         withContext(Dispatchers.IO) { explanations.put(AiExplain.key(c.model, payload), AiExplain.json(explanation).toString()) }
         explanation
     }
@@ -336,7 +367,7 @@ class AiRepository(
 class ContextAi internal constructor(context: Context, val settings: AiSettings = AiSettings(context), client: AiClient = DeepSeekClient()) {
     val repository = AiRepository(LexiconDatabase.get(context), client,
         { settings.config.value }, { settings.vault.read() }, PrefsUsage(context),
-        explanations = FileExplainCache(context))
+        explanations = FileExplainCache(context), journal = FileJournal(context))
     companion object {
         @Volatile private var instance: ContextAi? = null
         fun get(context: Context): ContextAi = instance ?: synchronized(this) {
