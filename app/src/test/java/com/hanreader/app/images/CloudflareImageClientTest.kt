@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -53,13 +54,21 @@ class CloudflareImageClientTest {
             val body = JSONObject(request.substringAfter("\n\n"))
             assertEquals("a red bank building", body.getString("prompt"))
             assertEquals(CloudflareImageClient.STEPS, body.getInt("steps"))
-            assertEquals(7, body.getInt("seed"))
+            assertFalse(body.has("seed"))
         } finally { ok.close() }
         val denied = serve(401, "{}", mutableListOf())
         try {
             CloudflareImageClient("http://127.0.0.1:${denied.localPort}").generate(account, "bad-token", "x", 1)
             fail()
         } catch (e: AiFailure) { assertTrue(e.userMessage.contains("токен")) } finally { denied.close() }
+        val refused = serve(400, """{"success":false,"errors":[{"code":5006,"message":"Error: required properties at '/' are 'prompt'"}]}""", mutableListOf())
+        try {
+            CloudflareImageClient("http://127.0.0.1:${refused.localPort}").generate(account, "t-token", "x", 1)
+            fail()
+        } catch (e: ImageFailure) {
+            assertEquals(400, e.status)
+            assertTrue(e.userMessage, e.userMessage.endsWith("Ответ Cloudflare: Error: required properties at '/' are 'prompt'"))
+        } finally { refused.close() }
     }
 
     @Test fun onlyPicturesAndEnglishScenesAreAccepted() {

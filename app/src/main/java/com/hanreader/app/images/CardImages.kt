@@ -94,7 +94,13 @@ class CardPictures private constructor(context: Context, private val client: Ima
                     ai.repository.imagePrompt(CardImagePrompt.payload(card.language, card.word, card.reading, meaning, sentence))
                 } catch (e: kotlinx.coroutines.CancellationException) { throw e }
                 catch (_: Exception) { usedTemplate = true; CardImagePrompt.fallback(card.word, meaning) }
-                val bytes = client.generate(c.accountId, token, CardImagePrompt.final(scene), (1..Int.MAX_VALUE).random())
+                val bytes = try { client.generate(c.accountId, token, CardImagePrompt.final(scene), 0) }
+                    catch (e: ImageFailure) {
+                        // A refused description (a filter, an odd word): once more with the plain template.
+                        if (e.status != 400 && e.status != 422 || usedTemplate) throw e
+                        usedTemplate = true
+                        client.generate(c.accountId, token, CardImagePrompt.final(CardImagePrompt.fallback(card.word, meaning)), 0)
+                    }
                 withContext(Dispatchers.IO) { store.save(card.id, CardImageStore.shrink(bytes)) }
                 note(card.id, if (usedTemplate) "Нарисовано по шаблону: с DeepSeek описание точнее." else null)
             } catch (e: kotlinx.coroutines.CancellationException) { throw e }

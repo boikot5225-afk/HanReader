@@ -33,6 +33,9 @@ class ImageSettings(context: Context, val vault: AiKeyVault = AiKeyVault(context
     }
 }
 
+/** A refused picture request; [status] tells a rejected description (400/422) from other failures. */
+class ImageFailure(val status: Int, message: String) : AiFailure(message)
+
 fun interface ImageClient { suspend fun generate(account: String, token: String, prompt: String, seed: Int): ByteArray }
 
 /**
@@ -51,16 +54,20 @@ class CloudflareImageClient(private val base: String = "https://api.cloudflare.c
             connection.doOutput = true
             connection.setRequestProperty("Authorization", "Bearer $token")
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            val body = JSONObject().put("prompt", prompt.take(MAX_PROMPT)).put("steps", STEPS).put("seed", seed)
+            // Only the documented fields: an unknown one (seed) makes the model refuse the request with 400.
+            val body = JSONObject().put("prompt", prompt.take(MAX_PROMPT)).put("steps", STEPS)
             connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             val status = connection.responseCode
-            if (status != 200) throw AiFailure(when (status) {
-                401, 403 -> "Cloudflare не принял токен. Нужен API-токен с правом Workers AI и верный Account ID."
-                404 -> "Cloudflare не нашёл аккаунт или модель. Проверь Account ID."
-                429 -> "Лимит Cloudflare исчерпан. Бесплатные нейроны обновятся завтра."
-                400, 422 -> "Cloudflare отклонил описание картинки. Попробуй ещё раз или выбери фото."
-                else -> "Cloudflare временно недоступен (HTTP $status)."
-            })
+            if (status != 200) {
+                val reason = connection.errorStream?.use { errorMessage(String(it.readLimited(64_000), Charsets.UTF_8)) }
+                throw ImageFailure(status, when (status) {
+                    401, 403 -> "Cloudflare не принял токен. Нужен API-токен с правом Workers AI и верный Account ID."
+                    404 -> "Cloudflare не нашёл аккаунт или модель. Проверь Account ID."
+                    429 -> "Лимит Cloudflare исчерпан. Бесплатные нейроны обновятся завтра."
+                    400, 422 -> "Cloudflare отклонил запрос картинки."
+                    else -> "Cloudflare временно недоступен (HTTP $status)."
+                } + (reason?.let { " Ответ Cloudflare: $it" } ?: ""))
+            }
             val text = connection.inputStream.use { String(it.readLimited(MAX_RESPONSE), Charsets.UTF_8) }
             parse(text)
         } catch (e: AiFailure) { throw e }
@@ -75,6 +82,13 @@ class CloudflareImageClient(private val base: String = "https://api.cloudflare.c
         const val STEPS = 4
         const val MAX_PROMPT = 2048
         private const val MAX_RESPONSE = 12_000_000
+
+        /** `errors[0].message` of a Cloudflare error answer, short and on one line; never the request. */
+        fun errorMessage(text: String): String? = runCatching {
+            val root = JSONObject(text)
+            val e = root.optJSONArray("errors")?.optJSONObject(0)
+            (e?.optString("message") ?: root.optString("error")).orEmpty()
+        }.getOrNull()?.replace(Regex("\\s+"), " ")?.trim()?.take(200)?.takeIf { it.isNotEmpty() }
 
         /** The picture bytes of a Workers AI answer; anything that is not a JPEG/PNG/WebP is refused. */
         fun parse(text: String): ByteArray {

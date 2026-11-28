@@ -11,7 +11,7 @@ import kotlin.coroutines.resumeWithException
 
 data class AiReply(val content: String, val tokens: Long?, val finished: Boolean)
 fun interface AiClient { suspend fun complete(key: String, model: String, payload: JSONObject): AiReply }
-class AiFailure(val userMessage: String) : Exception(userMessage)
+open class AiFailure(val userMessage: String) : Exception(userMessage)
 
 /** No redirects, SDK logging, retries, custom endpoints or server-side key storage. */
 class DeepSeekClient : AiClient {
