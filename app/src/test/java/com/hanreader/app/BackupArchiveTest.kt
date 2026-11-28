@@ -42,4 +42,22 @@ class BackupArchiveTest {
         val b = read(BackupFormat.encode(Backup(5, emptyList(), emptyList(), emptyList())).toByteArray())
         assertEquals(5L, b.exportedAt)
     }
+
+    @Test
+    fun cardPicturesTravelWithTheirCards() {
+        val card = WordCard(id = 7, language = "zh", word = "银行", reading = "yín háng", translation = "банк", example = "", exampleTranslation = "")
+        val jpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte()) + ByteArray(20) { 1 }
+        val images = File(tmp.parentFile, "hanreader-images-test").apply { deleteRecursively(); mkdirs() }
+        File(images, "7.jpg").writeBytes(jpeg)
+        File(images, "8.jpg").writeBytes(jpeg)
+        val out = ByteArrayOutputStream()
+        BackupArchive.write(out, Backup(1, listOf(card), emptyList(), emptyList()), File(tmp.parentFile, "no-books"), images)
+        val back = read(out.toByteArray())
+        assertEquals(setOf(7L), back.cardImages.keys)
+        assertTrue(back.cardImages.getValue(7).readBytes().contentEquals(jpeg))
+        // A picture of a card the copy does not have, or with a strange name, is ignored.
+        val odd = read(zip("backup.json" to BackupFormat.encode(Backup(1, listOf(card), emptyList(), emptyList())).toByteArray(),
+            "card-images/9.jpg" to jpeg, "card-images/../x.jpg" to jpeg))
+        assertTrue(odd.cardImages.isEmpty())
+    }
 }

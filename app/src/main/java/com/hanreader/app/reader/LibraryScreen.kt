@@ -123,6 +123,7 @@ fun LibraryScreen(vm: ReaderViewModel, padding: PaddingValues, onOpen: (Long) ->
         // Translations marked «Сомневаюсь в переводе»: shown only while there are some.
         item { DoubtsPanel() }
         item { com.hanreader.app.ai.AiSettingsSection() }
+        item { com.hanreader.app.images.CardImageSettingsSection() }
         item {
             // Word levels (HSK) exist for Chinese only for now.
             KnownWordsPanel(known.size, levelMark, onChoose = { showLevel = true },

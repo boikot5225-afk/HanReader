@@ -14,6 +14,7 @@ import com.hanreader.app.KnownWord
 import com.hanreader.app.isLearned
 import com.hanreader.app.LexiconDatabase
 import com.hanreader.app.ReaderSave
+import com.hanreader.app.WordCard
 import com.hanreader.app.epub.BookFiles
 import com.hanreader.app.epub.BookFormat
 import com.hanreader.app.epub.BookSource
@@ -161,6 +162,35 @@ class ReaderViewModel @JvmOverloads constructor(app: Application,
     val studyingWords: StateFlow<Set<String>> = studyCards
         .map { list -> list.filter { !it.isLearned() }.mapTo(HashSet()) { it.word } as Set<String> }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    /** Cards of the language being read, by word (several translations of one word are several cards). */
+    val cardsByWord: StateFlow<Map<String, List<WordCard>>> = studyCards
+        .map { list -> list.groupBy { it.word } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    /** Card translations shown above words still in the hint stage (see [StudyStages]). */
+    val studyHints: StateFlow<Map<String, String>> = studyCards
+        .map { StudyStages.hints(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    /** «Помню / Забыл» from the text: a recognition review of [card]. */
+    fun gradeInText(card: WordCard, remembered: Boolean) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val fresh = cards.getById(card.id) ?: return@launch
+            if (remembered && !StudyStages.canConfirm(fresh, now)) return@launch
+            cards.update(com.hanreader.app.ReviewSchedule.rate(fresh, remembered, now, com.hanreader.app.ReviewMode.RECOGNITION))
+            db.statsDao().addReview(com.hanreader.app.lang.LanguageDays.key(ReadingStats.today()))
+        }
+    }
+
+    /** The reader looked up a word whose hint is gone: its review comes within a day. */
+    fun peekedInText(card: WordCard) {
+        viewModelScope.launch {
+            val fresh = cards.getById(card.id) ?: return@launch
+            StudyStages.peeked(fresh, System.currentTimeMillis())?.let { cards.update(it) }
+        }
+    }
 
     /** Words marked «Знаю» by hand or by HSK level. */
     val markedKnown: StateFlow<Set<String>> = knownDao.observeWords(lang)

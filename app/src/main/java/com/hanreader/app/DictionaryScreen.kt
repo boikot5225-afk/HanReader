@@ -431,6 +431,7 @@ private fun WordDetails(
             Text(card.reading, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(card.translation, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Normal)
+        com.hanreader.app.images.CardPictureEditor(card)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SpeakButton("Слово", { onSpeak(card.word) })
             OutlinedButton(

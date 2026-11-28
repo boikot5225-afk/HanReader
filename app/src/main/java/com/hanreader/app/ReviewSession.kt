@@ -392,6 +392,7 @@ private fun RecognitionCard(
             )
             if (revealed) {
                 Spacer(Modifier.height(10.dp))
+                com.hanreader.app.images.CardPicture(card.id, height = 160.dp)
                 Text(card.translation, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
                 Text(
                     exampleTranslation,
@@ -432,6 +433,7 @@ private fun WritingCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            com.hanreader.app.images.CardPicture(card.id, height = 140.dp)
             Text(card.translation, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
             Text(
                 exampleTranslation,

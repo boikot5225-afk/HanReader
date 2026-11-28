@@ -154,7 +154,7 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) {
                     val stream = app.contentResolver.openOutputStream(uri, "wt")
                         ?: error("Не удалось открыть файл для записи")
-                    stream.use { BackupArchive.write(it, backup, booksDir) }
+                    stream.use { BackupArchive.write(it, backup, booksDir, com.hanreader.app.images.CardImageStore.get(app).dir) }
                 }
                 backup.cards.size
             })
@@ -248,6 +248,8 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
                         File(getApplication<Application>().cacheDir, "restore").deleteRecursively()
                     }
                 }
+                // Pictures follow the cards: ids now name the backup's cards, so old pictures go.
+                withContext(Dispatchers.IO) { com.hanreader.app.images.CardImageStore.get(getApplication()).replaceAll(backup.cardImages) }
                 backup.wordHistory?.let { getApplication<Application>().getSharedPreferences("word-history", 0).edit().putBoolean("enabled", it.enabled).apply() }
                 backup.settings
                     .filter { s -> com.hanreader.app.lang.Languages.ALL.any { it.tag == s.language } }
@@ -274,6 +276,9 @@ class LexiconViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun delete(id: Long) {
-        viewModelScope.launch { dao.delete(id) }
+        viewModelScope.launch {
+            dao.delete(id)
+            withContext(Dispatchers.IO) { com.hanreader.app.images.CardImageStore.get(getApplication()).delete(id) }
+        }
     }
 }

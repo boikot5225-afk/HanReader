@@ -27,6 +27,8 @@ data class Backup(
     val activity: List<DailyActivity>? = null,
     /** Book files unpacked from the archive (file name -> temporary file); not part of the JSON. */
     val bookFiles: Map<String, java.io.File> = emptyMap(),
+    /** Card pictures unpacked from the archive, by card id (see [com.hanreader.app.images.CardImageStore]). */
+    val cardImages: Map<Long, java.io.File> = emptyMap(),
     /** Context checks accompany the library with its original book ids. Never contains the API key. */
     val aiChecks: List<AiCheck>? = null,
     /** Null in older copies: do not replace article history. Book rows follow library cascades. */

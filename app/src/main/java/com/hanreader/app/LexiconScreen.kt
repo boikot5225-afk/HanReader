@@ -463,6 +463,7 @@ private fun LearningSettingsDialog(
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 com.hanreader.app.ai.AiSettingsSection()
+                com.hanreader.app.images.CardImageSettingsSection()
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 BackupSection(vm)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

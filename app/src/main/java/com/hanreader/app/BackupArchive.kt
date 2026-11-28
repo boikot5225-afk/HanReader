@@ -9,14 +9,16 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /**
- * A HanReader backup file: a ZIP with backup.json (BackupFormat) and the book files under books/.
+ * A HanReader backup file: a ZIP with backup.json (BackupFormat), the book files under books/ and
+ * card pictures under card-images/<card id>.jpg.
  * Older backups are the bare JSON; [read] accepts both.
  */
 object BackupArchive {
     private const val JSON = "backup.json"
     private const val BOOKS = "books/"
+    private const val IMAGES = "card-images/"
 
-    fun write(out: OutputStream, backup: Backup, booksDir: File) {
+    fun write(out: OutputStream, backup: Backup, booksDir: File, imagesDir: File? = null) {
         ZipOutputStream(out.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry(JSON))
             zip.write(BackupFormat.encode(backup).toByteArray(Charsets.UTF_8))
@@ -25,6 +27,13 @@ object BackupArchive {
                 val f = File(booksDir, b.fileName)
                 if (!f.isFile) return@forEach
                 zip.putNextEntry(ZipEntry(BOOKS + b.fileName))
+                f.inputStream().use { it.copyTo(zip, 1 shl 16) }
+                zip.closeEntry()
+            }
+            if (imagesDir != null) backup.cards.forEach { c ->
+                val f = File(imagesDir, "${c.id}.jpg")
+                if (!f.isFile) return@forEach
+                zip.putNextEntry(ZipEntry(IMAGES + f.name))
                 f.inputStream().use { it.copyTo(zip, 1 shl 16) }
                 zip.closeEntry()
             }
@@ -47,6 +56,7 @@ object BackupArchive {
         tempDir.mkdirs()
         var json: String? = null
         val files = HashMap<String, File>()
+        val images = HashMap<Long, File>()
         ZipInputStream(stream).use { zip ->
             while (true) {
                 val e = zip.nextEntry ?: break
@@ -60,6 +70,16 @@ object BackupArchive {
                         f.outputStream().use { zip.copyTo(it, 1 shl 16) }
                         files[name] = f
                     }
+                    e.name.startsWith(IMAGES) -> {
+                        // A picture whose name is not a card id is skipped, never written outside tempDir.
+                        val id = e.name.removePrefix(IMAGES).removeSuffix(".jpg").takeIf { e.name.endsWith(".jpg") }?.toLongOrNull()
+                        if (id != null && id > 0) {
+                            val dir = File(tempDir, IMAGES).apply { mkdirs() }
+                            val f = File(dir, "$id.jpg")
+                            f.outputStream().use { zip.copyTo(it, 1 shl 16) }
+                            images[id] = f
+                        }
+                    }
                 }
             }
         }
@@ -67,6 +87,7 @@ object BackupArchive {
         backup.library?.books?.forEach { b ->
             if (b.fileName !in files) throw BackupFormatException("Файл копии повреждён: нет файла книги «${b.title}»")
         }
-        return backup.copy(bookFiles = files)
+        val ids = backup.cards.mapTo(HashSet()) { it.id }
+        return backup.copy(bookFiles = files, cardImages = images.filterKeys { it in ids })
     }
 }

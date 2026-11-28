@@ -25,9 +25,9 @@ data class AiConfig(
 )
 
 /** The ciphertext is excluded from both Android backup and our explicit book archive. */
-class AiKeyVault(context: Context, private val keySource: (() -> SecretKey)? = null) {
-    private val file = AtomicFile(File(context.noBackupFilesDir, "deepseek-key.aes"))
-    private val alias = "amauta.deepseek.v1"
+class AiKeyVault(context: Context, fileName: String = "deepseek-key.aes", private val alias: String = "amauta.deepseek.v1",
+                 private val keySource: (() -> SecretKey)? = null) {
+    private val file = AtomicFile(File(context.noBackupFilesDir, fileName))
     private fun key(): SecretKey {
         keySource?.let { return it() }
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }

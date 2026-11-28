@@ -152,6 +152,9 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
     val saved by vm.savedWords.collectAsState()
     // Underlined as "in study": once learned (30+ days) a word reads like any known word.
     val studying by vm.studyingWords.collectAsState()
+    // Translations of words whose cards are still in the hint stage (StudyStages).
+    val studyHints by vm.studyHints.collectAsState()
+    val cardsByWord by vm.cardsByWord.collectAsState()
     val engine by vm.engine.collectAsState()
     val known by vm.knownWords.collectAsState()
     val pinyinMode by vm.pinyinMode.collectAsState()
@@ -304,20 +307,31 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
         if (!wantUnknown) emptySet()
         else chapterWords.filterTo(HashSet()) { it !in knownHere && it !in saved && it !in names && (eng == null || !VocabularyStats.isName(it, eng)) }
     }
-    // Short translations above the pinyin: over unknown words or over recommended ones.
-    val baseGlossFor: Map<String, String>? = readerWork(null, appearance.gloss, unknownSet, recommendedSet, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, known) {
+    // Words of the page whose card still shows its translation (Spanish habló: the card of hablar).
+    val hintFor: Map<String, String> = readerWork(emptyMap(), chapterWords, studyHints, names, engine) {
+        val eng = engine
+        if (studyHints.isEmpty() || eng == null) emptyMap()
+        else HashMap<String, String>().apply {
+            for (w in chapterWords) {
+                if (w in names) continue
+                (studyHints[w] ?: if (eng is ZhEngine) null else studyHints[eng.lemma(w)])?.let { put(w, it) }
+            }
+        }
+    }
+    // Short translations above the pinyin: over unknown words or over recommended ones, and over words in study.
+    val baseGlossFor: Map<String, String>? = readerWork(null, appearance.gloss, unknownSet, recommendedSet, hintFor, engine, chapter, userMeanings, appearance.esVariant, book.entity.id, known) {
         val eng = engine
         // A language with an alphabet: phrases carry one hint, words their reading in context.
         val zhless = eng is com.hanreader.app.lang.AlphabeticModule
         val words = when (appearance.gloss) {
             GlossMode.OFF -> null
-            GlossMode.UNKNOWN -> unknownSet
-            GlossMode.RECOMMENDED -> recommendedSet
+            GlossMode.UNKNOWN -> unknownSet + hintFor.keys
+            GlossMode.RECOMMENDED -> recommendedSet + hintFor.keys
         }
         if (words == null || eng == null) null
         else HashMap<String, String>().apply {
-            // The reader's own meaning wins over the dictionary's.
-            for (w in words) (userMeanings[w] ?: eng.glossShort(w))?.let { put(w, it) }
+            // The reader's own meaning wins over the card's, the card's over the dictionary's.
+            for (w in words) (userMeanings[w] ?: hintFor[w] ?: eng.glossShort(w))?.let { put(w, it) }
             // A single character gets the meaning of each reading it has on these pages (慢慢地 de, 土地 dì).
             chapter?.blocks?.forEach { b ->
                 val tokens = (b as? ReaderBlock.Text)?.tokens ?: return@forEach
@@ -338,7 +352,7 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
                 }
                 tokens.forEach { t ->
                     // Spanish: a word read in context (se alza: alzar, not alza) carries that reading too.
-                    if ((t.text.length == 1 || zhless || t.contextMeaning != null) && t.text in words && t.pinyin.isNotEmpty() && t.text !in userMeanings) {
+                    if ((t.text.length == 1 || zhless || t.contextMeaning != null) && t.text in words && t.pinyin.isNotEmpty() && t.text !in userMeanings && t.text !in hintFor) {
                         val key = t.glossKey
                         if (key !in this) eng.glossShort(t)?.let { put(key, it) }
                     }
@@ -946,6 +960,9 @@ fun ReaderScreen(vm: ReaderViewModel, onClose: () -> Unit) {
             entityPanel = entityControls,
             selection = sel,
             wordFamiliarity = if (sel.first == sel.last) familiarity[block.tokens[sel.first].text] else null,
+            studyPanel = { cardWord, here, sentence ->
+                cardsByWord[cardWord]?.let { StudyWordPanel(it, here, sentence, vm::gradeInText, vm::peekedInText) }
+            },
             block = block,
             engine = eng,
             saved = saved,
@@ -1781,7 +1798,9 @@ internal fun WordSheet(
     doubtSource: String = "",
     onWikipedia: (() -> Unit)? = null,
     entityPanel: (@Composable () -> Unit)? = null,
-    wordFamiliarity: WordFamiliarity? = null
+    wordFamiliarity: WordFamiliarity? = null,
+    /** The word's cards: stage, review, «Помню / Забыл», picture. Gets the card word, the meaning chosen here ("" for none) and the sentence. */
+    studyPanel: (@Composable (String, String, String) -> Unit)? = null
 ) {
     val tokens = block.tokens
     val first = tokens[selection.first]
@@ -1933,6 +1952,8 @@ internal fun WordSheet(
                     "Без подсказки и словаря: ${wordFamiliarity.unassisted} · Обращений: ${wordFamiliarity.lookups}",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            // Only a meaning chosen for this place (own or DeepSeek's) can differ from the card's; the dictionary's cannot.
+            studyPanel?.invoke(saveWord, (userMeaning ?: aiTranslation).orEmpty(), sentence)
             DoubtRow(word, cardWord, primaryMeaning, sentence, doubtSource) { correctingHere = true; correcting = true }
             key(selection) { OwnMeaning(word, own, editing = correcting, startHere = correctingHere, onEditingChange = { open -> if (open) correctingHere = false; correcting = open }, suggestions = remember(word, russian, es) {
                 (russian + es.drop(1).flatMap { it.entry.ru.take(2) }).distinct().take(8)

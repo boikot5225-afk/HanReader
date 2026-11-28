@@ -2,6 +2,32 @@
 
 Состояние на 26 ноября 2026, исходники **0.32.0** (versionCode 85), ветка **`amauta`**.
 
+## Слова в изучении в тексте и картинки к карточкам — 0.38.0
+
+- Отзыв: слово, взятое в карточки, сразу теряло подсказку (`unknownSet` исключает `saved`), а дальше
+  текст никак не влиял на изучение; нужны картинки к карточкам (выбран Cloudflare Workers AI FLUX.1 [schnell]).
+- `reader/StudyStages.kt`: этапы карточки NEW → LEARNING (подсказка — перевод карточки над словом, пока
+  меньше 2 успешных повторов) → RECALL (только подчёркивание) → LEARNED (≥30 дн., обычный текст). Ошибка
+  в повторе (−2 этапа) возвращает подсказку. `ReaderViewModel.studyHints`/`cardsByWord`; в ReaderScreen
+  `hintFor` (испанские формы — через `lemma`) добавляется к словам подсказок; свои значения и DeepSeek
+  по-прежнему важнее.
+- Карточка слова в тексте (`StudyWordPanel`, слот `WordSheet.studyPanel`): этап, следующий повтор,
+  «Помню» (только когда повтор уже наступил) / «Забыл» (`gradeInText`), «другое значение», если
+  значение этого места (своё/DeepSeek) не совпадает с карточкой; открыл карточку слова без подсказки —
+  повтор в течение суток (`StudyStages.peeked` → `peekedInText`), прогресс не теряется.
+- Картинки (`images/`): `CardImageStore` — files/card-images/<id карточки>.jpg (≤640 px), без миграции БД;
+  `CloudflareImageClient` — POST `…/accounts/{id}/ai/run/@cf/black-forest-labs/flux-1-schnell`
+  `{prompt, steps:4, seed}` → `result.image` (base64 JPEG); `ImageSettings` — Account ID в prefs,
+  токен в отдельном `AiKeyVault("cloudflare-token.aes")` (не в бэкапе). Описание сцены пишет DeepSeek
+  (`task: image_prompt`, `IMAGE_PROMPT`, `AiRepository.imagePrompt`, считается в дневной лимит), без него —
+  шаблон. `CardPictures` рисует в фоне (закрытие листа не отменяет), есть «Из галереи».
+  Показ: словарь (`WordDetails`, редактор), повтор (узнавание — после ответа, письмо — на лицевой
+  стороне), карточка слова в тексте. Настройки: «Картинки к карточкам · Cloudflare FLUX» рядом с DeepSeek.
+- Бэкап: `BackupArchive` пишет card-images/<id>.jpg, читает только картинки карточек копии;
+  восстановление заменяет все картинки (`CardImageStore.replaceAll`); удаление карточки удаляет картинку.
+- Тесты: `StudyStagesTest`, `CloudflareImageClientTest` (ServerSocket-заглушка),
+  `BackupArchiveTest.cardPicturesTravelWithTheirCards`.
+
 ## Значения из контекста в подготовке и итоге главы — 0.37.0
 
 - Отзыв: «Подготовиться к разделу» показывал словарную статью (犯罪 «совершать преступление; преступление»)

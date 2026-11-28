@@ -342,6 +342,13 @@ class AiRepository(
         explanation
     }
 
+    /** One paid request: an English scene for a card picture (see [com.hanreader.app.images.CardImagePrompt]). */
+    suspend fun imagePrompt(payload: JSONObject): String = mutex.withLock {
+        val reply = request(payload, config())
+        com.hanreader.app.images.CardImagePrompt.parse(reply.content)
+            ?: throw AiFailure("DeepSeek не дал описания картинки.")
+    }
+
     suspend fun probe() = mutex.withLock {
         try {
             val reply = request(JSONObject().put("task", "Connection check. Return JSON {\"results\":[]}")
