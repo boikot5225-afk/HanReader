@@ -40,7 +40,7 @@ fun interface ImageClient { suspend fun generate(account: String, token: String,
 
 /**
  * FLUX.1 [schnell] on Cloudflare Workers AI: `POST …/accounts/{id}/ai/run/@cf/black-forest-labs/flux-1-schnell`
- * with `{prompt, steps, seed}`; the answer is `{"result":{"image":"<base64 JPEG>"},"success":true}`.
+ * with `{prompt, steps}`; the answer is `{"result":{"image":"<base64 JPEG>"},"success":true}`.
  */
 class CloudflareImageClient(private val base: String = "https://api.cloudflare.com/client/v4") : ImageClient {
     override suspend fun generate(account: String, token: String, prompt: String, seed: Int): ByteArray = withContext(Dispatchers.IO) {
@@ -134,8 +134,12 @@ object CardImagePrompt {
     }.getOrNull()?.takeIf { p -> p.length in 8..600 && p.none { c -> Character.UnicodeScript.of(c.code).let { s ->
         s == Character.UnicodeScript.HAN || s == Character.UnicodeScript.CYRILLIC } } }
 
-    /** Without DeepSeek: the meaning itself; FLUX reads English best, so this is a weaker fallback. */
-    fun fallback(word: String, meaning: String): String = "A picture that shows the meaning \"${meaning.take(120)}\" (the word $word)"
+    /** Without DeepSeek: FLUX reads only English, so Latin words of the meaning or the word survive, else a generic scene. */
+    fun fallback(word: String, meaning: String): String {
+        fun latin(s: String) = s.replace(Regex("[^A-Za-z0-9 ,.'-]"), " ").replace(Regex("\\s+"), " ").trim().take(120)
+        val idea = latin(meaning).takeIf { it.any(Char::isLetter) } ?: latin(word).takeIf { it.any(Char::isLetter) }
+        return if (idea != null) "A clear picture that shows the idea \"$idea\"" else "A simple everyday scene with one clear object in the center"
+    }
 
     fun final(scene: String) = "${scene.trimEnd('.', ' ')}. $STYLE".take(CloudflareImageClient.MAX_PROMPT)
 }

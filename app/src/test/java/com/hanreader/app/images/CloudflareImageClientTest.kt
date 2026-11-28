@@ -80,4 +80,10 @@ class CloudflareImageClientTest {
         assertNull(CardImagePrompt.parse("not json"))
         assertTrue(CardImagePrompt.final("A bank.").startsWith("A bank. Simple clean flat illustration"))
     }
+
+    @Test
+    fun templateIsPlainEnglish() {
+        assertEquals("A clear picture that shows the idea \"committee member\"", CardImagePrompt.fallback("委员", "committee member"))
+        assertFalse(CardImagePrompt.fallback("委员", "член комитета").any { it.code > 127 })
+    }
 }
