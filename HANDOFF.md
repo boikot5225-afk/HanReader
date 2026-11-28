@@ -27,6 +27,7 @@
   восстановление заменяет все картинки (`CardImageStore.replaceAll`); удаление карточки удаляет картинку.
 - Тесты: `StudyStagesTest`, `CloudflareImageClientTest` (ServerSocket-заглушка),
   `BackupArchiveTest.cardPicturesTravelWithTheirCards`.
+- CI 46156636794 SUCCESS.
 
 ## Значения из контекста в подготовке и итоге главы — 0.37.0
 
